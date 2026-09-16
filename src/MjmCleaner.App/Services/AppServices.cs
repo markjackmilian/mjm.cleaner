@@ -15,14 +15,7 @@ namespace MjmCleaner.App.Services;
 /// </summary>
 public sealed class AppServices
 {
-    /// <summary>
-    /// Pubblico (non solo tramite <see cref="CreateAsync"/>) perché consente di comporre
-    /// un'istanza con una singola dipendenza sostituita da un finto — ad esempio un
-    /// <see cref="IScanEngine"/> che fallisce deliberatamente — riusando per il resto le
-    /// dipendenze reali di un'istanza creata da <see cref="CreateAsync"/>. Non cambia il percorso
-    /// di produzione, che continua a passare da <see cref="CreateAsync"/>.
-    /// </summary>
-    public AppServices(
+    private AppServices(
         IScanEngine scan,
         ICleanEngine clean,
         IHistoryStore history,

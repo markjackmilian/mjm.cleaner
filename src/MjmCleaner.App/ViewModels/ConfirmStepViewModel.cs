@@ -66,6 +66,18 @@ public sealed partial class ConfirmStepViewModel : ViewModelBase
     private string _deleteProgressText = string.Empty;
 
     /// <summary>
+    /// Stessa classe di difetto già corretta al passo 2: senza un catch qui, un'eccezione del
+    /// motore di pulizia lascerebbe <see cref="IsDeleting"/> vero per sempre, il pulsante
+    /// "Elimina" disabilitato, nessun messaggio, e — dopo aver disabilitato "Ricomincia" durante
+    /// l'eliminazione — nessuna via d'uscita se non la chiusura forzata dell'app.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDeleteError))]
+    private string _deleteErrorText = string.Empty;
+
+    public bool HasDeleteError => DeleteErrorText.Length > 0;
+
+    /// <summary>
     /// Vuoto finché la sonda non ha risposto: viene popolato in modo asincrono, fuori dal thread
     /// dell'interfaccia, perché avvia un processo esterno (<c>ps</c>) che in uno scenario
     /// patologico può impiegare fino a una decina di secondi. La schermata resta utilizzabile nel
@@ -83,13 +95,23 @@ public sealed partial class ConfirmStepViewModel : ViewModelBase
         _services = services;
         _main = main;
 
-        // Un elemento, una riga: vedi il commento su PathNode per il perché.
+        // Un elemento, una riga — ma una riga per PERCORSO, non per ScanItem: due regole della
+        // stessa categoria possono coprire lo stesso file (es. una root "file grandi" che
+        // contiene ~/Downloads), producendo due ScanItem distinti con lo stesso Path. Senza
+        // deduplica qui, quel percorso comparirebbe su due righe: il totale mostrato all'utente
+        // ne conterebbe la dimensione due volte, e deselezionandone solo una il motore
+        // riceverebbe comunque quel file dall'altra — la rete di sicurezza mentirebbe
+        // sull'esclusione appena promessa da "una riga = un elemento". Si tiene un solo
+        // ScanItem per percorso (il primo incontrato): è lo stesso file sul disco, quindi la
+        // stessa dimensione reale qualunque regola l'abbia prodotto.
         Nodes = [.. results
             .Where(r => r.Items.Count > 0)
             .Select(result => new CategoryNode(
                 result.CategoryId,
                 categories.First(c => c.Id == result.CategoryId).DisplayName,
-                result.Items.Select(item => new PathNode(item))))];
+                result.Items
+                    .GroupBy(item => item.Path, StringComparer.Ordinal)
+                    .Select(group => new PathNode(group.First()))))];
 
         foreach (PathNode node in Nodes.SelectMany(n => n.Paths))
         {
@@ -174,25 +196,37 @@ public sealed partial class ConfirmStepViewModel : ViewModelBase
     private async Task DeleteAsync()
     {
         IsDeleting = true;
+        DeleteErrorText = string.Empty;
 
-        CategorySelection[] selections =
-        [
-            .. Nodes
-                .Select(node => new CategorySelection(
-                    node.CategoryId,
-                    [.. node.Paths.Where(p => p.IsSelected).Select(p => p.Item)]))
-                .Where(s => s.Items.Count > 0),
-        ];
+        try
+        {
+            CategorySelection[] selections =
+            [
+                .. Nodes
+                    .Select(node => new CategorySelection(
+                        node.CategoryId,
+                        [.. node.Paths.Where(p => p.IsSelected).Select(p => p.Item)]))
+                    .Where(s => s.Items.Count > 0),
+            ];
 
-        _deleteCts = new CancellationTokenSource();
-        Progress<CleanProgress> reporter = new(OnDeleteProgress);
+            _deleteCts = new CancellationTokenSource();
+            Progress<CleanProgress> reporter = new(OnDeleteProgress);
 
-        // CleanAsync non solleva sull'annullamento: restituisce un resoconto parziale, che va
-        // comunque al passo 4 e comunque nello storico — ciò che è già stato cancellato deve
-        // risultare, annullamento o non annullamento.
-        CleanReport report = await _services.Clean.CleanAsync(selections, reporter, _deleteCts.Token);
+            // CleanAsync non solleva sull'annullamento: restituisce un resoconto parziale, che va
+            // comunque al passo 4 e comunque nello storico — ciò che è già stato cancellato deve
+            // risultare, annullamento o non annullamento.
+            CleanReport report = await _services.Clean.CleanAsync(selections, reporter, _deleteCts.Token);
 
-        _main.GoTo(new DoneStepViewModel(_services, _main, report));
+            _main.GoTo(new DoneStepViewModel(_services, _main, report));
+        }
+        catch (Exception ex)
+        {
+            DeleteErrorText = $"Eliminazione non riuscita: {ex.Message}";
+        }
+        finally
+        {
+            IsDeleting = false;
+        }
     }
 
     private void OnDeleteProgress(CleanProgress progress)

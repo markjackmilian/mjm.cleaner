@@ -33,6 +33,12 @@
                        IsVisible="{Binding IsDeleting}"
                        Opacity="0.75" FontSize="12" HorizontalAlignment="Right" />
 
+            <TextBlock Text="{Binding DeleteErrorText}"
+                       IsVisible="{Binding HasDeleteError}"
+                       Foreground="IndianRed"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
+
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
                 <Button Content="Ricomincia" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsDeleting}" />
                 <Button Content="Interrompi"

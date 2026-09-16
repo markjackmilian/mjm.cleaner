@@ -76,16 +76,18 @@ public sealed partial class DoneStepViewModel : ViewModelBase
     /// Poiché quasi tutto ciò che l'app elimina è una directory (bin, obj, ogni figlio delle
     /// cache, i pacchetti NuGet), non riconoscerlo qui significa che l'indicazione su dove
     /// concedere il permesso non compare quasi mai. Il testo del messaggio in quel caso è
-    /// letteralmente identico a quello di UnauthorizedAccessException ("Access to the path
-    /// '...' is denied."): è l'unico segnale disponibile senza toccare la classificazione nel
-    /// nucleo, che resta fuori da questo perimetro.
+    /// letteralmente identico a quello di UnauthorizedAccessException: <c>"Access to the path
+    /// '...' is denied."</c> — con il percorso incassato nel mezzo, non alla fine. Il controllo
+    /// verifica quindi il FORMATO del messaggio (inizio e fine fissi), non una sottostringa
+    /// libera al suo interno: una sottostringa come "denied" o, peggio, un frammento italiano
+    /// come "negat" comparirebbe per caso in un normalissimo percorso utente (es. una cartella
+    /// chiamata "negative-tests"), classificando come problema di permessi un errore che non lo
+    /// è. Ancorare a inizio+fine rende irrilevante qualunque testo il percorso contenga in mezzo.
     /// </summary>
     private static bool LooksLikePermissionError(ScanError error)
         => error.Kind == ScanErrorKind.AccessDenied
-           || error.Message.Contains("denied", StringComparison.OrdinalIgnoreCase)
-           || error.Message.Contains("not permitted", StringComparison.OrdinalIgnoreCase)
-           || error.Message.Contains("negat", StringComparison.OrdinalIgnoreCase)
-           || error.Message.Contains("consentit", StringComparison.OrdinalIgnoreCase);
+           || (error.Message.StartsWith("Access to the path", StringComparison.Ordinal)
+               && error.Message.EndsWith("is denied.", StringComparison.Ordinal));
 
     private static string DescribeErrors(IReadOnlyList<ScanError> errors)
     {

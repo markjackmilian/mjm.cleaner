@@ -14,14 +14,16 @@ Metodo: una piccola console app usa e getta (`spikes/fda-probe`) che tenta `Dire
 ```bash
 export PATH="/usr/local/share/dotnet:$PATH"
 dotnet new console -n fda-probe -o spikes/fda-probe -f net10.0
-# Program.cs come da task-2-brief.md, con l'aggiunta di riportare
-# esplicitamente tipo ed eccezione quando l'enumerazione fallisce
+# Program.cs sostituito con la versione estesa riportata per intero
+# in Appendice A (sezione 4) — non quella minima del brief — perché
+# riporta tipo/messaggio dell'eccezione e distingue esplicitamente
+# "0 elementi" da "eccezione durante l'enumerazione"
 dotnet run --project spikes/fda-probe
 ```
 
-Il progetto sonda è stato creato, eseguito e poi rimosso (`rm -rf spikes/fda-probe`); non è presente nel repository. Solo questo documento è permanente, come da brief.
+Il progetto sonda è stato creato, eseguito e poi rimosso (`rm -rf spikes/fda-probe`); non è presente nel repository. Solo questo documento è permanente, come da brief. Il sorgente esatto usato è incorporato per intero in Appendice A (sezione 4), così da poter riprodurre la misurazione senza dover recuperare nulla da altrove.
 
-**Importante — processo host della sonda:** il comando è stato eseguito dalla shell (`/bin/zsh`) lanciata da Claude Code (`claude.app`), **non** da `Terminal.app` o `iTerm2`. Questo è rilevante perché su macOS l'enforcement di TCC per le cartelle "protette leggere" (Scrivania/Documenti/Download) si applica tipicamente alle app con bundle e Info.plist che richiedono l'autorizzazione, mentre gli eseguibili CLI non firmati (come `dotnet run`) spesso non attivano quel prompt. Le poche risorse elencate esplicitamente da Apple sotto **Full Disk Access** (Mail, Messages, Safari, Time Machine, `~/.Trash`, il database TCC stesso, ecc.) restano invece protette indipendentemente dal tipo di processo. Questo spiega perché, di seguito, solo `~/.Trash` risulta negato: **il risultato su `~/.Trash` è affidabile e riproducibile in qualsiasi host**; i risultati "OK" sugli altri percorsi vanno riverificati quando l'app sarà pacchettizzata come `.app` (vedi nota nella sezione 5).
+**Importante — processo host della sonda:** il comando è stato eseguito dalla shell (`/bin/zsh`) lanciata da Claude Code (`claude.app`), **non** da `Terminal.app` o `iTerm2`. Questo è rilevante perché su macOS l'enforcement TCC per le categorie "leggere" (Scrivania, Documenti, Cartella Download — categorie distinte da Full Disk Access, anche se spesso raggruppate colloquialmente sotto lo stesso ombrello) si applica tipicamente alle app con bundle e Info.plist che richiedono l'autorizzazione, mentre gli eseguibili CLI non firmati (come `dotnet run`) spesso non attivano quel prompt. Le poche risorse elencate esplicitamente da Apple sotto la categoria **Full Disk Access** vera e propria (Mail, Messages, Safari, Time Machine, `~/.Trash`, il database TCC stesso, ecc.) restano invece protette indipendentemente dal tipo di processo. Questo spiega perché, di seguito, solo `~/.Trash` risulta negato: **il risultato su `~/.Trash` è affidabile e riproducibile in qualsiasi host**; i risultati "OK" su Download e sugli altri percorsi vanno riverificati quando l'app sarà pacchettizzata come `.app` (vedi nota nella sezione 5).
 
 ## 3. Risultati — SENZA Full Disk Access concesso
 
@@ -72,18 +74,86 @@ Questa parte **non è stata eseguita**: concedere Full Disk Access richiede di a
 2. Individuare nell'elenco l'applicazione che ha effettivamente eseguito il comando `dotnet run` (verificare quale, perché non è detto sia `Terminal.app`: in questa sessione era `claude.app`/Claude Code — vedi §2). Se l'app non è nell'elenco, aggiungerla con il pulsante **+** puntando al suo `.app` in `/Applications`.
 3. Attivare l'interruttore accanto all'applicazione.
 4. **Riavviare completamente l'applicazione** (chiuderla del tutto, non solo la finestra) perché la concessione TCC ha effetto solo sui processi lanciati dopo la modifica.
-5. Riaprire un terminale nella stessa app e rieseguire, dalla radice del repository:
+5. Dalla radice del repository, ricreare la sonda **esattamente** come segue (il progetto non è nel repository per scelta — va sempre creato al bisogno e rimosso dopo l'uso):
 
    ```bash
    export PATH="/usr/local/share/dotnet:$PATH"
    dotnet new console -n fda-probe -o spikes/fda-probe -f net10.0
-   # ricreare spikes/fda-probe/Program.cs con il contenuto usato per la
-   # misurazione "senza permesso" (vedi cronologia git di questo commit
-   # per il sorgente esatto, oppure il testo del brief task-2-brief.md)
+   ```
+
+6. Sostituire integralmente il contenuto di `spikes/fda-probe/Program.cs` generato al passo precedente con il seguente (identico a quello usato per la misurazione "senza permesso" in sezione 3 — usare la stessa versione è essenziale perché le due colonne della tabella siano confrontabili):
+
+   ```csharp
+   string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+   string tmp = Path.GetTempPath();
+
+   string[] targets =
+   [
+       Path.Combine(home, "Library/Caches"),
+       "/Library/Caches",
+       Path.Combine(home, "Library/Logs"),
+       "/Library/Logs",
+       Path.Combine(home, "Library/Logs/DiagnosticReports"),
+       "/Library/Logs/DiagnosticReports",
+       Path.Combine(home, ".Trash"),
+       Path.Combine(home, "Downloads"),
+       Path.Combine(home, ".nuget/packages"),
+       Path.Combine(home, ".npm"),
+       Path.Combine(home, ".cache"),
+       tmp,
+   ];
+
+   foreach (string target in targets)
+   {
+       string status;
+       int count = 0;
+       try
+       {
+           foreach (string _ in Directory.EnumerateFileSystemEntries(target))
+           {
+               count++;
+               if (count >= 5) break;
+           }
+           // Enumeration succeeded without throwing. Distinguish explicitly
+           // between "has entries" and "succeeded but zero entries" so that a
+           // silently-empty result is never confused with a denied/failed read
+           // (relevant for ~/.Trash, see brief note #4).
+           status = count > 0 ? "OK" : "OK (enumerazione riuscita, 0 elementi)";
+       }
+       catch (UnauthorizedAccessException ex)
+       {
+           status = $"ACCESSO NEGATO ({ex.GetType().Name}: {ex.Message})";
+       }
+       catch (DirectoryNotFoundException)
+       {
+           status = "ASSENTE";
+       }
+       catch (Exception ex)
+       {
+           // Any other exception (e.g. IOException for EPERM on some macOS
+           // paths) is reported with its concrete type and message rather than
+           // being folded into a generic bucket, so we can tell a permission
+           // failure apart from any other cause.
+           status = $"ERRORE: {ex.GetType().Name}: {ex.Message}";
+       }
+
+       Console.WriteLine($"{status,-70} {target}");
+   }
+   ```
+
+7. Riaprire un terminale nella stessa app (dopo il riavvio del passo 4) ed eseguire, dalla radice del repository:
+
+   ```bash
+   export PATH="/usr/local/share/dotnet:$PATH"
    dotnet run --project spikes/fda-probe
    ```
 
-6. Riportare qui l'output ottenuto per ciascun percorso, aggiornando la colonna "con permesso" della tabella in sezione 3, poi rimuovere di nuovo `spikes/fda-probe` (`rm -rf spikes/fda-probe`) prima di eventuali nuovi commit.
+8. Riportare qui l'output ottenuto per ciascun percorso, aggiornando la colonna "con permesso" della tabella in sezione 3.
+9. Rimuovere di nuovo il progetto sonda prima di qualunque nuovo commit (deve restare fuori dal repository, come da brief):
+
+   ```bash
+   rm -rf spikes/fda-probe
+   ```
 
 **Aspettativa da verificare:** con FDA concesso, `~/.Trash` dovrebbe passare a `OK`; gli altri percorsi, già `OK` senza il permesso, dovrebbero restare `OK`. Se un qualunque percorso oggi `OK` dovesse risultare diverso con FDA concesso, è un segnale che il risultato "senza permesso" era in realtà già coperto da una grant preesistente per l'app host e va indagato.
 

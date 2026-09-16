@@ -1,7 +1,7 @@
 # Spike — accessibilità dei percorsi e Full Disk Access
 
 **Data:** 2026-09-16
-**Stato:** parziale — misurazione "senza permesso" completata; misurazione "con permesso" da eseguire manualmente (vedi sezione 4)
+**Stato:** parziale — misurazione "senza permesso" completata e **riverificata** il 2026-09-16 durante il Task 22 (istruzioni e sorgente della sonda eseguiti alla lettera: vedi §7); misurazione "con permesso" ancora da eseguire manualmente (vedi sezione 4).
 
 ## 1. Obiettivo
 
@@ -72,6 +72,8 @@ Questa parte **non è stata eseguita**: concedere Full Disk Access richiede di a
 
 1. Aprire **Impostazioni di Sistema → Privacy e sicurezza → Accesso completo al disco**.
 2. Individuare nell'elenco l'applicazione che ha effettivamente eseguito il comando `dotnet run` (verificare quale, perché non è detto sia `Terminal.app`: in questa sessione era `claude.app`/Claude Code — vedi §2). Se l'app non è nell'elenco, aggiungerla con il pulsante **+** puntando al suo `.app` in `/Applications`.
+
+   *Variante con il bundle (preferibile, dal Task 15 in poi):* per misurare il comportamento dell'applicazione reale invece che quello dell'host CLI, aggiungere con **+** il bundle `artifacts/mjm.cleaner.app` prodotto da `./build/bundle.sh`. Non si trova in `/Applications`: nel pannello di scelta file premere <kbd>⌘⇧G</kbd> e incollare il percorso completo della cartella `artifacts` del repository. Vedi §7 per che cosa aspettarsi dopo una ricompilazione.
 3. Attivare l'interruttore accanto all'applicazione.
 4. **Riavviare completamente l'applicazione** (chiuderla del tutto, non solo la finestra) perché la concessione TCC ha effetto solo sui processi lanciati dopo la modifica.
 5. Dalla radice del repository, ricreare la sonda **esattamente** come segue (il progetto non è nel repository per scelta — va sempre creato al bisogno e rimosso dopo l'uso):
@@ -184,3 +186,68 @@ Nella sonda, per `~/.Trash` l'esito riportato è esplicitamente **`ACCESSO NEGAT
 - ✅ **è** un accesso negato da TCC/Full Disk Access che impedisce del tutto l'enumerazione, coerente con `du`/`ls` che falliscono con `Operation not permitted` (`EPERM`) invece di riportare "0 byte" o una lista vuota.
 
 **Conclusione:** il comportamento di `du -sh ~/.Trash` osservato in fase di progettazione è dovuto ai permessi (Full Disk Access mancante), non a una cartella vuota o inesistente. Il `PathGuard`/scanner di `mjm.cleaner` dovrà trattare questo percorso allo stesso modo: interpretare l'eccezione di accesso negato come "serve Full Disk Access", non come "0 byte da liberare".
+
+## 7. Riverifica del 2026-09-16 (Task 22) — riproducibilità e identità del bundle
+
+### 7.1 Le istruzioni e il sorgente della sonda sono ancora eseguibili alla lettera
+
+Rieseguito l'intero §2/§4 senza modificarne una riga, con .NET SDK **10.0.401**:
+
+```bash
+export PATH="/usr/local/share/dotnet:$PATH"
+dotnet new console -n fda-probe -o spikes/fda-probe -f net10.0   # OK
+# Program.cs sostituito con il sorgente dell'Appendice (§4 passo 6), invariato
+dotnet run --project spikes/fda-probe                            # OK, 0 warning
+rm -rf spikes/fda-probe
+```
+
+Esito: il template `console -f net10.0` esiste ancora, il sorgente compila **senza
+alcun warning** anche sotto il `Directory.Build.props` del repository (che imposta
+`TreatWarningsAsErrors=true`, quindi un solo warning basterebbe a bloccare la
+compilazione), e l'output riproduce **identicamente** la tabella della sezione 3:
+unico percorso negato `~/.Trash` con `UnauthorizedAccessException`, tutti gli altri
+`OK`. La colonna "senza permesso" è quindi confermata e le istruzioni di §4 non
+richiedono correzioni.
+
+### 7.2 Identità di codice del bundle e sopravvivenza della concessione
+
+Il bundle prodotto da `./build/bundle.sh` è firmato **ad hoc** (`codesign --sign -`):
+
+```
+Identifier      = com.mjm.cleaner
+Signature       = adhoc
+TeamIdentifier  = not set
+designated      => cdhash H"80b10cd8e158682c812fd582ec41bec695406a1e"
+```
+
+Il requisito designato di una firma ad hoc è il **cdhash**, cioè l'impronta del
+contenuto sigillato: non un Team ID stabile. TCC àncora la concessione di Accesso
+completo al disco a quel requisito, quindi la concessione vale esattamente finché il
+cdhash resta lo stesso. Misurato:
+
+| Scenario | cdhash | Conseguenza sulla concessione |
+|---|---|---|
+| `bundle.sh` eseguito due volte **senza modifiche al sorgente** | `80b10cd8…` → `80b10cd8…` (**identico**) | **sopravvive**: la ricompilazione da sola non la invalida |
+| Contenuto del bundle alterato di un solo byte, poi rifirmato ad hoc | `80b10cd8…` → `f5134fa8…` (**diverso**) | **decade**: va riconcessa |
+
+La build è quindi riproducibile bit per bit a sorgente invariato. In pratica: dopo
+**qualunque** modifica al codice il cdhash cambia e l'Accesso completo al disco va
+riconcesso; una ricompilazione a vuoto non costa nulla. La nota stampata da
+`bundle.sh` ("dopo ogni ricompilazione **può** essere necessario riconcedere
+l'Accesso completo al disco") è corretta proprio per quel *può*: è necessario solo
+quando il sorgente è cambiato.
+
+### 7.3 Gatekeeper
+
+`codesign --verify --deep` dà esito positivo (firma ad hoc valida, 232 file
+sigillati), ma `spctl --assess --type execute` risponde `rejected`: è il
+comportamento atteso per un bundle non notarizzato e non firmato con un certificato
+Developer ID. Compilando in locale il bundle non riceve l'attributo di quarantena,
+quindi si avvia normalmente; se venisse copiato da un altro Mac o scaricato,
+richiederebbe il primo avvio con **clic destro → Apri**.
+
+### 7.4 Che cosa resta da misurare
+
+Solo la colonna "con permesso" della tabella in §3, che richiede l'azione manuale
+descritta in §4 — preferibilmente nella variante col bundle (§4 passo 2), così da
+misurare l'applicazione reale e non l'host CLI.

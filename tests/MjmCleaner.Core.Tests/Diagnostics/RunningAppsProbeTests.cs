@@ -95,23 +95,72 @@ public class RunningAppsProbeTests
         Assert.Equal(["Docker Desktop"], affected);
     }
 
-    // "apple" (e altre parole generiche come "com") compare in moltissime cartelle cache Apple
-    // e in moltissimi nomi di demoni di sistema, entrambi in stile reverse-DNS: senza esclusione
-    // produrrebbe segnalazioni su larga scala e prive di significato (misurato sui dati reali:
-    // 85% delle segnalazioni derivava dalla sola parola "apple" condivisa). Con l'esclusione,
-    // demoni Apple realistici non devono corrispondere a cartelle cache Apple realistiche.
-    [Fact]
-    public void GenericReverseDnsWordsDoNotCauseAppleDaemonsToMatchAppleCacheFolders()
-    {
-        IReadOnlyList<string> affected = Create("com.apple.accountsd", "com.apple.secd", "com.apple.tipsd")
-            .AffectedApps(
-            [
-                "/Users/tester/Library/Caches/com.apple.Safari",
-                "/Users/tester/Library/Caches/com.apple.Dock",
-                "/Users/tester/Library/Caches/com.apple.Mail",
-                "/Users/tester/Library/Caches/com.apple.WebKit",
-            ]);
+    // --- ExtractApplicationNames: dal percorso completo del processo al nome dell'app -------
+    //
+    // Il vecchio elenco di parole generiche ("apple", "com", ...) è stato rimosso: serviva a
+    // compensare il rumore prodotto dai demoni di sistema quando la sorgente dei nomi era
+    // Process.ProcessName. Ora i demoni non entrano più nell'elenco dei candidati: vengono
+    // scartati qui, in base al percorso, perché non hanno un bundle .app in un posto che
+    // l'utente riconosce come "le mie applicazioni" — non perché condividono una parola con
+    // il nome della cartella cache.
 
-        Assert.Empty(affected);
+    [Theory]
+    [InlineData("/Applications/Safari.app/Contents/MacOS/Safari", "Safari")]
+    [InlineData("/System/Applications/Calendar.app/Contents/MacOS/Calendar", "Calendar")]
+    public void ExtractApplicationNamesRecognizesSimpleBundlesInStandardLocations(string path, string expectedName)
+    {
+        IReadOnlyList<string> names = RunningAppsProbe.ExtractApplicationNames([path]);
+
+        Assert.Equal([expectedName], names);
+    }
+
+    [Fact]
+    public void ExtractApplicationNamesRecognizesBundlesUnderTheUserHomeDirectory()
+    {
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string path = $"{home}/Applications/HomeBrewedApp.app/Contents/MacOS/HomeBrewedApp";
+
+        IReadOnlyList<string> names = RunningAppsProbe.ExtractApplicationNames([path]);
+
+        Assert.Equal(["HomeBrewedApp"], names);
+    }
+
+    [Fact]
+    public void ExtractApplicationNamesReturnsTheOutermostBundleNameForNestedHelperProcesses()
+    {
+        IReadOnlyList<string> names = RunningAppsProbe.ExtractApplicationNames(
+        [
+            "/Applications/Claude.app/Contents/Frameworks/Claude Helper (Renderer).app/Contents/MacOS/Claude Helper (Renderer)",
+        ]);
+
+        Assert.Equal(["Claude"], names);
+    }
+
+    [Theory]
+    [InlineData("/usr/libexec/secd")] // nessun bundle .app
+    [InlineData("/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter")] // bundle, ma sotto /System/Library
+    [InlineData("")] // percorso vuoto
+    [InlineData("   ")] // percorso vuoto/malformato
+    [InlineData("not a path at all")] // malformato, nessun bundle
+    public void ExtractApplicationNamesDiscardsPathsOutsideUserFacingApplications(string path)
+    {
+        IReadOnlyList<string> names = RunningAppsProbe.ExtractApplicationNames([path]);
+
+        Assert.Empty(names);
+    }
+
+    // Il caso che chiude il finding: demoni di sistema realistici, incluso uno che possiede un
+    // bundle .app ma vive sotto /System/Library, non devono produrre alcuna segnalazione.
+    [Fact]
+    public void ExtractApplicationNamesIgnoresRealisticSystemDaemonPaths()
+    {
+        IReadOnlyList<string> names = RunningAppsProbe.ExtractApplicationNames(
+        [
+            "/usr/libexec/secd",
+            "/System/Library/Frameworks/Accounts.framework/Versions/A/Support/accountsd",
+            "/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter",
+        ]);
+
+        Assert.Empty(names);
     }
 }

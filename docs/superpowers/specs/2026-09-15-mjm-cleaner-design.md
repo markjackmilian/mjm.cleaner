@@ -174,7 +174,11 @@ La ricorsione non prosegue all'interno di una directory già individuata. Selezi
 
 Invocato immediatamente prima di ogni eliminazione, non solo in fase di definizione delle regole. Cinque controlli in ordine:
 
-1. **Canonicalizzazione** del percorso (risoluzione di `.` e `..`) prima di ogni confronto.
+1. **Rifiuto dei percorsi non canonici.** Un percorso vuoto, non assoluto, o che contenga `//`, `/./` o `/../` viene respinto senza essere valutato.
+
+   Questa regola sostituisce la canonicalizzazione testuale prevista in origine, che era una difesa che la piattaforma non può sostenere: `Path.GetFullPath` risolve `..` *testualmente*, mentre il kernel lo risolve *dopo aver seguito i collegamenti simbolici*. Misurato, con `collegamento` che punta a `~/Documents/fatture`: il percorso `~/Library/Caches/collegamento/..` viene canonicalizzato in `~/Library/Caches` — che supera ogni controllo — mentre il sistema cancellerebbe `~/Documents`. Il collegamento sparisce dalla stringa prima che la regola 5 possa vederlo. Poiché gli elementi da eliminare provengono sempre dall'enumerazione del filesystem, che non produce mai `..`, il rifiuto non toglie nulla di legittimo.
+
+   Per la stessa ragione la validazione restituisce al chiamante il **percorso canonico su cui il verdetto è stato emesso**, ed è quello che va eliminato: validare una stringa e cancellarne un'altra è il difetto che rende sfruttabile tutto il resto.
 2. **Contenimento:** l'elemento deve trovarsi sotto la root dichiarata dalla regola che lo ha prodotto.
 3. **Deny-list** (non modificabile dall'interfaccia, deliberatamente), con due semantiche distinte:
 
@@ -182,7 +186,7 @@ Invocato immediatamente prima di ogni eliminazione, non solo in fase di definizi
 
    **Ricorsivi** — negati con tutto il loro contenuto:
    - sistema: `/System`, `/usr`, `/bin`, `/sbin`, `/etc`, `/private/etc`, `/private/var/db`, `/private/var/root`, `/Applications`, `/Library` (con eccezione di `/Library/Caches` e `/Library/Logs`), `/Volumes`, `/Network`, `/opt`, `/cores`
-   - utente: `~/Documents`, `~/Desktop`, `~/Pictures`, `~/Movies`, `~/Music`, `~/Public`, `~/Sites`, `~/Applications`, `~/Library/Application Support`, `~/Library/Mobile Documents`, `~/Library/Keychains`, `~/Library/Mail`, `~/Library/Messages`, `~/Library/Safari`, `~/Library/Preferences`, `~/Library/Containers`, `~/Library/Group Containers`, `~/Library/Application Scripts`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.docker`, `~/.config`, `~/.local`, `~/.password-store`
+   - utente: `~/Documents`, `~/Desktop`, `~/Pictures`, `~/Movies`, `~/Music`, `~/Public`, `~/Sites`, `~/Applications`, `~/Library/Application Support`, `~/Library/Mobile Documents`, `~/Library/Keychains`, `~/Library/CloudStorage`, `~/Library/Developer/Xcode/UserData`, `~/Library/Mail`, `~/Library/Messages`, `~/Library/Safari`, `~/Library/Preferences`, `~/Library/Containers`, `~/Library/Group Containers`, `~/Library/Application Scripts`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.docker`, `~/.config`, `~/.local`, `~/.password-store`
 
    Due voci meritano una nota. **`/Volumes`** copre i dischi esterni e i backup di Time Machine: è il percorso il cui danno potenziale è più grande di tutti gli altri messi insieme. **`/private/etc`** è il gemello di `/etc`, che la canonicalizzazione non raggiunge perché `Path.GetFullPath` non risolve i collegamenti simbolici.
 
@@ -190,7 +194,13 @@ Invocato immediatamente prima di ogni eliminazione, non solo in fase di definizi
 
    **Il controllo è fail-closed.** Un percorso vuoto, non assoluto, o che contenga `//`, `/./` o `/../` viene negato con motivazione esplicita, senza essere confrontato con gli elenchi. Non è pedanteria: le eccezioni sono ricorsive e valutate per prime, quindi un percorso non canonico che cominci per `/Library/Caches/` verrebbe altrimenti *attivamente permesso* in cortocircuito su tutte le negazioni — `/Library/Caches/../../etc/passwd` passava.
 4. **Profondità minima:** mai la home stessa; mai un figlio diretto della home che non compaia esplicitamente in una regola. Questa regola copre **esattamente** la profondità 1: tutto ciò che sta più in basso è affare della deny-list, che va tenuta completa di conseguenza. `~/Downloads/vecchio.dmg`, a profondità 2, è legittimamente eliminabile — ed è il motivo per cui la regola non può essere estesa in profondità senza rendere inutile l'applicazione.
-5. **Symlink:** si elimina il collegamento, mai il bersaglio.
+5. **Collegamenti simbolici:** si elimina il collegamento, mai il bersaglio. Un elemento che *sia* un collegamento può essere rimosso; un elemento un cui **antenato** è un collegamento viene negato, perché il contenimento non è più garantito.
+
+   Il controllo è diviso in due, e la divisione non è un dettaglio implementativo: **la root dichiarata viene validata a parte, una volta per regola, risalendo fino alla radice del filesystem**; la validazione del singolo elemento risale solo fino alla root. Senza la prima, una root che sia essa stessa un collegamento — `ln -s /Volumes/SSD/Caches ~/Library/Caches`, cioè spostare la cache su un disco esterno — non verrebbe mai esaminata, e ogni eliminazione sotto quella cache colpirebbe `/Volumes`, che la deny-list dichiara intoccabile. La separazione serve al costo: risalire fino alla radice per ciascuno dei centinaia di migliaia di elementi di una scansione significherebbe milioni di chiamate di sistema, mentre le root sono poche e non cambiano durante la scansione.
+
+6. **Coerenza della configurazione.** `PathGuard` e deny-list devono riferirsi alla stessa home, e una root che si riduca alla radice del filesystem viene rifiutata. Entrambe le condizioni sono imposte dai costruttori, non affidate alla documentazione: con due home diverse la regola di profondità protegge la home sbagliata, e con root `/` il contenimento smette di esistere perché il confronto diventa "comincia per `/`", vero per qualunque percorso assoluto.
+
+**Nessuna delle due validazioni solleva eccezioni.** L'ultimo controllo prima di una cancellazione irreversibile restituisce un rifiuto motivato anche su input malformati: un'eccezione che sfugge verrebbe intercettata da un `catch` a monte e trasformata in un salto silenzioso.
 
 **Il confronto è case-insensitive.** APFS è case-insensitive nella configurazione predefinita: un percorso che arriva come `~/documents` deve essere bloccato dalla voce `~/Documents`, perché il filesystem lo risolverebbe comunque sulla cartella reale.
 

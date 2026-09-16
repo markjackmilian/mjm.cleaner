@@ -135,6 +135,28 @@ public class DenyListTests
         Assert.True(Create().IsDenied(path, out _));
     }
 
+    // IMPORTANT 3 della revisione del PathGuard: da macOS 12 OneDrive, Dropbox e Google Drive
+    // montano qui i documenti dell'utente, e Xcode/UserData contiene identità di firma e
+    // profili di provisioning. Proteggere iCloud (Mobile Documents) e non questi era
+    // un'asimmetria arbitraria che costa dati.
+    [Theory]
+    [InlineData("/Users/tester/Library/CloudStorage/OneDrive-Personal/report.docx")]
+    [InlineData("/Users/tester/Library/Developer/Xcode/UserData/KeyBindings/Default.idekeybindings")]
+    public void DeniesNewlyAddedHomeSubtrees(string path)
+    {
+        Assert.True(Create().IsDenied(path, out _));
+    }
+
+    // La voce aggiunta sopra è specifica a "Xcode/UserData": non deve intaccare DerivedData e
+    // Archives, due categorie dell'app che devono restare pulibili.
+    [Theory]
+    [InlineData("/Users/tester/Library/Developer/Xcode/DerivedData/App-abc123/Build")]
+    [InlineData("/Users/tester/Library/Developer/Xcode/Archives/2026-01-01/App.xcarchive")]
+    public void KeepsXcodeDerivedDataAndArchivesCleanable(string path)
+    {
+        Assert.False(Create().IsDenied(path, out _));
+    }
+
     [Fact]
     public void DeniesDockerContainerWithSpecificReasonBeforeGenericContainers()
     {

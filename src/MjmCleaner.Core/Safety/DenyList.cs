@@ -60,7 +60,15 @@ public sealed class DenyList
             $"{home}/Music",
             $"{home}/Library/Application Support",
             $"{home}/Library/Mobile Documents",
+            // Da macOS 12, OneDrive, Dropbox e Google Drive montano qui i documenti
+            // dell'utente: proteggere iCloud (Mobile Documents) e non questi sarebbe
+            // un'asimmetria arbitraria che costa dati.
+            $"{home}/Library/CloudStorage",
             $"{home}/Library/Keychains",
+            // Solo la sottocartella con le identità di firma e i profili di provisioning:
+            // "Library/Developer" resta pulibile (DerivedData, Archives sono categorie
+            // dell'app), quindi non va negato in blocco.
+            $"{home}/Library/Developer/Xcode/UserData",
             $"{home}/.ssh",
             $"{home}/.gnupg",
             // Deve restare prima della voce "Containers" in blocco qui sotto: essendo più
@@ -93,6 +101,14 @@ public sealed class DenyList
     }
 
     /// <summary>
+    /// La home configurata, normalizzata (assoluta, senza "/" finale). Espone lo stesso valore
+    /// usato internamente per le regole, così che <see cref="PathGuard"/> possa verificare, al
+    /// proprio costruttore, di riferirsi alla stessa home: due home diverse fra guard e
+    /// deny-list proteggerebbero la home sbagliata.
+    /// </summary>
+    public string HomeDirectory => _home;
+
+    /// <summary>
     /// Il percorso deve essere già canonicalizzato (vedi PathGuard). Il contratto viene fatto
     /// rispettare, non solo dichiarato: un percorso nullo, vuoto, relativo o non canonico
     /// (contiene "//", "/./", "/.." oppure termina con "/." o "/..") viene negato per sicurezza
@@ -100,7 +116,7 @@ public sealed class DenyList
     /// </summary>
     public bool IsDenied(string? canonicalPath, out string reason)
     {
-        if (!IsCanonical(canonicalPath, out string path))
+        if (!CanonicalPath.IsCanonical(canonicalPath, out string path))
         {
             reason = "percorso non canonico";
             return true;
@@ -145,29 +161,6 @@ public sealed class DenyList
 
         reason = string.Empty;
         return false;
-    }
-
-    private static bool IsCanonical(string? path, out string normalized)
-    {
-        if (string.IsNullOrWhiteSpace(path) || path[0] != '/')
-        {
-            normalized = string.Empty;
-            return false;
-        }
-
-        if (path.Contains("//", StringComparison.Ordinal)
-            || path.Contains("/./", StringComparison.Ordinal)
-            || path.Contains("/../", StringComparison.Ordinal)
-            || path.EndsWith("/.", StringComparison.Ordinal)
-            || path.EndsWith("/..", StringComparison.Ordinal))
-        {
-            normalized = string.Empty;
-            return false;
-        }
-
-        string trimmed = path.TrimEnd('/');
-        normalized = trimmed.Length == 0 ? "/" : trimmed;
-        return true;
     }
 
     private static bool IsSameOrUnder(string path, string ancestor)

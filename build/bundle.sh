@@ -13,6 +13,10 @@ RID="osx-arm64"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
+"$ROOT/build/make-icon.sh" \
+    "$ROOT/src/MjmCleaner.App/Assets/AppIcon-1024.png" \
+    "$APP/Contents/Resources/AppIcon.icns"
+
 dotnet publish "$ROOT/src/MjmCleaner.App" \
     --configuration Release \
     --runtime "$RID" \

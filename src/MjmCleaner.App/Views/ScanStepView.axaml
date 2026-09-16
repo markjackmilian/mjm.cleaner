@@ -4,37 +4,40 @@
              x:Class="MjmCleaner.App.Views.ScanStepView"
              x:DataType="vm:ScanStepViewModel">
 
-    <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
-            <TextBlock Text="1 Scegli › 2 · Analizza › 3 Conferma › 4 Fatto" Opacity="0.6" FontSize="12" />
-            <TextBlock Text="Analisi in corso…" FontSize="22" FontWeight="Bold" />
-            <ProgressBar IsIndeterminate="{Binding IsRunning}" Height="4" Margin="0,8,0,0" />
-            <TextBlock Text="{Binding CurrentPath}" Opacity="0.55" FontSize="11" TextTrimming="CharacterEllipsis" />
-            <TextBlock Text="{Binding ErrorText}"
-                       IsVisible="{Binding HasError}"
-                       Foreground="IndianRed"
-                       FontSize="12"
-                       TextWrapping="Wrap"
-                       Margin="0,4,0,0" />
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,20">
+            <TextBlock Text="1 Scegli   —   2 · Analizza   —   3 Conferma   —   4 Fatto" Classes="Eyebrow" />
+            <TextBlock Text="Analisi in corso…" Classes="PageTitle" />
         </StackPanel>
-
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,16,0,0" Spacing="12">
-            <TextBlock Text="Nessun file è stato ancora toccato."
-                       Opacity="0.65"
-                       VerticalAlignment="Center" />
-            <Button Content="Annulla" Command="{Binding CancelCommand}" IsVisible="{Binding !HasError}" />
-            <Button Content="Torna al passo 1" Command="{Binding BackToStartCommand}" IsVisible="{Binding HasError}" />
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,18,0,0" Spacing="12" HorizontalAlignment="Right">
+            <Button Classes="Secondary" Content="Annulla" Command="{Binding CancelCommand}" IsVisible="{Binding !HasError}" />
+            <Button Classes="Secondary" Content="Torna al passo 1" Command="{Binding BackToStartCommand}" IsVisible="{Binding HasError}" />
         </StackPanel>
-
-        <ItemsControl ItemsSource="{Binding Progress}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="vm:CategoryProgress">
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,5">
-                        <TextBlock Grid.Column="0" Text="{Binding DisplayName}" />
-                        <TextBlock Grid.Column="1" Text="{Binding Status}" Opacity="0.65" />
-                    </Grid>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <StackPanel Spacing="14">
+            <Border Classes="SurfaceCard" Padding="18">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Stiamo controllando le categorie selezionate." FontWeight="SemiBold" />
+                    <ProgressBar IsIndeterminate="{Binding IsRunning}" Height="6" />
+                    <TextBlock Text="{Binding CurrentPath}" Classes="Muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+            <Border Classes="SurfaceCard" Padding="8,4">
+                <StackPanel>
+                    <TextBlock Text="CATEGORIE" Classes="Eyebrow" Margin="8,8,8,4" />
+                    <ItemsControl ItemsSource="{Binding Progress}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:CategoryProgress">
+                                <Grid ColumnDefinitions="*,Auto" Margin="8,8">
+                                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Status}" Classes="Muted" FontSize="12" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="Nessun file è stato ancora toccato." Classes="Muted" FontSize="12" HorizontalAlignment="Center" />
+        </StackPanel>
     </DockPanel>
 </UserControl>

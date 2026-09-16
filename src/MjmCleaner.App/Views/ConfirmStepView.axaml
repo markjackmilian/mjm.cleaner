@@ -4,47 +4,45 @@
              x:Class="MjmCleaner.App.Views.ConfirmStepView"
              x:DataType="vm:ConfirmStepViewModel">
 
-    <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,12">
-            <TextBlock Text="1 Scegli › 2 Analizza › 3 · Conferma › 4 Fatto" Opacity="0.6" FontSize="12" />
-            <TextBlock Text="Verifica prima di eliminare" FontSize="22" FontWeight="Bold" />
-            <TextBlock Text="{Binding TotalText}" Opacity="0.75" />
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,18">
+            <TextBlock Text="1 Scegli   —   2 Analizza   —   3 · Conferma   —   4 Fatto" Classes="Eyebrow" />
+            <TextBlock Text="Verifica prima di eliminare" Classes="PageTitle" />
+            <TextBlock Text="{Binding TotalText}" Classes="PageSubtitle" />
         </StackPanel>
 
         <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
-            <Border Padding="10"
-                    CornerRadius="6"
-                    BorderThickness="1"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumBrush}">
+            <Border Padding="12" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}" BorderThickness="1" BorderBrush="#F0D69B">
                 <TextBlock TextWrapping="Wrap"
-                           FontWeight="SemiBold"
+                          FontWeight="SemiBold"
+                          Foreground="{DynamicResource WarningTextBrush}"
                            Text="Eliminazione definitiva: questi file non finiscono nel Cestino e non sono recuperabili." />
             </Border>
 
             <TextBlock Text="{Binding RunningAppsWarning}"
                        IsVisible="{Binding RunningAppsWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                       Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                       Classes="Muted" FontSize="12" TextWrapping="Wrap" />
 
             <TextBlock Text="{Binding ExclusionsText}"
                        IsVisible="{Binding ExclusionsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                       Opacity="0.7" FontSize="11" TextWrapping="Wrap" />
+                       Classes="Muted" FontSize="11" TextWrapping="Wrap" />
 
             <TextBlock Text="{Binding DeleteProgressText}"
                        IsVisible="{Binding IsDeleting}"
-                       Opacity="0.75" FontSize="12" HorizontalAlignment="Right" />
+                       Classes="Muted" FontSize="12" HorizontalAlignment="Right" />
 
             <TextBlock Text="{Binding DeleteErrorText}"
                        IsVisible="{Binding HasDeleteError}"
-                       Foreground="IndianRed"
+                       Foreground="{DynamicResource DangerBrush}"
                        FontSize="12"
                        TextWrapping="Wrap" />
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                <Button Content="Ricomincia" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsDeleting}" />
-                <Button Content="Interrompi"
+                <Button Classes="Secondary" Content="Ricomincia" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsDeleting}" />
+                <Button Classes="Secondary" Content="Interrompi"
                         Command="{Binding CancelDeleteCommand}"
                         IsVisible="{Binding IsDeleting}" />
-                <Button Content="{Binding TotalText, StringFormat='Elimina {0}'}"
+                <Button Classes="Destructive" Content="{Binding TotalText, StringFormat='Elimina {0}'}"
                         Command="{Binding DeleteCommand}"
                         Padding="18,8"
                         FontWeight="Bold" />
@@ -60,7 +58,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                     <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
                                     <TextBlock Text="{Binding SummaryText}"
-                                               Opacity="0.6"
+                                               Classes="Muted"
                                                FontSize="12"
                                                VerticalAlignment="Center" />
                                 </StackPanel>
@@ -82,11 +80,11 @@
                             <ListBox ItemsSource="{Binding Paths}" MaxHeight="360">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate DataType="vm:PathNode">
-                                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="6,3">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,5">
                                             <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" />
                                             <TextBlock Grid.Column="1"
                                                        Text="{Binding Path}"
-                                                       Margin="6,0"
+                                                       Margin="8,0"
                                                        VerticalAlignment="Center"
                                                        TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2"

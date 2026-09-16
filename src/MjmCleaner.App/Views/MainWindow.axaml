@@ -6,24 +6,33 @@
         Title="mjm.cleaner"
         Width="900" Height="640"
         MinWidth="720" MinHeight="520">
-
-    <DockPanel>
-        <Border DockPanel.Dock="Top"
-                Padding="14,10"
-                BorderThickness="0,0,0,1"
-                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+    <DockPanel Background="{DynamicResource CanvasBrush}">
+        <Border DockPanel.Dock="Top" Height="64" Padding="28,10"
+                BorderThickness="0,0,0,1" Background="{DynamicResource ToolbarBrush}"
+                BorderBrush="{DynamicResource BorderBrush}">
             <Grid ColumnDefinitions="Auto,*,Auto">
-                <TextBlock Grid.Column="0"
-                           Text="{Binding TotalFreedText}"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center" />
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                    <Button Content="Storico" Command="{Binding ShowHistoryCommand}" />
-                    <Button Content="Impostazioni" Command="{Binding ShowSettingsCommand}" />
+                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="SPAZIO LIBERATO" Classes="Eyebrow" FontSize="10" />
+                    <TextBlock Text="{Binding TotalFreedText}" FontWeight="SemiBold" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                    <Button Classes="ToolbarButton" Command="{Binding ShowHistoryCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Width="15" Height="15" Data="M3,2 L12,2 L12,13 L3,13 Z M5,5 L10,5 M5,8 L10,8 M5,11 L8,11" Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
+                            <TextBlock Text="Storico" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="ToolbarButton" Command="{Binding ShowSettingsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Width="15" Height="15" Data="M7.5,2.5 A5,5 0 1,0 7.51,2.5 M7.5,5.4 A2.1,2.1 0 1,0 7.51,5.4" Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
+                            <TextBlock Text="Impostazioni" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
-
-        <ContentControl Content="{Binding CurrentPage}" Margin="16" />
+        <ScrollViewer>
+            <ContentControl Content="{Binding CurrentPage}" MaxWidth="1120" HorizontalAlignment="Center" Margin="30,28" />
+        </ScrollViewer>
     </DockPanel>
 </Window>

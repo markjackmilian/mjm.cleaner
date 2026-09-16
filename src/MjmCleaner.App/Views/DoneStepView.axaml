@@ -4,37 +4,39 @@
              x:Class="MjmCleaner.App.Views.DoneStepView"
              x:DataType="vm:DoneStepViewModel">
 
-    <DockPanel>
+    <DockPanel LastChildFill="True">
         <TextBlock DockPanel.Dock="Top"
-                   Text="1 Scegli › 2 Analizza › 3 Conferma › 4 · Fatto"
-                   Opacity="0.6" FontSize="12" Margin="0,0,0,16" />
+                   Text="1 Scegli   —   2 Analizza   —   3 Conferma   —   4 · Fatto"
+                   Classes="Eyebrow" Margin="0,0,0,20" />
 
         <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,16,0,0">
             <TextBlock Text="{Binding ErrorsText}"
                        IsVisible="{Binding ErrorsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                       Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                       Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap" />
             <TextBlock Text="{Binding HistoryWarning}"
                        IsVisible="{Binding HistoryWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                       Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
-            <Button Content="Nuova pulizia"
+                       Classes="Muted" FontSize="12" TextWrapping="Wrap" />
+            <Button Classes="Primary" Content="Nuova pulizia"
                     Command="{Binding NewCleanupCommand}"
                     HorizontalAlignment="Right"
                     Padding="18,8" />
         </StackPanel>
 
-        <StackPanel Spacing="14">
-            <StackPanel HorizontalAlignment="Center" Spacing="2">
+        <StackPanel Spacing="18" VerticalAlignment="Center">
+            <StackPanel HorizontalAlignment="Center" Spacing="6">
+                <Border Width="48" Height="48" CornerRadius="24" Background="{DynamicResource SuccessSurfaceBrush}" HorizontalAlignment="Center">
+                    <TextBlock Text="✓" Foreground="{DynamicResource SuccessBrush}" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Pulizia completata" Classes="PageTitle" HorizontalAlignment="Center" />
                 <TextBlock Text="{Binding FreedText}" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding SummaryText}" Opacity="0.6" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding SummaryText}" Classes="PageSubtitle" HorizontalAlignment="Center" />
             </StackPanel>
 
-            <ItemsControl ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" Margin="0,3" />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <Border Classes="SurfaceCard" Padding="14" MaxWidth="600" HorizontalAlignment="Center">
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Margin="0,4" /></DataTemplate></ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
         </StackPanel>
     </DockPanel>
 </UserControl>

@@ -4,48 +4,63 @@
              x:Class="MjmCleaner.App.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
-    <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Text="Impostazioni" FontSize="22" FontWeight="Bold" Margin="0,0,0,14" />
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Spacing="5" Margin="0,0,0,18">
+            <TextBlock Text="Impostazioni" Classes="PageTitle" />
+            <TextBlock Text="Personalizza i percorsi e le soglie usate durante l'analisi." Classes="PageSubtitle" />
+        </StackPanel>
 
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
                     Spacing="10" Margin="0,14,0,0">
-            <Button Content="Annulla" Command="{Binding CancelCommand}" />
-            <Button Content="Salva" Command="{Binding SaveCommand}" Padding="18,8" FontWeight="SemiBold" />
+            <Button Classes="Secondary" Content="Annulla" Command="{Binding CancelCommand}" />
+            <Button Classes="Primary" Content="Salva" Command="{Binding SaveCommand}" />
         </StackPanel>
 
         <ScrollViewer>
             <StackPanel Spacing="14">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="Cartelle di progetto per bin e obj (una per riga)" FontWeight="SemiBold" />
-                    <TextBox Text="{Binding ProjectRoots}" AcceptsReturn="True" Height="80" />
-                </StackPanel>
-
-                <StackPanel Spacing="4">
-                    <TextBlock Text="Cartelle in cui cercare file grandi (una per riga)" FontWeight="SemiBold" />
-                    <TextBox Text="{Binding LargeFileRoots}" AcceptsReturn="True" Height="60" />
-                </StackPanel>
-
-                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="10">
-                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Soglia file grandi (MB)" />
-                        <NumericUpDown Value="{Binding LargeFileThresholdMegabytes}" Minimum="1" Maximum="100000" />
+                <Border Classes="SurfaceCard" Padding="16">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Progetti .NET" Classes="FieldLabel" />
+                        <TextBlock Text="Cartelle di progetto per bin e obj, una per riga." Classes="PageSubtitle" />
+                        <TextBox Text="{Binding ProjectRoots}" AcceptsReturn="True" Height="80" />
                     </StackPanel>
-                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
-                        <TextBlock Text="Età minima Download (giorni)" />
+                </Border>
+
+                <Border Classes="SurfaceCard" Padding="16">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="File grandi" Classes="FieldLabel" />
+                        <TextBlock Text="Cartelle in cui cercare file grandi, una per riga." Classes="PageSubtitle" />
+                        <TextBox Text="{Binding LargeFileRoots}" AcceptsReturn="True" Height="60" />
+                        <StackPanel Spacing="4" Margin="0,6,0,0">
+                            <TextBlock Text="Soglia file grandi (MB)" Classes="FieldLabel" />
+                            <NumericUpDown Value="{Binding LargeFileThresholdMegabytes}" Minimum="1" Maximum="100000" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="SurfaceCard" Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Età minima" Classes="FieldLabel" />
+                        <TextBlock Text="I file più recenti restano esclusi dall'analisi." Classes="PageSubtitle" />
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="10">
+                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Download (giorni)" Classes="FieldLabel" />
                         <NumericUpDown Value="{Binding DownloadsMinAgeDays}" Minimum="0" Maximum="3650" />
                     </StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Età minima log (giorni)" />
+                        <TextBlock Text="Log (giorni)" Classes="FieldLabel" />
                         <NumericUpDown Value="{Binding LogsMinAgeDays}" Minimum="0" Maximum="3650" />
                     </StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
-                        <TextBlock Text="Età minima pacchetti NuGet (giorni)" />
+                        <TextBlock Text="Pacchetti NuGet (giorni)" Classes="FieldLabel" />
                         <NumericUpDown Value="{Binding NuGetMinAgeDays}" Minimum="0" Maximum="3650" />
                     </StackPanel>
-                </Grid>
+                        </Grid>
 
-                <TextBlock Opacity="0.6" FontSize="11" TextWrapping="Wrap"
+                <TextBlock Classes="Muted" FontSize="11" TextWrapping="Wrap"
                            Text="L'età dei pacchetti NuGet si basa sull'ultimo accesso registrato dal filesystem: è un'euristica, non una certezza." />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
     </DockPanel>

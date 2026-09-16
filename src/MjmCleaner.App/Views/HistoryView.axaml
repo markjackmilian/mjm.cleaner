@@ -4,24 +4,39 @@
              x:Class="MjmCleaner.App.Views.HistoryView"
              x:DataType="vm:HistoryViewModel">
 
-    <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Text="Storico delle pulizie" FontSize="22" FontWeight="Bold" Margin="0,0,0,14" />
-        <Button DockPanel.Dock="Bottom" Content="Chiudi" Command="{Binding CloseCommand}"
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Spacing="5" Margin="0,0,0,18">
+            <TextBlock Text="Storico delle pulizie" Classes="PageTitle" />
+            <TextBlock Text="Le pulizie completate e lo spazio effettivamente recuperato." Classes="PageSubtitle" />
+        </StackPanel>
+        <Button DockPanel.Dock="Bottom" Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}"
                 HorizontalAlignment="Right" Margin="0,14,0,0" />
 
-        <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="vm:HistoryRow">
-                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,6">
-                            <TextBlock Grid.Column="0" Text="{Binding When}" Width="130" />
-                            <TextBlock Grid.Column="1" Text="{Binding Freed}" Width="90" FontWeight="SemiBold" />
-                            <TextBlock Grid.Column="2" Text="{Binding Categories}" Opacity="0.6" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="3" Text="{Binding Items}" Opacity="0.6" />
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <Border Classes="SurfaceCard">
+            <DockPanel>
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="130,100,*,110" Margin="14,10" ColumnSpacing="10">
+                    <TextBlock Grid.Column="0" Text="DATA" Classes="Eyebrow" />
+                    <TextBlock Grid.Column="1" Text="SPAZIO" Classes="Eyebrow" />
+                    <TextBlock Grid.Column="2" Text="CATEGORIE" Classes="Eyebrow" />
+                    <TextBlock Grid.Column="3" Text="ELEMENTI" Classes="Eyebrow" />
+                </Grid>
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:HistoryRow">
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,10">
+                                    <Grid ColumnDefinitions="130,100,*,110" ColumnSpacing="10">
+                                        <TextBlock Grid.Column="0" Text="{Binding When}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Freed}" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Categories}" Classes="Muted" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="3" Text="{Binding Items}" Classes="Muted" HorizontalAlignment="Right" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
     </DockPanel>
 </UserControl>

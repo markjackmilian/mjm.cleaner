@@ -4,52 +4,47 @@
              x:Class="MjmCleaner.App.Views.ChooseStepView"
              x:DataType="vm:ChooseStepViewModel">
 
-    <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
-            <TextBlock Text="1 · Scegli › 2 Analizza › 3 Conferma › 4 Fatto" Opacity="0.6" FontSize="12" />
-            <TextBlock Text="Cosa vuoi pulire?" FontSize="22" FontWeight="Bold" />
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,20">
+            <TextBlock Text="1 · Scegli   —   2 Analizza   —   3 Conferma   —   4 Fatto" Classes="Eyebrow" />
+            <TextBlock Text="Cosa vuoi pulire?" Classes="PageTitle" />
+            <TextBlock Text="Seleziona solo ciò che vuoi analizzare. Vedrai ogni elemento prima della rimozione." Classes="PageSubtitle" />
         </StackPanel>
 
-        <Button DockPanel.Dock="Bottom"
-                HorizontalAlignment="Right"
-                Margin="0,16,0,0"
-                Padding="18,8"
-                Content="Analizza →"
-                Command="{Binding AnalyzeCommand}" />
+        <Border DockPanel.Dock="Bottom" Classes="SurfaceCard" Padding="12" Margin="0,18,0,0">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="L'analisi non elimina alcun file." Classes="Muted" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="Primary" Content="Analizza →" Command="{Binding AnalyzeCommand}" />
+            </Grid>
+        </Border>
 
         <ScrollViewer>
             <ItemsControl ItemsSource="{Binding Choices}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:CategoryChoice">
-                        <Border Margin="{Binding Indent}"
-                                Padding="12,10"
-                                CornerRadius="6"
-                                BorderThickness="1"
-                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                        <Border Margin="{Binding Indent}" Padding="14,12" Classes="SurfaceCard">
                             <Grid ColumnDefinitions="Auto,*,Auto">
                                 <CheckBox Grid.Column="0"
                                           IsChecked="{Binding IsSelected}"
                                           VerticalAlignment="Center"
                                           Margin="0,0,10,0" />
-                                <StackPanel Grid.Column="1" Spacing="2">
+                                <StackPanel Grid.Column="1" Spacing="3">
                                     <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
                                     <TextBlock Text="{Binding Description}"
-                                               Opacity="0.65"
+                                               Classes="Muted"
                                                FontSize="12"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding RiskLabel}"
-                                           Opacity="0.6"
-                                           FontSize="11"
-                                           VerticalAlignment="Center" />
+                                <Border Grid.Column="2" Classes="StatusPill" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding RiskLabel}" Classes="Muted" FontSize="11" />
+                                </Border>
                             </Grid>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <StackPanel Spacing="8" />
+                        <StackPanel Spacing="7" />
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
             </ItemsControl>

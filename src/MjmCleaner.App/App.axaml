@@ -3,11 +3,11 @@
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
              xmlns:views="clr-namespace:MjmCleaner.App.Views"
              x:Class="MjmCleaner.App.App"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Light">
 
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://MjmCleaner.App/Styles/MacTheme.axaml" />
     </Application.Styles>
 
     <Application.DataTemplates>

@@ -10,6 +10,16 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly AppServices _services;
     private readonly MainWindowViewModel _main;
 
+    /// <summary>
+    /// Byte esatti letti al caricamento, insieme al valore in MB troncato che ne deriva.
+    /// Se al salvataggio il campo mostrato non è cambiato, si riscrivono questi byte
+    /// invariati invece di ricalcolarli da MB: altrimenti un valore che non è multiplo
+    /// esatto di un megabyte perderebbe precisione a ogni salvataggio, anche quando
+    /// l'utente modifica un campo del tutto scorrelato.
+    /// </summary>
+    private readonly long _loadedThresholdBytes;
+    private readonly int _loadedThresholdMegabytes;
+
     [ObservableProperty] private string _projectRoots;
     [ObservableProperty] private string _largeFileRoots;
     [ObservableProperty] private int _largeFileThresholdMegabytes;
@@ -25,7 +35,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
         CleanerSettings settings = services.Settings.Load();
         _projectRoots = string.Join(Environment.NewLine, settings.ProjectRoots);
         _largeFileRoots = string.Join(Environment.NewLine, settings.LargeFileRoots);
-        _largeFileThresholdMegabytes = (int)(settings.LargeFileThresholdBytes / (1024 * 1024));
+        _loadedThresholdBytes = settings.LargeFileThresholdBytes;
+        _loadedThresholdMegabytes = (int)(settings.LargeFileThresholdBytes / (1024 * 1024));
+        _largeFileThresholdMegabytes = _loadedThresholdMegabytes;
         _downloadsMinAgeDays = settings.DownloadsMinAgeDays;
         _logsMinAgeDays = settings.LogsMinAgeDays;
         _nuGetMinAgeDays = settings.NuGetMinAgeDays;
@@ -34,11 +46,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void Save()
     {
+        long thresholdBytes = LargeFileThresholdMegabytes == _loadedThresholdMegabytes
+            ? _loadedThresholdBytes
+            : Math.Max(1, LargeFileThresholdMegabytes) * 1024L * 1024L;
+
         CleanerSettings settings = _services.Settings.Load() with
         {
             ProjectRoots = SplitLines(ProjectRoots),
             LargeFileRoots = SplitLines(LargeFileRoots),
-            LargeFileThresholdBytes = Math.Max(1, LargeFileThresholdMegabytes) * 1024L * 1024L,
+            LargeFileThresholdBytes = thresholdBytes,
             DownloadsMinAgeDays = Math.Max(0, DownloadsMinAgeDays),
             LogsMinAgeDays = Math.Max(0, LogsMinAgeDays),
             NuGetMinAgeDays = Math.Max(0, NuGetMinAgeDays),

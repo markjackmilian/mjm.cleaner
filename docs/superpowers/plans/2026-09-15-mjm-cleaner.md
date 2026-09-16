@@ -1652,6 +1652,17 @@ public sealed class RuleScanner(
             return new RuleScanOutcome(items, errors, exclusions);
         }
 
+        // La root si valida una volta sola, e la validazione risale fino alla radice del
+        // filesystem: se la root stessa o un suo antenato è un collegamento simbolico,
+        // ogni elemento trovato sotto di essa punterebbe altrove. È il caso di chi sposta
+        // ~/Library/Caches su un disco esterno con un collegamento.
+        GuardVerdict rootVerdict = guard.ValidateRoot(rule.Root);
+        if (!rootVerdict.IsAllowed)
+        {
+            exclusions.Add(new GuardExclusion(rule.Root, rootVerdict.Reason));
+            return new RuleScanOutcome(items, errors, exclusions);
+        }
+
         switch (rule.Mode)
         {
             case ScanMode.ClearContents:
@@ -2651,25 +2662,30 @@ public sealed class CleanEngine(IFileSystem fileSystem, IPathGuard guard, TimePr
                     continue;
                 }
 
+                // Si elimina il percorso che il guard ha VALIDATO, non quello di partenza:
+                // validare una stringa e cancellarne un'altra è il difetto che renderebbe
+                // aggirabile ogni controllo a monte.
+                string target = verdict.CanonicalPathValidated;
+
                 try
                 {
                     if (item.IsDirectory)
                     {
-                        fileSystem.Directory.Delete(item.Path, recursive: true);
+                        fileSystem.Directory.Delete(target, recursive: true);
                     }
                     else
                     {
-                        if (!fileSystem.File.Exists(item.Path))
+                        if (!fileSystem.File.Exists(target))
                         {
-                            throw new FileNotFoundException("elemento non più presente", item.Path);
+                            throw new FileNotFoundException("elemento non più presente", target);
                         }
 
-                        fileSystem.File.Delete(item.Path);
+                        fileSystem.File.Delete(target);
                     }
 
                     categoryBytes += item.SizeBytes;
                     categoryDeleted++;
-                    deleted.Add(item.Path);
+                    deleted.Add(target);
                 }
                 catch (Exception ex) when (RuleScanner.IsExpected(ex))
                 {

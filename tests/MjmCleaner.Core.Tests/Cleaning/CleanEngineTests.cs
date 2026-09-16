@@ -44,6 +44,27 @@ public class CleanEngineTests
         public void Report(CleanProgress value) => cts.Cancel();
     }
 
+    /// <summary>
+    /// Doppio minimo di <see cref="IPathGuard"/> che ammette sempre, ma il cui <c>Validate</c>
+    /// restituisce deliberatamente un <see cref="GuardVerdict.CanonicalPathValidated"/> DIVERSO
+    /// dall'argomento ricevuto — esattamente ciò che il commento su quel campo dichiara possibile
+    /// (una root risolta, un collegamento seguito, qualunque normalizzazione futura del guard) e
+    /// che oggi coincide sempre con l'argomento solo per una coincidenza fra due stringhe, non per
+    /// garanzia. Ancora "si valida un percorso, si cancella QUEL percorso" a un'asserzione.
+    /// </summary>
+    private sealed class RedirectingPathGuard(string root, string redirectTarget) : IPathGuard
+    {
+        public GuardVerdict ValidateRoot(string declaredRoot) => GuardVerdict.Allow(root);
+
+        public GuardVerdict Validate(string candidatePath, string declaredRoot) => GuardVerdict.Allow(redirectTarget);
+
+        public bool ShouldPrune(string candidatePath, out string reason)
+        {
+            reason = string.Empty;
+            return false;
+        }
+    }
+
     [Fact]
     public async Task DeletesFilesAndCountsBytes()
     {
@@ -469,5 +490,32 @@ public class CleanEngineTests
         Assert.Equal(10, report.BytesFreed);
         Assert.True(fs.File.Exists($"{CacheRoot}/due.tmp"));
         Assert.True(fs.File.Exists($"{CacheRoot}/tre.tmp"));
+    }
+
+    // "Si valida un percorso, si cancella QUEL percorso": è la proposizione per cui esiste
+    // GuardVerdict.CanonicalPathValidated, il cui stesso commento dichiara che può differire
+    // dall'argomento passato a Validate. Oggi le due stringhe coincidono sempre (Validate
+    // normalizza solo lo slash finale, e gli elementi enumerati non ne hanno mai uno) — una
+    // coincidenza, non una garanzia: RedirectingPathGuard la rompe deliberatamente, restituendo
+    // un percorso diverso da quello ricevuto, entrambi esistenti sul filesystem simulato.
+    [Fact]
+    public async Task DeletesThePathTheGuardReturnsNotThePathItWasGiven()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/richiesto.tmp", new MockFileData(new byte[999])); // non va toccato
+        fs.AddFile($"{CacheRoot}/reale.tmp", new MockFileData(new byte[7])); // quello che il guard restituisce
+
+        RedirectingPathGuard guard = new(CacheRoot, $"{CacheRoot}/reale.tmp");
+        CleanEngine engine = new(fs, guard, new TestTimeProvider(Now));
+
+        CleanReport report = await engine.CleanAsync(
+            [Selection("caches", new ScanItem($"{CacheRoot}/richiesto.tmp", 999, false, CacheRoot))],
+            progress: null,
+            CancellationToken.None);
+
+        Assert.True(fs.File.Exists($"{CacheRoot}/richiesto.tmp"));
+        Assert.False(fs.File.Exists($"{CacheRoot}/reale.tmp"));
+        Assert.Equal(7, report.BytesFreed);
+        Assert.Equal([$"{CacheRoot}/reale.tmp"], report.DeletedPaths);
     }
 }

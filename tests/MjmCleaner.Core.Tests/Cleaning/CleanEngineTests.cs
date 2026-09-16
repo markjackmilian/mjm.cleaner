@@ -1,3 +1,4 @@
+using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using MjmCleaner.Core.Cleaning;
 using MjmCleaner.Core.Safety;
@@ -20,6 +21,18 @@ public class CleanEngineTests
     }
 
     private static CategorySelection Selection(string id, params ScanItem[] items) => new(id, items);
+
+    /// <summary>
+    /// Doppio minimo di <see cref="IProgress{T}"/>: registra ogni segnalazione sincronamente,
+    /// senza il marshaling su un <see cref="SynchronizationContext"/> di <see cref="Progress{T}"/>
+    /// (che consegnerebbe le notifiche in modo asincrono e renderebbe il test instabile).
+    /// </summary>
+    private sealed class RecordingProgress : IProgress<CleanProgress>
+    {
+        public List<CleanProgress> Reports { get; } = [];
+
+        public void Report(CleanProgress value) => Reports.Add(value);
+    }
 
     [Fact]
     public async Task DeletesFilesAndCountsBytes()
@@ -259,5 +272,93 @@ public class CleanEngineTests
         Assert.Equal(0, report.BytesFreed);
         Assert.Equal(1, report.ItemsFailed);
         Assert.Empty(report.DeletedPaths);
+    }
+
+    // IMPORTANT 2: un'eccezione fuori dal contratto di RuleScanner.IsExpected (qui
+    // InvalidOperationException, non UnauthorizedAccessException/IOException) non deve far
+    // propagare CleanAsync né perdere il resoconto. Con l'eliminazione definitiva, l'elenco di
+    // ciò che è già stato cancellato prima del crash è l'unica ricostruzione possibile di cosa
+    // è sparito: perderlo è peggio del fallimento stesso.
+    [Fact]
+    public async Task UnexpectedExceptionDuringDeletionReturnsPartialReportInsteadOfThrowing()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/uno.tmp", new MockFileData(new byte[10]));
+        fs.AddFile($"{CacheRoot}/due.tmp", new MockFileData(new byte[20]));
+        fs.AddFile($"{CacheRoot}/tre.tmp", new MockFileData(new byte[30]));
+
+        ThrowingOnDeleteFileSystem throwing = new(fs, $"{CacheRoot}/due.tmp");
+        CleanEngine engine = new(
+            throwing,
+            new PathGuard(new DenyList(Home), new FakeLinkInspector(), Home),
+            new TestTimeProvider(Now));
+
+        CleanReport report = await engine.CleanAsync(
+            [Selection(
+                "caches",
+                new ScanItem($"{CacheRoot}/uno.tmp", 10, false, CacheRoot),
+                new ScanItem($"{CacheRoot}/due.tmp", 20, false, CacheRoot),
+                new ScanItem($"{CacheRoot}/tre.tmp", 30, false, CacheRoot))],
+            progress: null,
+            CancellationToken.None);
+
+        // Il primo elemento, cancellato prima del crash, resta nel resoconto...
+        Assert.Contains($"{CacheRoot}/uno.tmp", report.DeletedPaths);
+        Assert.Equal(10, report.BytesFreed);
+        Assert.Equal(1, report.ItemsDeleted);
+        // ...l'errore imprevisto compare fra gli errori invece di propagare...
+        Assert.Equal(1, report.ItemsFailed);
+        Assert.NotEmpty(report.Errors);
+        // ...e il terzo elemento, mai raggiunto, non risulta né eliminato né tentato.
+        Assert.True(fs.File.Exists($"{CacheRoot}/due.tmp"));
+        Assert.True(fs.File.Exists($"{CacheRoot}/tre.tmp"));
+    }
+
+    // MINOR 1: due CategorySelection con lo stesso identificativo devono produrre UNA voce nel
+    // resoconto con i totali sommati, non due. Single() è l'accesso che l'interfaccia userà per
+    // cercare una categoria per identificativo, e fallisce in presenza di duplicati.
+    [Fact]
+    public async Task DuplicateCategoryIdsAreMergedIntoOneReportEntry()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/a.tmp", new MockFileData(new byte[10]));
+        fs.AddFile($"{CacheRoot}/b.tmp", new MockFileData(new byte[20]));
+
+        CleanReport report = await Create(fs).CleanAsync(
+            [
+                Selection("caches", new ScanItem($"{CacheRoot}/a.tmp", 10, false, CacheRoot)),
+                Selection("caches", new ScanItem($"{CacheRoot}/b.tmp", 20, false, CacheRoot)),
+            ],
+            progress: null,
+            CancellationToken.None);
+
+        CategoryCleanResult merged = report.Categories.Single(c => c.CategoryId == "caches");
+        Assert.Equal(30, merged.BytesFreed);
+        Assert.Equal(2, merged.ItemsDeleted);
+    }
+
+    // MINOR 2: il continue sugli elementi respinti dal guard non deve saltare la segnalazione di
+    // avanzamento. Con due elementi di cui il secondo respinto, l'ULTIMA notifica deve riportare
+    // due elementi elaborati su due, non fermarsi a uno.
+    [Fact]
+    public async Task ProgressReachesTheEndEvenWithRejectedItems()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/a.tmp", new MockFileData(new byte[10]));
+        fs.AddFile($"{Home}/Documents/riservato.pdf", new MockFileData(new byte[10]));
+
+        RecordingProgress progress = new();
+
+        await Create(fs).CleanAsync(
+            [Selection(
+                "misto",
+                new ScanItem($"{CacheRoot}/a.tmp", 10, false, CacheRoot),
+                new ScanItem($"{Home}/Documents/riservato.pdf", 10, false, Home))],
+            progress,
+            CancellationToken.None);
+
+        CleanProgress last = progress.Reports[^1];
+        Assert.Equal(2, last.ItemsDone);
+        Assert.Equal(2, last.ItemsTotal);
     }
 }

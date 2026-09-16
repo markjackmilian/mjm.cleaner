@@ -23,6 +23,19 @@ public sealed class DenyList
         }
 
         string home = homeDirectory.TrimEnd('/');
+
+        // Validato DOPO la normalizzazione, non prima: un argomento come "//" supera indisturbato
+        // il controllo sul valore grezzo qui sopra (non è né vuoto né "/"), ma TrimEnd('/') lo
+        // riduce a "" — a quel punto _home smette di essere un confine e la regola su "/Users"
+        // si autoannulla, perché IsSameOrUnder(path, "") è vero per qualunque percorso assoluto.
+        // "/Users" grezzo degenera la stessa regola allo stesso modo.
+        if (home.Length == 0 || home.Equals("/Users", Cmp))
+        {
+            throw new ArgumentException(
+                "La home directory deve restare un percorso assoluto non degenere, e diverso da \"/Users\", dopo la normalizzazione.",
+                nameof(homeDirectory));
+        }
+
         _home = home;
 
         // Uguaglianza esatta: proteggono solo se stesse, non un intero sottoalbero.

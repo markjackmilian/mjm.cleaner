@@ -164,10 +164,44 @@ public class DenyListTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
+    [InlineData("   ")]
     [InlineData("relative/path")]
     [InlineData("/")]
+    [InlineData("//")]
+    [InlineData("///")]
+    [InlineData("/Users")]
     public void ConstructorRejectsInvalidHomeDirectory(string? homeDirectory)
     {
         Assert.Throws<ArgumentException>(() => new DenyList(homeDirectory));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("relative/path")]
+    [InlineData("/")]
+    [InlineData("//")]
+    [InlineData("///")]
+    [InlineData("/Users")]
+    public void DegenerateHomeDirectoryNeverProducesADenyListThatAllowsProtectedPaths(string? homeDirectory)
+    {
+        DenyList? list = null;
+        Exception? exception = Record.Exception(() => list = new DenyList(homeDirectory));
+
+        // La proprietà di sicurezza che conta è questa, non solo "lancia un'eccezione": se una
+        // forma degenere di homeDirectory riuscisse comunque a costruire una DenyList, quella
+        // istanza non deve MAI rispondere IsDenied(".../Documents/x") == false. Oggi lo
+        // garantiamo lanciando prima che l'istanza esista; se in futuro qualcuno intercettasse
+        // l'eccezione altrove, questo test resterebbe comunque un'assicurazione contro una
+        // deny-list permissiva.
+        if (exception is null)
+        {
+            Assert.True(list!.IsDenied("/Users/tester/Documents/x", out _));
+        }
+        else
+        {
+            Assert.IsType<ArgumentException>(exception);
+        }
     }
 }

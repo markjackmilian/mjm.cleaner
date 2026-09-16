@@ -30,4 +30,30 @@ public class PathExpanderTests
     [Fact]
     public void DoesNotExpandTildeOfAnotherUser()
         => Assert.Equal("~altro/Documents", Create().Expand("~altro/Documents"));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("relative/path")]
+    [InlineData("/")]
+    [InlineData("//")]
+    [InlineData("///")]
+    public void ConstructorRejectsInvalidHomeDirectory(string? homeDirectory)
+    {
+        Assert.Throws<ArgumentException>(() => new PathExpander(homeDirectory, "/var/folders/ab/xyz/T"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("relative/path")]
+    [InlineData("/")]
+    [InlineData("//")]
+    [InlineData("///")]
+    public void ConstructorRejectsInvalidTempDirectory(string? tempDirectory)
+    {
+        Assert.Throws<ArgumentException>(() => new PathExpander("/Users/tester", tempDirectory));
+    }
 }

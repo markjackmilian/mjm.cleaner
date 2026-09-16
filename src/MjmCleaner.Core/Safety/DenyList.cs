@@ -9,17 +9,37 @@ public sealed class DenyList
     private const StringComparison Cmp = StringComparison.OrdinalIgnoreCase;
 
     private readonly string _home;
+    private readonly string[] _deniedExact;
     private readonly string[] _denied;
     private readonly string[] _exceptions;
 
-    public DenyList(string homeDirectory)
+    public DenyList(string? homeDirectory)
     {
+        if (string.IsNullOrEmpty(homeDirectory) || homeDirectory[0] != '/' || homeDirectory == "/")
+        {
+            throw new ArgumentException(
+                "La home directory deve essere un percorso assoluto diverso dalla radice.",
+                nameof(homeDirectory));
+        }
+
         string home = homeDirectory.TrimEnd('/');
         _home = home;
+
+        // Uguaglianza esatta: proteggono solo se stesse, non un intero sottoalbero.
+        // Un confronto ricorsivo su "/" o "/Users" negherebbe rispettivamente l'intero
+        // filesystem o l'intera home di ogni utente, incluse le eccezioni sotto la home
+        // dell'utente corrente — lo stesso difetto già corretto per la sola home.
+        _deniedExact =
+        [
+            "/",
+            "/Users",
+            home,
+        ];
 
         _denied =
         [
             "/System", "/usr", "/bin", "/sbin", "/etc", "/Applications", "/Library",
+            "/Volumes", "/private/etc", "/private/var/db", "/private/var/root", "/Network", "/cores", "/opt",
             $"{home}/Documents",
             $"{home}/Desktop",
             $"{home}/Pictures",
@@ -30,7 +50,26 @@ public sealed class DenyList
             $"{home}/Library/Keychains",
             $"{home}/.ssh",
             $"{home}/.gnupg",
+            // Deve restare prima della voce "Containers" in blocco qui sotto: essendo più
+            // specifica, vince nel ciclo e la motivazione restituita nomina Docker invece
+            // della cartella generica.
             $"{home}/Library/Containers/com.docker.docker",
+            $"{home}/Library/Messages",
+            $"{home}/Library/Mail",
+            $"{home}/Library/Safari",
+            $"{home}/Library/Preferences",
+            $"{home}/Library/Group Containers",
+            $"{home}/Library/Application Scripts",
+            $"{home}/Library/Containers",
+            $"{home}/.aws",
+            $"{home}/.kube",
+            $"{home}/.docker",
+            $"{home}/.config",
+            $"{home}/.password-store",
+            $"{home}/.local",
+            $"{home}/Applications",
+            $"{home}/Public",
+            $"{home}/Sites",
         ];
 
         _exceptions =
@@ -40,10 +79,19 @@ public sealed class DenyList
         ];
     }
 
-    /// <summary>Il percorso deve essere già canonicalizzato (vedi PathGuard).</summary>
-    public bool IsDenied(string canonicalPath, out string reason)
+    /// <summary>
+    /// Il percorso deve essere già canonicalizzato (vedi PathGuard). Il contratto viene fatto
+    /// rispettare, non solo dichiarato: un percorso nullo, vuoto, relativo o non canonico
+    /// (contiene "//", "/./", "/.." oppure termina con "/." o "/..") viene negato per sicurezza
+    /// (fail-closed), perché altrimenti potrebbe scavalcare le eccezioni e i controlli sottostanti.
+    /// </summary>
+    public bool IsDenied(string? canonicalPath, out string reason)
     {
-        string path = canonicalPath.TrimEnd('/');
+        if (!IsCanonical(canonicalPath, out string path))
+        {
+            reason = "percorso non canonico";
+            return true;
+        }
 
         foreach (string allowed in _exceptions)
         {
@@ -54,12 +102,22 @@ public sealed class DenyList
             }
         }
 
-        // La home directory stessa è protetta, ma solo come blocco esatto: un confronto
-        // ricorsivo (come per le altre voci) negherebbe l'intero albero sotto la home,
-        // oscurando sia le eccezioni sia qualunque percorso pulibile non elencato.
-        if (path.Equals(_home, Cmp))
+        foreach (string exact in _deniedExact)
         {
-            reason = $"percorso protetto: {_home}";
+            if (path.Equals(exact, Cmp))
+            {
+                reason = $"percorso protetto: {exact}";
+                return true;
+            }
+        }
+
+        // "/Users" è protetto in blocco tranne il sottoalbero della home configurata: le home
+        // degli altri utenti del Mac non godono delle eccezioni di questo profilo e vanno
+        // negate per intero, senza riprodurre a un livello più in alto lo stesso difetto già
+        // corretto per la home dell'utente corrente.
+        if (IsSameOrUnder(path, "/Users") && !IsSameOrUnder(path, _home))
+        {
+            reason = "percorso protetto: /Users (home di un altro utente)";
             return true;
         }
 
@@ -74,6 +132,29 @@ public sealed class DenyList
 
         reason = string.Empty;
         return false;
+    }
+
+    private static bool IsCanonical(string? path, out string normalized)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path[0] != '/')
+        {
+            normalized = string.Empty;
+            return false;
+        }
+
+        if (path.Contains("//", StringComparison.Ordinal)
+            || path.Contains("/./", StringComparison.Ordinal)
+            || path.Contains("/../", StringComparison.Ordinal)
+            || path.EndsWith("/.", StringComparison.Ordinal)
+            || path.EndsWith("/..", StringComparison.Ordinal))
+        {
+            normalized = string.Empty;
+            return false;
+        }
+
+        string trimmed = path.TrimEnd('/');
+        normalized = trimmed.Length == 0 ? "/" : trimmed;
+        return true;
     }
 
     private static bool IsSameOrUnder(string path, string ancestor)

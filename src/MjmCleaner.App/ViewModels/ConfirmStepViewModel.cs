@@ -95,23 +95,17 @@ public sealed partial class ConfirmStepViewModel : ViewModelBase
         _services = services;
         _main = main;
 
-        // Un elemento, una riga — ma una riga per PERCORSO, non per ScanItem: due regole della
-        // stessa categoria possono coprire lo stesso file (es. una root "file grandi" che
-        // contiene ~/Downloads), producendo due ScanItem distinti con lo stesso Path. Senza
-        // deduplica qui, quel percorso comparirebbe su due righe: il totale mostrato all'utente
-        // ne conterebbe la dimensione due volte, e deselezionandone solo una il motore
-        // riceverebbe comunque quel file dall'altra — la rete di sicurezza mentirebbe
-        // sull'esclusione appena promessa da "una riga = un elemento". Si tiene un solo
-        // ScanItem per percorso (il primo incontrato): è lo stesso file sul disco, quindi la
-        // stessa dimensione reale qualunque regola l'abbia prodotto.
-        Nodes = [.. results
-            .Where(r => r.Items.Count > 0)
-            .Select(result => new CategoryNode(
-                result.CategoryId,
-                categories.First(c => c.Id == result.CategoryId).DisplayName,
-                result.Items
-                    .GroupBy(item => item.Path, StringComparer.Ordinal)
-                    .Select(group => new PathNode(group.First()))))];
+        // Un elemento, una riga — ma una riga per PERCORSO, non per ScanItem, e la
+        // deduplicazione è GLOBALE a tutto il passo, non solo dentro ciascuna categoria: due
+        // regole, anche di categorie diverse, possono coprire lo stesso file (es. una root
+        // "file grandi" che contiene ~/Downloads o ~/Library/Logs). La logica vive nel Core
+        // (ConfirmationRows), pura e testabile senza dipendenze grafiche; qui ci si limita a
+        // trasformarne il risultato in nodi per l'interfaccia.
+        Nodes = [.. ConfirmationRows.Build(results)
+            .Select(category => new CategoryNode(
+                category.CategoryId,
+                categories.First(c => c.Id == category.CategoryId).DisplayName,
+                category.Items.Select(item => new PathNode(item))))];
 
         foreach (PathNode node in Nodes.SelectMany(n => n.Paths))
         {

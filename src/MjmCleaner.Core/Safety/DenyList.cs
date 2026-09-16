@@ -175,7 +175,7 @@ public sealed class DenyList
     /// <see cref="PathGuard.Validate"/> continua a usare <see cref="IsDenied"/> per intero, perché
     /// lì il percorso candidato è l'elemento da cancellare, non la root da cui si parte.
     /// </summary>
-    public bool IsDeniedRecursively(string? canonicalPath, out string reason)
+    internal bool IsDeniedRecursively(string? canonicalPath, out string reason)
     {
         if (!CanonicalPath.IsCanonical(canonicalPath, out string path))
         {

@@ -18,9 +18,14 @@ public interface IPathGuard
 {
     /// <summary>
     /// Valida la root dichiarata da una regola, risalendo i suoi antenati fino alla radice del
-    /// filesystem: nega se la root stessa, o un suo qualsiasi antenato, è un collegamento
-    /// simbolico. Va invocata una volta per regola, prima di iterare sugli elementi che quella
-    /// regola produce — non per ciascun elemento validato da <see cref="Validate"/>.
+    /// filesystem: se la root stessa, o un suo qualsiasi antenato, è un collegamento simbolico,
+    /// lo risolve alla destinazione finale invece di negarlo alla cieca (su macOS "/var", "/etc"
+    /// e "/tmp" sono essi stessi collegamenti, quindi negare sempre renderebbe "$TMPDIR"
+    /// permanentemente non pulibile), e applica la deny-list e il controllo di canonicità al
+    /// percorso risolto — che <see cref="GuardVerdict.CanonicalPathValidated"/> riporta. Nega
+    /// comunque se la destinazione di un collegamento non è determinabile. Va invocata una
+    /// volta per regola, prima di iterare sugli elementi che quella regola produce — non per
+    /// ciascun elemento validato da <see cref="Validate"/>.
     /// </summary>
     GuardVerdict ValidateRoot(string declaredRoot);
 
@@ -30,6 +35,17 @@ public interface IPathGuard
     /// stessa root: il ciclo sui collegamenti simbolici qui risale solo fino alla root, non oltre.
     /// </summary>
     GuardVerdict Validate(string candidatePath, string declaredRoot);
+
+    /// <summary>
+    /// Indica se una directory va esclusa dalla discesa ricorsiva perché la deny-list la
+    /// protegge, così che uno scanner possa potare l'intero ramo invece di enumerarlo e
+    /// produrre un'esclusione per ciascun elemento al suo interno (che, per percorsi come
+    /// "~/Documents" o "~/.ssh", ne rivelerebbe i nomi dei file nell'elenco delle esclusioni
+    /// mostrato all'utente). Applica solo la deny-list, non il contenimento né la regola di
+    /// profondità di <see cref="Validate"/>: quest'ultima poterebbe ogni cartella legittima di
+    /// primo livello sotto la home.
+    /// </summary>
+    bool ShouldPrune(string candidatePath, out string reason);
 }
 
 /// <summary>
@@ -72,6 +88,13 @@ public sealed class PathGuard : IPathGuard
         _home = home;
     }
 
+    /// <summary>
+    /// Limite di sostituzioni successive durante la risoluzione dei collegamenti di una root:
+    /// una catena più lunga è quasi certamente un ciclo nel doppio di test, non uno scenario
+    /// reale — nega invece di girare all'infinito.
+    /// </summary>
+    private const int MaxSymlinkResolutions = 32;
+
     public GuardVerdict ValidateRoot(string declaredRoot)
     {
         try
@@ -81,24 +104,97 @@ public sealed class PathGuard : IPathGuard
                 return error!;
             }
 
-            // Risale fino alla radice del filesystem (non solo fino alla home): una root può
-            // essere un collegamento anche quando la home non lo è, e viceversa.
-            for (string? ancestor = root; ancestor is not null; ancestor = Path.GetDirectoryName(ancestor))
+            // Invece di negare non appena un antenato è un collegamento, lo risolve: su macOS
+            // "/var" (quindi "$TMPDIR"), "/etc" e "/tmp" sono essi stessi collegamenti simbolici
+            // verso "/private/...", quindi negare alla cieca renderebbe $TMPDIR permanentemente
+            // non pulibile. Il percorso risolto è quello reale: gli va applicata la stessa
+            // deny-list e lo stesso controllo di canonicità già usati altrove, non un'esenzione.
+            if (!TryResolveSymlinkedAncestors(root, out string resolved, out GuardVerdict? resolutionError))
             {
-                if (_links.IsSymbolicLink(ancestor))
-                {
-                    return GuardVerdict.Deny(
-                        $"la root o un suo antenato è un collegamento simbolico: {ancestor}",
-                        root);
-                }
+                return resolutionError!;
             }
 
-            return GuardVerdict.Allow(root);
+            if (!CanonicalPath.IsCanonical(resolved, out string canonicalResolved) || canonicalResolved == "/")
+            {
+                return GuardVerdict.Deny(
+                    "root risolta non canonica o degenere: coincide con la radice del filesystem");
+            }
+
+            if (_denyList.IsDenied(canonicalResolved, out string reason))
+            {
+                return GuardVerdict.Deny(reason, canonicalResolved);
+            }
+
+            return GuardVerdict.Allow(canonicalResolved);
         }
         catch (Exception ex) when (IsPathException(ex))
         {
             return GuardVerdict.Deny($"root non valida: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Risolve iterativamente i collegamenti simbolici fra gli antenati di <paramref name="root"/>
+    /// (se stessa inclusa), sostituendo ciascuno con la sua destinazione finale, finché non ne
+    /// restano più. Se un antenato è un collegamento la cui destinazione non è determinabile,
+    /// nega per sicurezza invece di proseguire alla cieca: non è una regressione, è lo stesso
+    /// rifiuto che il codice precedente applicava a ogni antenato collegato, ora ristretto ai
+    /// soli casi realmente irrisolvibili.
+    /// </summary>
+    private bool TryResolveSymlinkedAncestors(string root, out string resolved, out GuardVerdict? error)
+    {
+        string current = root;
+
+        for (int iteration = 0; iteration < MaxSymlinkResolutions; iteration++)
+        {
+            string? substituted = null;
+
+            for (string? ancestor = current; ancestor is not null; ancestor = Path.GetDirectoryName(ancestor))
+            {
+                if (!_links.IsSymbolicLink(ancestor))
+                {
+                    continue;
+                }
+
+                string? target = _links.ResolveLinkTarget(ancestor);
+                if (target is null)
+                {
+                    resolved = string.Empty;
+                    error = GuardVerdict.Deny(
+                        $"la root o un suo antenato è un collegamento simbolico la cui destinazione non è determinabile: {ancestor}",
+                        current);
+                    return false;
+                }
+
+                string suffix = current.Length > ancestor.Length ? current[ancestor.Length..] : string.Empty;
+                substituted = target.TrimEnd('/') + suffix;
+                break;
+            }
+
+            if (substituted is null)
+            {
+                resolved = current;
+                error = null;
+                return true;
+            }
+
+            current = substituted;
+        }
+
+        resolved = string.Empty;
+        error = GuardVerdict.Deny($"troppi collegamenti simbolici annidati mentre si risolveva la root: {root}");
+        return false;
+    }
+
+    public bool ShouldPrune(string candidatePath, out string reason)
+    {
+        if (!CanonicalPath.IsCanonical(candidatePath, out string path))
+        {
+            reason = "percorso non canonico";
+            return true;
+        }
+
+        return _denyList.IsDenied(path, out reason);
     }
 
     public GuardVerdict Validate(string candidatePath, string declaredRoot)

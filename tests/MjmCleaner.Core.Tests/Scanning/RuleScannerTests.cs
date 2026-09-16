@@ -170,4 +170,120 @@ public class RuleScannerTests
         Assert.Throws<OperationCanceledException>(() =>
             Create(fs).Scan(new CleanupRule(CacheRoot, ScanMode.ClearContents, All, []), cts.Token));
     }
+
+    // IMPORTANT 2 della revisione del Task 8: ClearContents ignorava IncludeGlobs, ExcludeGlobs
+    // e MinSizeBytes, proponendo elementi che la regola dichiara di conservare.
+    [Fact]
+    public void ClearContentsHonoursExcludeGlobs()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/normale.tmp", File(10));
+        fs.AddFile($"{CacheRoot}/da_conservare.keep", File(10));
+
+        RuleScanOutcome outcome = Create(fs).Scan(
+            new CleanupRule(CacheRoot, ScanMode.ClearContents, All, ["*.keep"]),
+            CancellationToken.None);
+
+        Assert.Equal($"{CacheRoot}/normale.tmp", outcome.Items.Single().Path);
+    }
+
+    [Fact]
+    public void ClearContentsHonoursMinSize()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/grande.tmp", File(2_000_000));
+        fs.AddFile($"{CacheRoot}/piccolo.tmp", File(10));
+
+        RuleScanOutcome outcome = Create(fs).Scan(
+            new CleanupRule(CacheRoot, ScanMode.ClearContents, All, [], MinSizeBytes: 1_000_000),
+            CancellationToken.None);
+
+        Assert.Equal($"{CacheRoot}/grande.tmp", outcome.Items.Single().Path);
+    }
+
+    // IMPORTANT 3: in ClearContents il filtro di età guardava il timestamp del solo
+    // contenitore, non del contenuto. Su disco vero l'mtime di una directory non cambia quando
+    // un file al suo interno viene riscritto sul posto, quindi una directory "vecchia" può
+    // contenere un file scritto oggi: l'età va calcolata sul timestamp più recente nell'albero.
+    [Fact]
+    public void ClearContentsDirectoryAgeReflectsNewestContainedFile()
+    {
+        MockFileSystem fs = new();
+        string dir = $"{CacheRoot}/app";
+        fs.AddFile($"{dir}/nuovo.bin", File(10, Now.UtcDateTime.AddDays(-1)));
+
+        DateTime old = Now.UtcDateTime.AddDays(-200);
+        fs.Directory.SetLastWriteTimeUtc(dir, old);
+        fs.Directory.SetLastAccessTimeUtc(dir, old);
+
+        RuleScanOutcome outcome = Create(fs).Scan(
+            new CleanupRule(CacheRoot, ScanMode.ClearContents, All, [], MinAge: TimeSpan.FromDays(30)),
+            CancellationToken.None);
+
+        Assert.Empty(outcome.Items);
+    }
+
+    // IMPORTANT 4: MatchingFiles scendeva dentro i rami negati dalla deny-list, producendo
+    // un'esclusione per ciascun file privato al loro interno (i cui nomi finiscono così
+    // nell'elenco delle esclusioni mostrato all'utente) invece di potare il ramo intero.
+    // Root = "~/Library", non la home stessa: contiene sia una sottocartella protetta
+    // (Keychains) sia una non protetta (Caches), per isolare l'effetto della potatura.
+    [Fact]
+    public void MatchingFilesPrunesDeniedBranchWithoutDescendingIntoIt()
+    {
+        MockFileSystem fs = new();
+        string library = $"{Home}/Library";
+        fs.AddFile($"{library}/Keychains/login.keychain", File(10));
+        fs.AddFile($"{library}/Caches/normale.tmp", File(10));
+
+        RuleScanOutcome outcome = Create(fs).Scan(
+            new CleanupRule(library, ScanMode.MatchingFiles, All, []),
+            CancellationToken.None);
+
+        Assert.Contains(outcome.Exclusions, e => e.Path == $"{library}/Keychains");
+        Assert.DoesNotContain(outcome.Exclusions, e => e.Path == $"{library}/Keychains/login.keychain");
+        Assert.Equal($"{library}/Caches/normale.tmp", outcome.Items.Single().Path);
+    }
+
+    // Test opposto, a protezione dal rischio contrario: un ramo ordinario non va potato, e la
+    // ricorsione deve continuare a funzionare normalmente.
+    [Fact]
+    public void MatchingFilesDoesNotPruneOrdinaryBranches()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/app/sub/file.log", File(10));
+
+        RuleScanOutcome outcome = Create(fs).Scan(
+            new CleanupRule(CacheRoot, ScanMode.MatchingFiles, All, []),
+            CancellationToken.None);
+
+        Assert.Empty(outcome.Exclusions);
+        Assert.Equal($"{CacheRoot}/app/sub/file.log", outcome.Items.Single().Path);
+    }
+
+    // Minor (caso E2 della revisione): un elemento scomparso fra l'enumerazione e la lettura
+    // della dimensione veniva annotato come errore NotFound ma anche aggiunto agli elementi con
+    // dimensione zero, comparendo così sia fra gli errori sia fra ciò che si propone di
+    // eliminare. Richiede un IFileSystem che simuli davvero la corsa critica: un percorso mai
+    // aggiunto al MockFileSystem non verrebbe nemmeno enumerato, e non eserciterebbe il ramo
+    // "elencato ma poi introvabile" che questo test deve coprire.
+    [Fact]
+    public void MatchingFilesDoesNotListAFileThatVanishesBeforeSizeRead()
+    {
+        MockFileSystem mock = new();
+        string logs = $"{Home}/Library/Logs";
+        string vanished = $"{logs}/scomparso.log";
+        mock.AddFile(vanished, File(10));
+
+        VanishingFileSystem fs = new(mock, vanished);
+        FakeLinkInspector links = new();
+        RuleScanner scanner = new(fs, new PathGuard(new DenyList(Home), links, Home), links, new TestTimeProvider(Now));
+
+        RuleScanOutcome outcome = scanner.Scan(
+            new CleanupRule(logs, ScanMode.MatchingFiles, All, []),
+            CancellationToken.None);
+
+        Assert.Empty(outcome.Items);
+        Assert.Contains(outcome.Errors, e => e.Path == vanished && e.Kind == ScanErrorKind.NotFound);
+    }
 }

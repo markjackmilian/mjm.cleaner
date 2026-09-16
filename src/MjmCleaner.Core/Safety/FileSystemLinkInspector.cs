@@ -25,4 +25,30 @@ public sealed class FileSystemLinkInspector(IFileSystem fileSystem) : ILinkInspe
             return false;
         }
     }
+
+    public string? ResolveLinkTarget(string path)
+    {
+        try
+        {
+            if (fileSystem.Directory.Exists(path))
+            {
+                return fileSystem.DirectoryInfo.New(path).ResolveLinkTarget(returnFinalTarget: true)?.FullName;
+            }
+
+            if (fileSystem.File.Exists(path))
+            {
+                return fileSystem.FileInfo.New(path).ResolveLinkTarget(returnFinalTarget: true)?.FullName;
+            }
+
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 }

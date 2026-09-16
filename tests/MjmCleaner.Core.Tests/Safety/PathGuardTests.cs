@@ -263,4 +263,72 @@ public class PathGuardTests
         Assert.Throws<ArgumentException>(
             () => new PathGuard(new DenyList("/Users/altro"), new FakeLinkInspector(), Home));
     }
+
+    // IMPORTANT 1 della revisione del Task 8: su macOS "/var" (quindi "$TMPDIR"), "/etc" e
+    // "/tmp" sono essi stessi collegamenti simbolici verso "/private/...". Negare ogni root il
+    // cui antenato sia un collegamento (comportamento precedente) rendeva $TMPDIR
+    // permanentemente non pulibile su ogni Mac, pur non essendoci alcun dato a rischio. La
+    // correzione risolve la root invece di negarla alla cieca, e applica al percorso risolto la
+    // stessa deny-list e lo stesso controllo di canonicità già in uso altrove.
+    [Fact]
+    public void ValidateRootResolvesSymlinkedAncestorAndStillDeniesProtectedTarget()
+    {
+        PathGuard guard = new(
+            new DenyList(Home),
+            new FakeLinkInspector(new Dictionary<string, string?> { ["/etc"] = "/private/etc" }),
+            Home);
+
+        GuardVerdict verdict = guard.ValidateRoot("/etc/qualcosa");
+
+        Assert.False(verdict.IsAllowed);
+        Assert.Contains("/private/etc", verdict.Reason);
+        Assert.Equal("/private/etc/qualcosa", verdict.CanonicalPathValidated);
+    }
+
+    [Fact]
+    public void ValidateRootResolvesSymlinkedAncestorAndAllowsUnprotectedTarget()
+    {
+        PathGuard guard = new(
+            new DenyList(Home),
+            new FakeLinkInspector(new Dictionary<string, string?> { ["/var"] = "/private/var" }),
+            Home);
+
+        GuardVerdict verdict = guard.ValidateRoot("/var/folders/xyz/T");
+
+        Assert.True(verdict.IsAllowed);
+        Assert.Equal("/private/var/folders/xyz/T", verdict.CanonicalPathValidated);
+    }
+
+    // Il test più importante dei tre: è lo scenario che ha fatto nascere ValidateRoot
+    // (CRITICAL 1) e deve continuare a essere negato dopo la correzione.
+    [Fact]
+    public void ValidateRootStillDeniesCacheRootRelocatedToExternalVolume()
+    {
+        PathGuard guard = new(
+            new DenyList(Home),
+            new FakeLinkInspector(new Dictionary<string, string?> { [CacheRoot] = "/Volumes/SSD/Caches" }),
+            Home);
+
+        GuardVerdict verdict = guard.ValidateRoot(CacheRoot);
+
+        Assert.False(verdict.IsAllowed);
+        Assert.Contains("/Volumes", verdict.Reason);
+        Assert.Equal("/Volumes/SSD/Caches", verdict.CanonicalPathValidated);
+    }
+
+    // IMPORTANT 4: la discesa ricorsiva di uno scanner deve poter chiedere se un ramo è protetto
+    // dalla deny-list senza applicare anche la regola di profondità di Validate, che poterebbe
+    // ogni cartella legittima di primo livello sotto la home.
+    [Fact]
+    public void ShouldPruneReportsDeniedBranch()
+    {
+        Assert.True(Create().ShouldPrune($"{Home}/Documents", out string reason));
+        Assert.Contains("Documents", reason);
+    }
+
+    [Fact]
+    public void ShouldPruneAllowsOrdinaryBranch()
+    {
+        Assert.False(Create().ShouldPrune(CacheRoot, out _));
+    }
 }

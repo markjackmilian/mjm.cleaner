@@ -176,9 +176,20 @@ Invocato immediatamente prima di ogni eliminazione, non solo in fase di definizi
 
 1. **Canonicalizzazione** del percorso (risoluzione di `.` e `..`) prima di ogni confronto.
 2. **Contenimento:** l'elemento deve trovarsi sotto la root dichiarata dalla regola che lo ha prodotto.
-3. **Deny-list** (non modificabile dall'interfaccia, deliberatamente):
-   `/`, `/System`, `/usr`, `/bin`, `/sbin`, `/etc`, `/Applications`, `/Library` (con eccezione di `/Library/Caches` e `/Library/Logs`), `~`, `~/Documents`, `~/Desktop`, `~/Pictures`, `~/Movies`, `~/Music`, `~/Library/Application Support`, `~/Library/Mobile Documents`, `~/Library/Keychains`, `~/.ssh`, `~/.gnupg`, `~/Library/Containers/com.docker.docker`.
-4. **Profondità minima:** mai la home stessa; mai un figlio diretto della home che non compaia esplicitamente in una regola.
+3. **Deny-list** (non modificabile dall'interfaccia, deliberatamente), con due semantiche distinte:
+
+   **Uguaglianza esatta** — negati come blocco singolo, perché negarli in modo ricorsivo renderebbe non pulibile tutto ciò che sta sotto: `/`, `/Users`, `~`.
+
+   **Ricorsivi** — negati con tutto il loro contenuto:
+   - sistema: `/System`, `/usr`, `/bin`, `/sbin`, `/etc`, `/private/etc`, `/private/var/db`, `/private/var/root`, `/Applications`, `/Library` (con eccezione di `/Library/Caches` e `/Library/Logs`), `/Volumes`, `/Network`, `/opt`, `/cores`
+   - utente: `~/Documents`, `~/Desktop`, `~/Pictures`, `~/Movies`, `~/Music`, `~/Public`, `~/Sites`, `~/Applications`, `~/Library/Application Support`, `~/Library/Mobile Documents`, `~/Library/Keychains`, `~/Library/Mail`, `~/Library/Messages`, `~/Library/Safari`, `~/Library/Preferences`, `~/Library/Containers`, `~/Library/Group Containers`, `~/Library/Application Scripts`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, `~/.docker`, `~/.config`, `~/.local`, `~/.password-store`
+
+   Due voci meritano una nota. **`/Volumes`** copre i dischi esterni e i backup di Time Machine: è il percorso il cui danno potenziale è più grande di tutti gli altri messi insieme. **`/private/etc`** è il gemello di `/etc`, che la canonicalizzazione non raggiunge perché `Path.GetFullPath` non risolve i collegamenti simbolici.
+
+   `/private/var/db` e `/private/var/root` sono negati, ma **`/private/var/folders` no**: è `$TMPDIR`, ed è legittimamente pulibile. Per la stessa ragione restano fuori dalla deny-list `~/Library/Caches`, `/Library/Caches`, `~/Library/Logs`, `/Library/Logs`, `~/Library/Developer`, `~/.Trash`, `~/Downloads`, `~/.nuget`, `~/.npm`, `~/.cache` e `/tmp`: sono le categorie stesse dell'applicazione.
+
+   **Il controllo è fail-closed.** Un percorso vuoto, non assoluto, o che contenga `//`, `/./` o `/../` viene negato con motivazione esplicita, senza essere confrontato con gli elenchi. Non è pedanteria: le eccezioni sono ricorsive e valutate per prime, quindi un percorso non canonico che cominci per `/Library/Caches/` verrebbe altrimenti *attivamente permesso* in cortocircuito su tutte le negazioni — `/Library/Caches/../../etc/passwd` passava.
+4. **Profondità minima:** mai la home stessa; mai un figlio diretto della home che non compaia esplicitamente in una regola. Questa regola copre **esattamente** la profondità 1: tutto ciò che sta più in basso è affare della deny-list, che va tenuta completa di conseguenza. `~/Downloads/vecchio.dmg`, a profondità 2, è legittimamente eliminabile — ed è il motivo per cui la regola non può essere estesa in profondità senza rendere inutile l'applicazione.
 5. **Symlink:** si elimina il collegamento, mai il bersaglio.
 
 **Il confronto è case-insensitive.** APFS è case-insensitive nella configurazione predefinita: un percorso che arriva come `~/documents` deve essere bloccato dalla voce `~/Documents`, perché il filesystem lo risolverebbe comunque sulla cartella reale.

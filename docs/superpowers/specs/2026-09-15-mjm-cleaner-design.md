@@ -196,7 +196,17 @@ Invocato immediatamente prima di ogni eliminazione, non solo in fase di definizi
 4. **Profondità minima:** mai la home stessa; mai un figlio diretto della home che non compaia esplicitamente in una regola. Questa regola copre **esattamente** la profondità 1: tutto ciò che sta più in basso è affare della deny-list, che va tenuta completa di conseguenza. `~/Downloads/vecchio.dmg`, a profondità 2, è legittimamente eliminabile — ed è il motivo per cui la regola non può essere estesa in profondità senza rendere inutile l'applicazione.
 5. **Collegamenti simbolici:** si elimina il collegamento, mai il bersaglio. Un elemento che *sia* un collegamento può essere rimosso; un elemento un cui **antenato** è un collegamento viene negato, perché il contenimento non è più garantito.
 
-   Il controllo è diviso in due, e la divisione non è un dettaglio implementativo: **la root dichiarata viene validata a parte, una volta per regola, risalendo fino alla radice del filesystem**; la validazione del singolo elemento risale solo fino alla root. Senza la prima, una root che sia essa stessa un collegamento — `ln -s /Volumes/SSD/Caches ~/Library/Caches`, cioè spostare la cache su un disco esterno — non verrebbe mai esaminata, e ogni eliminazione sotto quella cache colpirebbe `/Volumes`, che la deny-list dichiara intoccabile. La separazione serve al costo: risalire fino alla radice per ciascuno dei centinaia di migliaia di elementi di una scansione significherebbe milioni di chiamate di sistema, mentre le root sono poche e non cambiano durante la scansione.
+   Il controllo è diviso in due, e la divisione non è un dettaglio implementativo: **la root dichiarata viene validata a parte, una volta per regola**, e la validazione del singolo elemento risale solo fino alla root. Senza la prima, una root che sia essa stessa un collegamento — `ln -s /Volumes/SSD/Caches ~/Library/Caches`, cioè spostare la cache su un disco esterno — non verrebbe mai esaminata, e ogni eliminazione sotto quella cache colpirebbe `/Volumes`, che la deny-list dichiara intoccabile. La separazione serve al costo: validare la root per ciascuno dei centinaia di migliaia di elementi di una scansione significherebbe un milione di ispezioni invece di cinque, e le root sono poche e non cambiano durante la scansione.
+
+   **La validazione della root risolve i collegamenti e giudica la destinazione, non la forma del percorso.** Negare ogni root che abbia un antenato collegato sarebbe la regola più semplice, ma è inapplicabile alla topologia di macOS, dove `/var`, `/tmp` ed `/etc` sono tutti e tre collegamenti verso `/private`: con quella regola `$TMPDIR` — una delle categorie selezionate per default — risulterebbe permanentemente non pulibile, con un'esclusione incomprensibile per l'utente. Risolvere e valutare la destinazione è insieme più permissivo e più severo, e in entrambi i casi nella direzione giusta:
+
+   | Root | Risolve in | Esito |
+   |---|---|---|
+   | `$TMPDIR` = `/var/folders/…/T` | `/private/var/folders/…/T` | ammessa |
+   | `/etc/qualcosa` | `/private/etc/qualcosa` | negata (deny-list) |
+   | `~/Library/Caches` → disco esterno | `/Volumes/SSD/Caches` | negata (deny-list) |
+
+   L'ultima riga è lo scenario che ha reso necessaria questa validazione, e continua a essere coperto.
 
 6. **Coerenza della configurazione.** `PathGuard` e deny-list devono riferirsi alla stessa home, e una root che si riduca alla radice del filesystem viene rifiutata. Entrambe le condizioni sono imposte dai costruttori, non affidate alla documentazione: con due home diverse la regola di profondità protegge la home sbagliata, e con root `/` il contenimento smette di esistere perché il confronto diventa "comincia per `/`", vero per qualunque percorso assoluto.
 

@@ -175,6 +175,21 @@ public sealed class RuleScanner(
 
             if (fileSystem.Directory.Exists(entry))
             {
+                string dirName = fileSystem.Path.GetFileName(entry);
+
+                // Ramo saltato per intero, non una potatura per singolo file: sotto ".git" (o
+                // ".hg"/".svn") vivono i pack file con l'intera storia del repository, che una
+                // regola a root configurabile dall'utente (es. "file grandi") altrimenti
+                // proporrebbe indistinguibili da un file grande legittimo. La cartella ".git"
+                // sopravviverebbe alla cancellazione, la storia no — una perdita non
+                // ricostruibile. Non è nella deny-list, che ragiona per percorsi assoluti fissi,
+                // non per nomi di cartella che possono comparire ovunque nell'albero.
+                if (IsVersionControlDirectory(dirName))
+                {
+                    exclusions.Add(new GuardExclusion(entry, VcsExclusionReason));
+                    continue;
+                }
+
                 // Pota il ramo intero invece di scendervi: un'esclusione per directory protetta
                 // invece di una per ciascun file al suo interno, che altrimenti ne rivelerebbe i
                 // nomi (es. dentro "~/Documents" o "~/.ssh") nell'elenco mostrato all'utente.
@@ -220,6 +235,31 @@ public sealed class RuleScanner(
     private static readonly string[] ProjectMarkers =
         ["*.csproj", "*.fsproj", "*.vbproj", "*.sln", "*.slnx"];
 
+    /// <summary>Nomi di directory di metadati dei sistemi di controllo versione: mai attraversate.</summary>
+    private static readonly string[] VcsDirectoryNames = [".git", ".hg", ".svn"];
+
+    private const string VcsExclusionReason =
+        "repository di controllo versione: ramo saltato per non cancellare la storia del progetto";
+
+    /// <summary>
+    /// Vero se il nome corrisponde a una directory di metadati di un sistema di controllo
+    /// versione. Confronto per nome, non per percorso: può comparire a qualunque profondità
+    /// sotto una root configurabile dall'utente (es. una cartella "file grandi" puntata su una
+    /// directory che contiene repository).
+    /// </summary>
+    private static bool IsVersionControlDirectory(string name)
+    {
+        foreach (string vcs in VcsDirectoryNames)
+        {
+            if (name.Equals(vcs, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Cerca ricorsivamente directory il cui nome corrisponde ai pattern (cartelle "bin"/"obj"
     /// nei progetti .NET, pacchetti NuGet inutilizzati). Una directory trovata non viene mai
@@ -250,6 +290,16 @@ public sealed class RuleScanner(
             }
 
             string name = fileSystem.Path.GetFileName(entry);
+
+            // Stesso ramo saltato di ScanFiles, per simmetria: prima di ogni altra valutazione
+            // (esclusioni, pattern di inclusione), non si entra mai in ".git"/".hg"/".svn", e non
+            // si propone nemmeno la cartella stessa come elemento, anche se il suo nome
+            // corrispondesse per caso a un pattern di inclusione della regola.
+            if (IsVersionControlDirectory(name))
+            {
+                exclusions.Add(new GuardExclusion(entry, VcsExclusionReason));
+                continue;
+            }
 
             if (MatchesAnyGlob(name, rule.ExcludeGlobs))
             {

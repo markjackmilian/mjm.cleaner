@@ -363,4 +363,47 @@ public class RuleScannerTests
 
         Assert.DoesNotContain(outcome.Items, i => i.Path == vanished);
     }
+
+    // IMPORTANT della revisione finale: configurando le cartelle per la ricerca dei file grandi
+    // su una directory che contiene repository, la ricorsione entrava in ".git" e proponeva i
+    // pack file dell'intera storia del repository, indistinguibili per nome o estensione da un
+    // file grande legittimo — una perdita non ricostruibile, perché la cartella ".git"
+    // sopravvive alla cancellazione ma la storia no. Misura che il ramo viene saltato per
+    // intero, mentre un file grande legittimo accanto al repository continua a comparire.
+    [Fact]
+    public void MatchingFilesNeverEntersAGitDirectory()
+    {
+        MockFileSystem fs = new();
+        string projects = $"{Home}/projects";
+        fs.AddFile($"{projects}/progetto/.git/objects/pack/grosso.pack", File(200_000_000));
+        fs.AddFile($"{projects}/progetto/dati.bin", File(100_000_000));
+
+        RuleScanOutcome outcome = Create(fs).Scan(
+            new CleanupRule(projects, ScanMode.MatchingFiles, All, [], MinSizeBytes: 50_000_000),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(outcome.Items, i => i.Path.Contains(".git"));
+        Assert.Contains(outcome.Items, i => i.Path == $"{projects}/progetto/dati.bin");
+        Assert.Contains(outcome.Exclusions, e => e.Path == $"{projects}/progetto/.git");
+    }
+
+    // Per simmetria: la ricerca per directory (usata per "bin"/"obj" e i pacchetti NuGet) non
+    // deve nemmeno considerare ".git" come candidato, né scendervi in cerca di altro.
+    [Fact]
+    public void MatchingDirsNeverEntersOrMatchesAGitDirectory()
+    {
+        MockFileSystem fs = new();
+        string projects = $"{Home}/projects";
+        fs.AddFile($"{projects}/progetto/app.csproj", new MockFileData("<Project/>"));
+        fs.AddFile($"{projects}/progetto/bin/app.dll", File(10));
+        fs.AddFile($"{projects}/progetto/.git/objects/pack/grosso.pack", File(200_000_000));
+
+        RuleScanOutcome outcome = Create(fs).Scan(
+            new CleanupRule(projects, ScanMode.MatchingDirs, ["bin", "obj"], [], RequiresProjectMarker: true),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(outcome.Items, i => i.Path.Contains(".git"));
+        Assert.Contains(outcome.Items, i => i.Path == $"{projects}/progetto/bin");
+        Assert.Contains(outcome.Exclusions, e => e.Path == $"{projects}/progetto/.git");
+    }
 }

@@ -387,15 +387,16 @@ public sealed class DenyList
 
     private readonly string[] _denied;
     private readonly string[] _exceptions;
+    private readonly string _home;
 
     public DenyList(string homeDirectory)
     {
         string home = homeDirectory.TrimEnd('/');
+        _home = home;
 
         _denied =
         [
             "/System", "/usr", "/bin", "/sbin", "/etc", "/Applications", "/Library",
-            home,
             $"{home}/Documents",
             $"{home}/Desktop",
             $"{home}/Pictures",
@@ -428,6 +429,15 @@ public sealed class DenyList
                 reason = string.Empty;
                 return false;
             }
+        }
+
+        // La home è protetta solo come blocco esatto: un confronto ricorsivo negherebbe
+        // l'intero albero sotto la home, rendendo non pulibile ~/Library/Caches. I figli
+        // diretti della home li protegge la regola 4 del PathGuard (Task 4).
+        if (path.Equals(_home, Cmp))
+        {
+            reason = $"percorso protetto: {_home}";
+            return true;
         }
 
         foreach (string denied in _denied)

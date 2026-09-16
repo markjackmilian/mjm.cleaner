@@ -361,4 +361,32 @@ public class PathGuardTests
         Assert.True(Create().ValidateRoot(Home).IsAllowed);
         Assert.False(Create().Validate($"{Home}/Documents/fattura.pdf", Home).IsAllowed);
     }
+
+    // Punto 4 della revisione finale: un elemento manipolato fra la scansione e la conferma che
+    // coincide con la root dichiarata cancellerebbe l'intera root invece di svuotarla (es.
+    // "~/Library/Caches" rimossa invece che svuotata). Lo scanner non lo produce mai — nessuno
+    // dei controlli precedenti lo intercetta per una root profonda come questa: il contenimento
+    // ammette l'uguaglianza, la deny-list la esenta esplicitamente, e non è né la home né un suo
+    // figlio diretto.
+    [Fact]
+    public void DeniesItemThatCoincidesWithADeepDeclaredRoot()
+    {
+        string root = CacheRoot;
+        GuardVerdict verdict = Create().Validate(root, root);
+
+        Assert.False(verdict.IsAllowed);
+        Assert.Contains(root, verdict.Reason);
+    }
+
+    // Ciò che deve restare invariato: quando la root coincide anche con un figlio diretto della
+    // home, il motivo restituito resta quello più specifico della regola di profondità (punto
+    // 4 di Validate), non quello più generico introdotto qui.
+    [Fact]
+    public void DirectChildOfHomeRootStillReportsDepthReasonNotCoincidenceReason()
+    {
+        GuardVerdict verdict = Create().Validate($"{Home}/Downloads", $"{Home}/Downloads");
+
+        Assert.False(verdict.IsAllowed);
+        Assert.Contains("profondità", verdict.Reason);
+    }
 }

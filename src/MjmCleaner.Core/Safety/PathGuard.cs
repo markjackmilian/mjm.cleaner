@@ -265,6 +265,21 @@ public sealed class PathGuard : IPathGuard
                 }
             }
 
+            // 6. Un elemento che coincide esattamente con la root dichiarata cancellerebbe la
+            //    root per intero invece di svuotarla — il contratto di ogni regola (in
+            //    particolare quelle a svuotamento) è che la root sopravvive. Lo scanner non
+            //    produce mai un elemento così (ClearContents elenca solo i figli diretti della
+            //    root, mai la root stessa), ma il modello di minaccia dichiara esplicitamente
+            //    l'elenco manipolabile fra la scansione e la conferma. Deliberatamente l'ultimo
+            //    controllo, dopo quello di profondità (punto 4): quando root e home coincidono
+            //    (o la root è un figlio diretto della home), quella regola già nega con un
+            //    motivo più specifico ("profondità insufficiente"), e non va scavalcata da un
+            //    motivo più generico qui.
+            if (path.Equals(root, Cmp))
+            {
+                return GuardVerdict.Deny($"l'elemento coincide con la root della regola: {root}", path);
+            }
+
             return GuardVerdict.Allow(path);
         }
         catch (Exception ex) when (IsPathException(ex))

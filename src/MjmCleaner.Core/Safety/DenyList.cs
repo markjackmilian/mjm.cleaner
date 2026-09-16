@@ -66,8 +66,9 @@ public sealed class DenyList
             $"{home}/Library/CloudStorage",
             $"{home}/Library/Keychains",
             // Solo la sottocartella con le identità di firma e i profili di provisioning:
-            // "Library/Developer" resta pulibile (DerivedData, Archives sono categorie
-            // dell'app), quindi non va negato in blocco.
+            // "Library/Developer" resta pulibile (DerivedData è una categoria dell'app;
+            // Archives non lo è più — vedi CategoryCatalog — ma resta un percorso legittimo,
+            // non una cartella di sistema), quindi non va negato in blocco.
             $"{home}/Library/Developer/Xcode/UserData",
             $"{home}/.ssh",
             $"{home}/.gnupg",

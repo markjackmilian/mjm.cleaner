@@ -38,7 +38,12 @@ public static class CategoryCatalog
                     new CleanupRule(E("~/.npm/_cacache"), ScanMode.ClearContents, All, []),
                     new CleanupRule(E("~/.cache"), ScanMode.ClearContents, All, []),
                     new CleanupRule(E("~/Library/Developer/Xcode/DerivedData"), ScanMode.ClearContents, All, []),
-                    new CleanupRule(E("~/Library/Developer/Xcode/Archives"), ScanMode.ClearContents, All, []),
+                    // Niente regola su "Archives": a differenza di DerivedData (output di
+                    // compilazione, rigenerabile), un archivio Xcode contiene il binario e il
+                    // dSYM di una build già spedita. Senza quel dSYM non si simbolicano più i
+                    // crash report di quella release: non è "rigenerabile alla prossima
+                    // compilazione" come il resto di questa categoria a basso rischio,
+                    // selezionata di default.
                     new CleanupRule(E("~/.gradle/caches"), ScanMode.ClearContents, All, []),
                 ]),
 

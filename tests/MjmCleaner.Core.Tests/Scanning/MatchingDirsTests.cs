@@ -252,6 +252,33 @@ public class MatchingDirsTests
         Assert.Contains(outcome.Errors, e => e.Path == unreadable && e.Kind == ScanErrorKind.AccessDenied);
     }
 
+    // Re-revisione del Task 9: una directory corrispondente ma svanita fra il momento in cui
+    // ScanDirectories la riconosce come tale (Directory.Exists) e il momento in cui
+    // DirectoryStats ne legge le statistiche non deve comparire fra gli elementi proposti (con
+    // dimensione zero), pur restando registrata fra gli errori — altrimenti lo stesso percorso
+    // starebbe contemporaneamente fra ciò che si sta per cancellare e fra ciò che è fallito.
+    // L'equivalente esiste già per ClearContents (ClearContentsDoesNotListADirectoryThatVanishesBeforeStatsRead);
+    // riusa lo stesso doppio di filesystem (VanishingChildFileSystem), non uno nuovo.
+    [Fact]
+    public void DoesNotListAMatchedDirectoryThatVanishesBeforeStatsRead()
+    {
+        MockFileSystem mock = new();
+        mock.AddFile($"{Projects}/app/app.csproj", new MockFileData("x"));
+        string vanished = $"{Projects}/app/bin";
+        mock.AddFile($"{vanished}/dentro.dll", new MockFileData(new byte[10]));
+        mock.AddFile($"{Projects}/app/obj/normale.bin", new MockFileData(new byte[20]));
+
+        VanishingChildFileSystem fs = new(mock, vanished);
+        FakeLinkInspector links = new();
+        RuleScanner scanner = new(fs, new PathGuard(new DenyList(Home), links, Home), links, new TestTimeProvider(Now));
+
+        RuleScanOutcome outcome = scanner.Scan(BinObjRule(), CancellationToken.None);
+
+        Assert.DoesNotContain(outcome.Items, i => i.Path == vanished);
+        Assert.Contains(outcome.Items, i => i.Path == $"{Projects}/app/obj" && i.SizeBytes == 20);
+        Assert.Contains(outcome.Errors, e => e.Path == vanished && e.Kind == ScanErrorKind.NotFound);
+    }
+
     // Minor della revisione del Task 9: MinSizeBytes è applicato nelle altre due modalità ma era
     // ignorato in questa.
     [Fact]

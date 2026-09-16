@@ -44,7 +44,8 @@ public sealed class RuleScanner(
                 ScanFiles(rule, rule.Root, depth: 0, items, errors, exclusions, ct);
                 break;
             case ScanMode.MatchingDirs:
-                throw new NotSupportedException("MatchingDirs viene implementato nel Task 9.");
+                ScanDirectories(rule, rule.Root, depth: 0, items, errors, exclusions, ct);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(rule));
         }
@@ -214,6 +215,106 @@ public sealed class RuleScanner(
 
             items.Add(new ScanItem(entry, size, false, rule.Root));
         }
+    }
+
+    private static readonly string[] ProjectMarkers =
+        ["*.csproj", "*.fsproj", "*.vbproj", "*.sln", "*.slnx"];
+
+    /// <summary>
+    /// Cerca ricorsivamente directory il cui nome corrisponde ai pattern (cartelle "bin"/"obj"
+    /// nei progetti .NET, pacchetti NuGet inutilizzati). Una directory trovata non viene mai
+    /// attraversata oltre: verrà eliminata per intero, quindi scendervi produrrebbe elementi
+    /// annidati ridondanti.
+    /// </summary>
+    private void ScanDirectories(
+        CleanupRule rule,
+        string directory,
+        int depth,
+        List<ScanItem> items,
+        List<ScanError> errors,
+        List<GuardExclusion> exclusions,
+        CancellationToken ct)
+    {
+        if (depth > rule.MaxDepth)
+        {
+            return;
+        }
+
+        foreach (string entry in Enumerate(directory, errors))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (links.IsSymbolicLink(entry) || !fileSystem.Directory.Exists(entry))
+            {
+                continue;
+            }
+
+            string name = fileSystem.Path.GetFileName(entry);
+            bool matches = MatchesGlobs(name, rule)
+                           && (!rule.RequiresProjectMarker || HasProjectMarker(directory, errors));
+
+            if (matches)
+            {
+                // Il verdetto del guard precede la lettura di dimensione ed età, come in
+                // ScanContents: per una directory negata, calcolarle comunque richiederebbe di
+                // attraversarla per intero (vedi il commento sopra la chiamata equivalente in
+                // ScanContents).
+                GuardVerdict verdict = guard.Validate(entry, rule.Root);
+                if (!verdict.IsAllowed)
+                {
+                    exclusions.Add(new GuardExclusion(entry, verdict.Reason));
+                    continue;
+                }
+
+                // Stesso attraversamento unico di ScanContents per una directory: dimensione ed
+                // età più recente si leggono insieme, non con un secondo giro sull'albero.
+                (long size, DateTime newestUtc, bool determinable) = DirectoryStats(entry, errors, ct);
+                if (!determinable || !AcceptStamp(newestUtc, rule.MinAge))
+                {
+                    continue;
+                }
+
+                items.Add(new ScanItem(entry, size, true, rule.Root));
+
+                // Trovata: non si scende oltre, l'intera cartella verrà eliminata.
+                continue;
+            }
+
+            // Pota il ramo intero invece di scendervi, come ScanFiles: solo la deny-list, non
+            // Validate, la cui regola di profondità poterebbe ogni cartella legittima di primo
+            // livello sotto la home.
+            if (guard.ShouldPrune(entry, out string pruneReason))
+            {
+                exclusions.Add(new GuardExclusion(entry, pruneReason));
+                continue;
+            }
+
+            ScanDirectories(rule, entry, depth + 1, items, errors, exclusions, ct);
+        }
+    }
+
+    /// <summary>
+    /// Vera se la directory che contiene il candidato ospita un file di progetto. Senza questo
+    /// vincolo una root mal configurata (es. "/" o "/usr") porterebbe a proporre l'eliminazione
+    /// di cartelle come "/usr/bin": il PathGuard la bloccherebbe comunque, ma questo è il primo
+    /// filtro.
+    /// </summary>
+    private bool HasProjectMarker(string parentDirectory, List<ScanError> errors)
+    {
+        foreach (string sibling in Enumerate(parentDirectory, errors))
+        {
+            string name = fileSystem.Path.GetFileName(sibling);
+
+            foreach (string marker in ProjectMarkers)
+            {
+                if (FileSystemName.MatchesSimpleExpression(marker, name, ignoreCase: true))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

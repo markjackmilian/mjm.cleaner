@@ -250,7 +250,20 @@ public sealed class RuleScanner(
             }
 
             string name = fileSystem.Path.GetFileName(entry);
-            bool matches = MatchesGlobs(name, rule)
+
+            if (MatchesAnyGlob(name, rule.ExcludeGlobs))
+            {
+                // Un'esclusione qui ha un significato diverso da "il nome non corrisponde a
+                // nessun pattern di inclusione": è un rifiuto esplicito, non un "continua pure
+                // a cercare più in basso". Trattarla come un semplice mancato match (proseguendo
+                // la ricorsione al suo interno) proporrebbe una singola versione di un pacchetto
+                // NuGet esplicitamente escluso invece del pacchetto intero — l'esito che questo
+                // task esiste per impedire. Stessa semantica della potatura di un ramo negato
+                // dalla deny-list: non si propone e non ci si scende dentro.
+                continue;
+            }
+
+            bool matches = MatchesAnyGlob(name, rule.IncludeGlobs)
                            && (!rule.RequiresProjectMarker || HasProjectMarker(directory, errors));
 
             if (matches)
@@ -270,6 +283,11 @@ public sealed class RuleScanner(
                 // età più recente si leggono insieme, non con un secondo giro sull'albero.
                 (long size, DateTime newestUtc, bool determinable) = DirectoryStats(entry, errors, ct);
                 if (!determinable || !AcceptStamp(newestUtc, rule.MinAge))
+                {
+                    continue;
+                }
+
+                if (rule.MinSizeBytes is { } minSize && size < minSize)
                 {
                     continue;
                 }
@@ -303,6 +321,15 @@ public sealed class RuleScanner(
     {
         foreach (string sibling in Enumerate(parentDirectory, errors))
         {
+            // Un marcatore di progetto è sempre un file (".csproj", ".sln", ...): una
+            // *directory* chiamata per esempio "x.sln" non deve poter soddisfare il vincolo,
+            // altrimenti diventerebbe un modo in più per proporre l'eliminazione di una cartella
+            // che il marcatore esiste apposta per proteggere.
+            if (fileSystem.Directory.Exists(sibling))
+            {
+                continue;
+            }
+
             string name = fileSystem.Path.GetFileName(sibling);
 
             foreach (string marker in ProjectMarkers)
@@ -354,18 +381,13 @@ public sealed class RuleScanner(
         => minAge is not { } age || clock.GetUtcNow().UtcDateTime - stampUtc >= age;
 
     private static bool MatchesGlobs(string name, CleanupRule rule)
-    {
-        foreach (string excluded in rule.ExcludeGlobs)
-        {
-            if (FileSystemName.MatchesSimpleExpression(excluded, name, ignoreCase: true))
-            {
-                return false;
-            }
-        }
+        => !MatchesAnyGlob(name, rule.ExcludeGlobs) && MatchesAnyGlob(name, rule.IncludeGlobs);
 
-        foreach (string included in rule.IncludeGlobs)
+    private static bool MatchesAnyGlob(string name, IReadOnlyList<string> globs)
+    {
+        foreach (string glob in globs)
         {
-            if (FileSystemName.MatchesSimpleExpression(included, name, ignoreCase: true))
+            if (FileSystemName.MatchesSimpleExpression(glob, name, ignoreCase: true))
             {
                 return true;
             }

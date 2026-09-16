@@ -1,11 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using MjmCleaner.App.Services;
 
 namespace MjmCleaner.App.ViewModels;
 
-// Nota: l'using di CommunityToolkit.Mvvm.Input serve dal Task 21, quando arrivano i comandi
-// della barra strumenti. Se il compilatore segnala un using inutilizzato, rimuoverlo ora e
-// riaggiungerlo allora.
 public sealed partial class MainWindowViewModel : ViewModelBase
 {
     private readonly AppServices _services;
@@ -35,4 +33,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         long total = await _services.History.GetTotalBytesFreedAsync(CancellationToken.None);
         TotalFreedText = $"{FormatBytes(total)} liberati finora";
     }
+
+    [RelayCommand]
+    private void ShowHistory() => CurrentPage = new HistoryViewModel(_services, this);
+
+    [RelayCommand]
+    private void ShowSettings() => CurrentPage = new SettingsViewModel(_services, this);
 }

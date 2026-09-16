@@ -15,5 +15,7 @@
         <DataTemplate DataType="vm:ScanStepViewModel"><views:ScanStepView /></DataTemplate>
         <DataTemplate DataType="vm:ConfirmStepViewModel"><views:ConfirmStepView /></DataTemplate>
         <DataTemplate DataType="vm:DoneStepViewModel"><views:DoneStepView /></DataTemplate>
+        <DataTemplate DataType="vm:HistoryViewModel"><views:HistoryView /></DataTemplate>
+        <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
     </Application.DataTemplates>
 </Application>

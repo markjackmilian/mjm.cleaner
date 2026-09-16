@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             x:Class="MjmCleaner.App.Views.HistoryView"
+             x:DataType="vm:HistoryViewModel">
+
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Storico delle pulizie" FontSize="22" FontWeight="Bold" Margin="0,0,0,14" />
+        <Button DockPanel.Dock="Bottom" Content="Chiudi" Command="{Binding CloseCommand}"
+                HorizontalAlignment="Right" Margin="0,14,0,0" />
+
+        <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:HistoryRow">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,6">
+                            <TextBlock Grid.Column="0" Text="{Binding When}" Width="130" />
+                            <TextBlock Grid.Column="1" Text="{Binding Freed}" Width="90" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="2" Text="{Binding Categories}" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="3" Text="{Binding Items}" Opacity="0.6" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

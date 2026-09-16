@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             x:Class="MjmCleaner.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Impostazioni" FontSize="22" FontWeight="Bold" Margin="0,0,0,14" />
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Spacing="10" Margin="0,14,0,0">
+            <Button Content="Annulla" Command="{Binding CancelCommand}" />
+            <Button Content="Salva" Command="{Binding SaveCommand}" Padding="18,8" FontWeight="SemiBold" />
+        </StackPanel>
+
+        <ScrollViewer>
+            <StackPanel Spacing="14">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Cartelle di progetto per bin e obj (una per riga)" FontWeight="SemiBold" />
+                    <TextBox Text="{Binding ProjectRoots}" AcceptsReturn="True" Height="80" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Cartelle in cui cercare file grandi (una per riga)" FontWeight="SemiBold" />
+                    <TextBox Text="{Binding LargeFileRoots}" AcceptsReturn="True" Height="60" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="10">
+                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Soglia file grandi (MB)" />
+                        <NumericUpDown Value="{Binding LargeFileThresholdMegabytes}" Minimum="1" Maximum="100000" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
+                        <TextBlock Text="Età minima Download (giorni)" />
+                        <NumericUpDown Value="{Binding DownloadsMinAgeDays}" Minimum="0" Maximum="3650" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Età minima log (giorni)" />
+                        <NumericUpDown Value="{Binding LogsMinAgeDays}" Minimum="0" Maximum="3650" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
+                        <TextBlock Text="Età minima pacchetti NuGet (giorni)" />
+                        <NumericUpDown Value="{Binding NuGetMinAgeDays}" Minimum="0" Maximum="3650" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Opacity="0.6" FontSize="11" TextWrapping="Wrap"
+                           Text="L'età dei pacchetti NuGet si basa sull'ultimo accesso registrato dal filesystem: è un'euristica, non una certezza." />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

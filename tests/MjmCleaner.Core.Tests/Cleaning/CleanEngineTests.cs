@@ -34,6 +34,16 @@ public class CleanEngineTests
         public void Report(CleanProgress value) => Reports.Add(value);
     }
 
+    /// <summary>
+    /// Doppio minimo di <see cref="IProgress{T}"/> che annulla un <see cref="CancellationTokenSource"/>
+    /// alla prima segnalazione ricevuta: usato per annullare in modo deterministico A METÀ
+    /// dell'esecuzione (dopo la prima categoria elaborata), senza basarsi su una temporizzazione.
+    /// </summary>
+    private sealed class CancelingProgress(CancellationTokenSource cts) : IProgress<CleanProgress>
+    {
+        public void Report(CleanProgress value) => cts.Cancel();
+    }
+
     [Fact]
     public async Task DeletesFilesAndCountsBytes()
     {
@@ -360,5 +370,104 @@ public class CleanEngineTests
         CleanProgress last = progress.Reports[^1];
         Assert.Equal(2, last.ItemsDone);
         Assert.Equal(2, last.ItemsTotal);
+    }
+
+    // IMPORTANT: RuleScanner enumera a partire dalla root DICHIARATA, quindi ScanItem.Path e
+    // ScanItem.DeclaredRoot sono entrambi non risolti. Se ValidateRoot risolve la root a una
+    // stringa diversa — l'esempio reale è $TMPDIR: "/var" è un collegamento a "/private/var" su
+    // ogni macOS di serie — l'elemento va riportato nello stesso sistema di riferimento PRIMA di
+    // validarlo, altrimenti il contenimento confronta basi diverse e fallisce sempre, rendendo
+    // la categoria $TMPDIR (selezionata di default) inservibile su ogni Mac. Stessi percorsi di
+    // esempio di PathGuardTests.ValidateRootResolvesSymlinkedAncestorAndAllowsUnprotectedTarget,
+    // qui verificati end-to-end fino alla cancellazione effettiva.
+    [Fact]
+    public async Task ItemUnderRootThatResolvesToADifferentStringIsStillDeletable()
+    {
+        const string DeclaredTmpRoot = "/var/folders/xyz/T";
+        const string ResolvedTmpRoot = "/private/var/folders/xyz/T";
+
+        MockFileSystem fs = new();
+        fs.AddFile($"{ResolvedTmpRoot}/temp123.tmp", new MockFileData(new byte[15]));
+
+        CleanEngine engine = new(
+            fs,
+            new PathGuard(
+                new DenyList(Home),
+                new FakeLinkInspector(new Dictionary<string, string?> { ["/var"] = "/private/var" }),
+                Home),
+            new TestTimeProvider(Now));
+
+        CleanReport report = await engine.CleanAsync(
+            [Selection("tmp", new ScanItem($"{DeclaredTmpRoot}/temp123.tmp", 15, false, DeclaredTmpRoot))],
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal(15, report.BytesFreed);
+        Assert.Equal(1, report.ItemsDeleted);
+        Assert.Equal(0, report.ItemsFailed);
+        // Si cancella il percorso RISOLTO restituito dal guard, non quello dichiarato.
+        Assert.Equal([$"{ResolvedTmpRoot}/temp123.tmp"], report.DeletedPaths);
+        Assert.False(fs.File.Exists($"{ResolvedTmpRoot}/temp123.tmp"));
+    }
+
+    // MINOR: un elemento con DeclaredRoot nulla ("malformato") non deve far fallire l'intera
+    // pre-validazione delle root. Prima della correzione, il dizionario costruito una volta sola
+    // sulle root distinte veniva indicizzato direttamente con quella stringa nulla — Dictionary
+    // rifiuta una chiave nulla lanciando ArgumentNullException fuori da ogni isolamento per
+    // elemento — facendo fallire l'intera pulizia (zero eliminati) invece del solo elemento
+    // malformato.
+    [Fact]
+    public async Task MalformedItemWithNullDeclaredRootDoesNotAbortTheWholeRun()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/uno.tmp", new MockFileData(new byte[10]));
+        fs.AddFile($"{CacheRoot}/tre.tmp", new MockFileData(new byte[30]));
+
+        CleanReport report = await Create(fs).CleanAsync(
+            [Selection(
+                "caches",
+                new ScanItem($"{CacheRoot}/uno.tmp", 10, false, CacheRoot),
+                new ScanItem("qualunque/percorso", 20, false, null!),
+                new ScanItem($"{CacheRoot}/tre.tmp", 30, false, CacheRoot))],
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal(2, report.ItemsDeleted);
+        Assert.Equal(1, report.ItemsFailed);
+        Assert.Equal(40, report.BytesFreed);
+        Assert.False(fs.File.Exists($"{CacheRoot}/uno.tmp"));
+        Assert.False(fs.File.Exists($"{CacheRoot}/tre.tmp"));
+    }
+
+    // Difesa "nessuna categoria fantasma dopo l'annullamento" (MINOR 3 della correzione
+    // precedente), finora non ancorata da alcun test: CancellationReturnsPartialReportInsteadOfThrowing
+    // annulla PRIMA di iniziare, quindi passa identico con o senza quella difesa. Qui
+    // l'annullamento avviene A METÀ (dopo la prima categoria, tramite CancelingProgress): le
+    // categorie successive, mai iniziate, non devono comparire nel resoconto nemmeno a zero.
+    [Fact]
+    public async Task CancellationMidRunDoesNotAddUnprocessedCategoriesToTheReport()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{CacheRoot}/uno.tmp", new MockFileData(new byte[10]));
+        fs.AddFile($"{CacheRoot}/due.tmp", new MockFileData(new byte[20]));
+        fs.AddFile($"{CacheRoot}/tre.tmp", new MockFileData(new byte[30]));
+
+        using CancellationTokenSource cts = new();
+        CancelingProgress progress = new(cts);
+
+        CleanReport report = await Create(fs).CleanAsync(
+            [
+                Selection("uno", new ScanItem($"{CacheRoot}/uno.tmp", 10, false, CacheRoot)),
+                Selection("due", new ScanItem($"{CacheRoot}/due.tmp", 20, false, CacheRoot)),
+                Selection("tre", new ScanItem($"{CacheRoot}/tre.tmp", 30, false, CacheRoot)),
+            ],
+            progress,
+            cts.Token);
+
+        CategoryCleanResult onlyCategory = Assert.Single(report.Categories);
+        Assert.Equal("uno", onlyCategory.CategoryId);
+        Assert.Equal(10, report.BytesFreed);
+        Assert.True(fs.File.Exists($"{CacheRoot}/due.tmp"));
+        Assert.True(fs.File.Exists($"{CacheRoot}/tre.tmp"));
     }
 }

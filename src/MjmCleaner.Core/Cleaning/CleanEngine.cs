@@ -90,6 +90,18 @@ public sealed class CleanEngine(IFileSystem fileSystem, IPathGuard guard, TimePr
                          .Select(i => i.DeclaredRoot)
                          .Distinct(StringComparer.OrdinalIgnoreCase))
             {
+                // Una root dichiarata nulla (elemento malformato) non può essere indicizzata:
+                // Dictionary<string, _> rifiuta una chiave nulla lanciando ArgumentNullException,
+                // fuori da ogni isolamento per elemento — il ciclo qui gira una volta sola per
+                // TUTTE le root, non per elemento, quindi quel lancio farebbe fallire l'intera
+                // pulizia invece del solo elemento che dichiara la root nulla. Va saltata qui; il
+                // ciclo di eliminazione più sotto la tratta come root mancante per ciascun
+                // elemento che la dichiara, isolando il fallimento a quegli elementi soltanto.
+                if (declaredRoot is null)
+                {
+                    continue;
+                }
+
                 rootVerdicts[declaredRoot] = guard.ValidateRoot(declaredRoot);
             }
 
@@ -118,20 +130,48 @@ public sealed class CleanEngine(IFileSystem fileSystem, IPathGuard guard, TimePr
                     done++;
                     lastSeenPath = item.Path;
 
-                    GuardVerdict rootVerdict = rootVerdicts[item.DeclaredRoot];
-                    if (!rootVerdict.IsAllowed)
+                    // Root mancante (elemento con DeclaredRoot nulla, isolata sopra) o negata: in
+                    // entrambi i casi solo QUESTO elemento fallisce, non l'intera pulizia. Il
+                    // controllo su declaredRoot è separato (invece di un unico "rootVerdict is
+                    // null || ...") perché una variabile locale ristretta con un continue
+                    // incondizionato resta non nulla per il resto del blocco, mentre un accesso a
+                    // proprietà (item.DeclaredRoot) non lo sarebbe.
+                    string? declaredRoot = item.DeclaredRoot;
+                    if (declaredRoot is null)
                     {
-                        errors.Add(new ScanError(item.Path, ScanErrorKind.Other, rootVerdict.Reason));
+                        errors.Add(new ScanError(item.Path, ScanErrorKind.Other, "root dichiarata mancante"));
                         totalFailed++;
                         progress?.Report(new CleanProgress(item.Path, done, total, totalBytes));
                         continue;
                     }
 
+                    if (!rootVerdicts.TryGetValue(declaredRoot, out GuardVerdict? rootVerdict)
+                        || !rootVerdict.IsAllowed)
+                    {
+                        string rootReason = rootVerdict?.Reason ?? "root dichiarata non riconosciuta";
+                        errors.Add(new ScanError(item.Path, ScanErrorKind.Other, rootReason));
+                        totalFailed++;
+                        progress?.Report(new CleanProgress(item.Path, done, total, totalBytes));
+                        continue;
+                    }
+
+                    // RuleScanner enumera a partire dalla root DICHIARATA: item.Path è quindi nel
+                    // suo stesso sistema di riferimento non risolto, mentre ValidateRoot può aver
+                    // risolto la root a una stringa diversa (es. $TMPDIR: "/var" è un collegamento
+                    // a "/private/var" su ogni macOS di serie). Va riportato nel sistema di
+                    // riferimento RISOLTO PRIMA di validarlo: altrimenti il contenimento
+                    // confronterebbe due basi diverse e fallirebbe sempre, negando ogni elemento
+                    // di ogni root la cui risoluzione cambia la stringa. Riscrivere DOPO la
+                    // validazione reintrodurrebbe il difetto originario: prima si riscrive, poi si
+                    // valida, poi si cancella il percorso che il guard restituisce.
+                    string resolvedRoot = rootVerdict.CanonicalPathValidated;
+                    string rewrittenPath = RewriteToResolvedRoot(item.Path, declaredRoot, resolvedRoot);
+
                     // Il contenimento (e il limite della risalita sui collegamenti simbolici) va
                     // verificato contro il percorso RISOLTO della root, non contro quello
                     // dichiarato: se la root risolve altrove, l'elemento non le appartiene più. È
                     // il passaggio che chiude la fuga per una root fabbricata o rilocata.
-                    GuardVerdict verdict = guard.Validate(item.Path, rootVerdict.CanonicalPathValidated);
+                    GuardVerdict verdict = guard.Validate(rewrittenPath, resolvedRoot);
                     if (!verdict.IsAllowed)
                     {
                         errors.Add(new ScanError(item.Path, ScanErrorKind.Other, verdict.Reason));
@@ -197,6 +237,34 @@ public sealed class CleanEngine(IFileSystem fileSystem, IPathGuard guard, TimePr
             categories,
             errors,
             deleted);
+    }
+
+    /// <summary>
+    /// Riporta <paramref name="path"/> dal sistema di riferimento della root DICHIARATA a quello
+    /// della sua risoluzione, sostituendo il prefisso corrispondente. Se <paramref name="path"/>
+    /// non inizia con <paramref name="declaredRoot"/> (confine di segmento, senza distinzione fra
+    /// maiuscole e minuscole), non c'è nulla da riscrivere: non è comunque contenuto nella root
+    /// dichiarata, e <c>Validate</c> lo rileverà confrontando il percorso invariato con quella
+    /// risolta.
+    /// </summary>
+    private static string RewriteToResolvedRoot(string path, string declaredRoot, string resolvedRoot)
+    {
+        if (declaredRoot.Equals(resolvedRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return path;
+        }
+
+        if (path.Equals(declaredRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return resolvedRoot;
+        }
+
+        if (path.StartsWith(declaredRoot + "/", StringComparison.OrdinalIgnoreCase))
+        {
+            return resolvedRoot + path[declaredRoot.Length..];
+        }
+
+        return path;
     }
 
     /// <summary>

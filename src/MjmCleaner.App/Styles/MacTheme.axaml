@@ -8,8 +8,9 @@
         <SolidColorBrush x:Key="BorderBrush" Color="#D9D9DE" />
         <SolidColorBrush x:Key="PrimaryTextBrush" Color="#1D1D1F" />
         <SolidColorBrush x:Key="SecondaryTextBrush" Color="#6E6E73" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#0A84FF" />
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#0077ED" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#0066CC" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#005BB5" />
+        <SolidColorBrush x:Key="AccentPressedBrush" Color="#004C99" />
         <SolidColorBrush x:Key="DangerBrush" Color="#D70015" />
         <SolidColorBrush x:Key="DangerHoverBrush" Color="#B00012" />
         <SolidColorBrush x:Key="WarningSurfaceBrush" Color="#FFF7E4" />
@@ -81,6 +82,10 @@
     <Style Selector="Button.Primary:pointerover">
         <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
+    </Style>
+    <Style Selector="Button.Primary:pressed">
+        <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentPressedBrush}" />
     </Style>
     <Style Selector="Button.Secondary">
         <Setter Property="Background" Value="{DynamicResource CardBrush}" />

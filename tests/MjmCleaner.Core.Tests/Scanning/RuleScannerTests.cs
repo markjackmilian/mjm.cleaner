@@ -286,4 +286,81 @@ public class RuleScannerTests
         Assert.Empty(outcome.Items);
         Assert.Contains(outcome.Errors, e => e.Path == vanished && e.Kind == ScanErrorKind.NotFound);
     }
+
+    // IMPORTANT (re-revisione): root = home con soglia sui file grandi (LargeFileRoots = ["~"]
+    // nel catalogo reale) deve continuare a trovare i file legittimi, non restituire zero
+    // elementi. Misura anche l'effetto congiunto con la correzione a ValidateRoot: la home come
+    // root è ora ammessa (voci a uguaglianza esatta non applicate alle root), e i rami protetti
+    // al suo interno vengono comunque potati da ScanFiles (Important 4), non attraversati.
+    [Fact]
+    public void MatchingFilesFindsLegitimateLargeFilesInHomeWhilePruningProtectedBranches()
+    {
+        MockFileSystem fs = new();
+        fs.AddFile($"{Home}/Downloads/installer.dmg", File(2_000_000));
+        fs.AddFile($"{Home}/progetti/archivio.zip", File(3_000_000));
+        fs.AddFile($"{Home}/Documents/riservato.pdf", File(5_000_000));
+        fs.AddFile($"{Home}/.ssh/id_rsa", File(10));
+
+        RuleScanOutcome outcome = Create(fs).Scan(
+            new CleanupRule(Home, ScanMode.MatchingFiles, All, [], MinSizeBytes: 1_000_000),
+            CancellationToken.None);
+
+        Assert.Equal(2, outcome.Items.Count);
+        Assert.Contains(outcome.Items, i => i.Path == $"{Home}/Downloads/installer.dmg");
+        Assert.Contains(outcome.Items, i => i.Path == $"{Home}/progetti/archivio.zip");
+        Assert.Contains(outcome.Exclusions, e => e.Path == $"{Home}/Documents");
+        Assert.Contains(outcome.Exclusions, e => e.Path == $"{Home}/.ssh");
+    }
+
+    // Minor (re-revisione): la potatura introdotta per l'Important 4 era stata aggiunta solo a
+    // ScanFiles, e il calcolo delle statistiche era stato spostato prima del verdetto del guard
+    // in ScanContents — una directory negata veniva quindi attraversata per intero (i percorsi
+    // interni illeggibili finiscono fra gli errori mostrati all'utente) e solo dopo esclusa.
+    // Verificato con un file che, se letto, produrrebbe un errore: con la correzione, il guard
+    // esclude "Keychains" PRIMA di attraversarla, quindi quel file non viene mai toccato.
+    [Fact]
+    public void ClearContentsValidatesBeforeTraversingADeniedDirectory()
+    {
+        MockFileSystem mock = new();
+        string library = $"{Home}/Library";
+        string innerSecret = $"{library}/Keychains/login.keychain";
+        mock.AddFile(innerSecret, File(10));
+        mock.AddFile($"{library}/Caches/normale.tmp", File(10));
+
+        VanishingFileSystem fs = new(mock, innerSecret);
+        FakeLinkInspector links = new();
+        RuleScanner scanner = new(fs, new PathGuard(new DenyList(Home), links, Home), links, new TestTimeProvider(Now));
+
+        RuleScanOutcome outcome = scanner.Scan(
+            new CleanupRule(library, ScanMode.ClearContents, All, []),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(outcome.Errors, e => e.Path == innerSecret);
+        Assert.Contains(outcome.Exclusions, e => e.Path == $"{library}/Keychains");
+        Assert.Contains(outcome.Items, i => i.Path == $"{library}/Caches");
+    }
+
+    // Minor (re-revisione): DirectoryInfo.LastWriteTimeUtc/LastAccessTimeUtc su una directory
+    // scomparsa non lanciano — restituiscono la sentinella "1601-01-01", la data più vecchia
+    // possibile, non "indeterminato". Prima della correzione questo faceva apparire la
+    // directory antichissima (quindi superava qualunque soglia di età) e, non essendo la
+    // deduplicazione estesa alle directory, veniva comunque aggiunta agli elementi mentre lo
+    // stesso percorso finiva anche fra gli errori.
+    [Fact]
+    public void ClearContentsDoesNotListADirectoryThatVanishesBeforeStatsRead()
+    {
+        MockFileSystem mock = new();
+        string vanished = $"{CacheRoot}/scomparsa";
+        mock.AddFile($"{vanished}/dentro.bin", File(10));
+
+        VanishingChildFileSystem fs = new(mock, vanished);
+        FakeLinkInspector links = new();
+        RuleScanner scanner = new(fs, new PathGuard(new DenyList(Home), links, Home), links, new TestTimeProvider(Now));
+
+        RuleScanOutcome outcome = scanner.Scan(
+            new CleanupRule(CacheRoot, ScanMode.ClearContents, All, []),
+            CancellationToken.None);
+
+        Assert.DoesNotContain(outcome.Items, i => i.Path == vanished);
+    }
 }

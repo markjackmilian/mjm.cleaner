@@ -69,14 +69,28 @@ public sealed class RuleScanner(
                 continue;
             }
 
+            // Il verdetto del guard precede qualunque lettura di statistiche (dimensione, età):
+            // per una directory negata (es. "~/Library/Keychains"), calcolarle comunque
+            // richiederebbe di attraversarla per intero, ed eventuali errori di lettura sui file
+            // al suo interno — i cui percorsi possono essere privati — finirebbero nell'elenco
+            // degli errori mostrato all'utente prima ancora che l'elemento risulti escluso.
+            GuardVerdict verdict = guard.Validate(entry, rule.Root);
+            if (!verdict.IsAllowed)
+            {
+                exclusions.Add(new GuardExclusion(entry, verdict.Reason));
+                continue;
+            }
+
             bool isLink = links.IsSymbolicLink(entry);
             bool isDirectory = !isLink && fileSystem.Directory.Exists(entry);
             long size;
 
             if (isLink)
             {
-                // Non si attraversa mai un collegamento: nessuna dimensione da leggere, ma il
-                // filtro di età resta quello del collegamento stesso (mai del bersaglio).
+                // Non si attraversa mai il bersaglio per calcolarne la dimensione (resta 0). Il
+                // filtro di età legge comunque l'inode tramite FileInfo/DirectoryInfo, che su
+                // Unix seguono i collegamenti: il timestamp letto è quindi quello del bersaglio,
+                // non quello del collegamento in sé.
                 if (!Accept(entry, rule, isDirectoryCandidate: true, errors))
                 {
                     continue;
@@ -90,7 +104,16 @@ public sealed class RuleScanner(
                 // directory non cambia quando un file al suo interno viene riscritto sul posto,
                 // quindi il timestamp del solo contenitore è un segnale inaffidabile per l'età
                 // del contenuto. Si usa invece il timestamp più recente trovato nell'albero.
-                (long dirSize, DateTime newestUtc) = DirectoryStats(entry, errors, ct);
+                (long dirSize, DateTime newestUtc, bool determinable) = DirectoryStats(entry, errors, ct);
+                if (!determinable)
+                {
+                    // Scomparsa o illeggibile fra l'enumerazione e questo punto: non va
+                    // aggiunta agli elementi, altrimenti lo stesso percorso comparirebbe sia
+                    // fra gli errori sia fra ciò che si propone di eliminare — la stessa
+                    // deduplicazione già applicata ai file in TryFileSize.
+                    continue;
+                }
+
                 if (!AcceptStamp(newestUtc, rule.MinAge))
                 {
                     continue;
@@ -119,13 +142,6 @@ public sealed class RuleScanner(
 
             if (rule.MinSizeBytes is { } minSize && size < minSize)
             {
-                continue;
-            }
-
-            GuardVerdict verdict = guard.Validate(entry, rule.Root);
-            if (!verdict.IsAllowed)
-            {
-                exclusions.Add(new GuardExclusion(entry, verdict.Reason));
                 continue;
             }
 
@@ -271,16 +287,29 @@ public sealed class RuleScanner(
     }
 
     /// <summary>
-    /// Calcola dimensione totale e timestamp più recente di una directory in un solo
-    /// attraversamento (invece di due), saltando i collegamenti simbolici incontrati: non vanno
-    /// mai attraversati, altrimenti la dimensione conteggerebbe due volte o uscirebbe
+    /// Prima data considerata un vero timestamp anziché una sentinella: ben prima che questo
+    /// progetto esistesse. Vedi <see cref="ReadDirectoryStampUtc"/>.
+    /// </summary>
+    private static readonly DateTime MinDeterminableStampUtc = new(1990, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>
+    /// Calcola dimensione totale, timestamp più recente e determinabilità di una directory in un
+    /// solo attraversamento (invece di due), saltando i collegamenti simbolici incontrati: non
+    /// vanno mai attraversati, altrimenti la dimensione conteggerebbe due volte o uscirebbe
     /// dall'albero. Il timestamp della directory stessa è il valore di partenza (serve da
     /// riferimento per le directory vuote), poi si tiene il massimo con ogni figlio trovato.
+    /// Il flag di determinabilità nel valore restituito riguarda solo il timestamp della
+    /// directory passata come argomento, non dei suoi discendenti: una sottodirectory scomparsa
+    /// durante la ricorsione non invalida l'intero risultato, contribuisce semplicemente 0 alla
+    /// dimensione (Enumerate registra comunque il proprio errore) e non aggiorna il timestamp
+    /// più recente.
     /// </summary>
-    private (long Size, DateTime NewestUtc) DirectoryStats(string directory, List<ScanError> errors, CancellationToken ct)
+    private (long Size, DateTime NewestUtc, bool Determinable) DirectoryStats(
+        string directory, List<ScanError> errors, CancellationToken ct)
     {
         long total = 0;
-        DateTime newest = ReadDirectoryStampUtc(directory, errors);
+        DateTime? ownStamp = ReadDirectoryStampUtc(directory, errors);
+        DateTime newest = ownStamp ?? DateTime.MinValue;
 
         foreach (string entry in Enumerate(directory, errors))
         {
@@ -293,7 +322,7 @@ public sealed class RuleScanner(
 
             if (fileSystem.Directory.Exists(entry))
             {
-                (long size, DateTime childNewest) = DirectoryStats(entry, errors, ct);
+                (long size, DateTime childNewest, _) = DirectoryStats(entry, errors, ct);
                 total += size;
                 if (childNewest > newest)
                 {
@@ -311,24 +340,34 @@ public sealed class RuleScanner(
             }
         }
 
-        return (total, newest);
+        return (total, newest, ownStamp is not null);
     }
 
-    private DateTime ReadDirectoryStampUtc(string path, List<ScanError> errors)
+    /// <summary>
+    /// Legge il timestamp più recente (fra accesso e scrittura) di una directory, o null se non
+    /// è determinabile. Una directory scomparsa o illeggibile non sempre lancia un'eccezione:
+    /// misurato sul filesystem reale, <c>DirectoryInfo.LastWriteTimeUtc</c>/<c>LastAccessTimeUtc</c>
+    /// su un percorso inesistente non lanciano affatto — restituiscono la sentinella
+    /// "1601-01-01", il valore più vecchio possibile, l'opposto di "indeterminato". Qualunque
+    /// data precedente a <see cref="MinDeterminableStampUtc"/> è quindi trattata come sentinella,
+    /// non come età reale (il controllo sull'eccezione resta comunque, come difesa in profondità
+    /// per implementazioni di IFileSystem diverse da quella reale).
+    /// </summary>
+    private DateTime? ReadDirectoryStampUtc(string path, List<ScanError> errors)
     {
         try
         {
             IDirectoryInfo info = fileSystem.DirectoryInfo.New(path);
-            return info.LastAccessTimeUtc > info.LastWriteTimeUtc ? info.LastAccessTimeUtc : info.LastWriteTimeUtc;
+            DateTime stamp = info.LastAccessTimeUtc > info.LastWriteTimeUtc
+                ? info.LastAccessTimeUtc
+                : info.LastWriteTimeUtc;
+
+            return stamp < MinDeterminableStampUtc ? null : stamp;
         }
         catch (Exception ex) when (IsExpected(ex))
         {
             errors.Add(Describe(path, ex));
-
-            // Non determinabile: si assume "adesso" (il timestamp più fresco possibile) invece
-            // di lasciare la directory con un'età indefinita, che rischierebbe di farla
-            // considerare erroneamente abbastanza vecchia da essere eliminata.
-            return clock.GetUtcNow().UtcDateTime;
+            return null;
         }
     }
 

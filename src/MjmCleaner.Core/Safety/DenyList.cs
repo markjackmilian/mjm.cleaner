@@ -163,6 +163,54 @@ public sealed class DenyList
         return false;
     }
 
+    /// <summary>
+    /// Come <see cref="IsDenied"/>, ma ignora le voci a uguaglianza esatta ("/", "/Users", la
+    /// home configurata): quelle proteggono solo se stesse, non un intero sottoalbero (vedi il
+    /// commento sopra <c>_deniedExact</c>). Ha senso negare l'ELEMENTO "/Users/tester" stesso
+    /// (non lo si può cancellare), ma non ha senso negare la ROOT di una scansione "/Users/tester"
+    /// per lo stesso motivo: significherebbe vietare di guardare nell'intero albero sottostante,
+    /// dove vivono percorsi legittimamente pulibili come "~/Downloads" o "~/progetti". La regola
+    /// "/Users" resta invece una protezione ricorsiva mirata (le home degli ALTRI utenti, non la
+    /// propria) e si applica anche qui. Usato da <see cref="PathGuard.ValidateRoot"/>;
+    /// <see cref="PathGuard.Validate"/> continua a usare <see cref="IsDenied"/> per intero, perché
+    /// lì il percorso candidato è l'elemento da cancellare, non la root da cui si parte.
+    /// </summary>
+    public bool IsDeniedRecursively(string? canonicalPath, out string reason)
+    {
+        if (!CanonicalPath.IsCanonical(canonicalPath, out string path))
+        {
+            reason = "percorso non canonico";
+            return true;
+        }
+
+        foreach (string allowed in _exceptions)
+        {
+            if (IsSameOrUnder(path, allowed))
+            {
+                reason = string.Empty;
+                return false;
+            }
+        }
+
+        if (IsSameOrUnder(path, "/Users") && !IsSameOrUnder(path, _home))
+        {
+            reason = "percorso protetto: /Users (home di un altro utente)";
+            return true;
+        }
+
+        foreach (string denied in _denied)
+        {
+            if (IsSameOrUnder(path, denied))
+            {
+                reason = $"percorso protetto: {denied}";
+                return true;
+            }
+        }
+
+        reason = string.Empty;
+        return false;
+    }
+
     private static bool IsSameOrUnder(string path, string ancestor)
         => path.Equals(ancestor, Cmp)
            || path.StartsWith(ancestor + "/", Cmp);

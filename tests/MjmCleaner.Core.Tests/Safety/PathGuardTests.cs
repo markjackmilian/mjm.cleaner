@@ -331,4 +331,34 @@ public class PathGuardTests
     {
         Assert.False(Create().ShouldPrune(CacheRoot, out _));
     }
+
+    // IMPORTANT (re-revisione): le voci a uguaglianza esatta della deny-list ("/", "/Users", la
+    // home) proteggono solo se stesse, non un intero sottoalbero — applicarle alla ROOT di una
+    // scansione (non solo agli elementi, dove è corretto) vieta di guardare sotto quella root.
+    // Misurato con LargeFileRoots = ["~"], un'impostazione utente plausibile: la home veniva
+    // negata già da ValidateRoot, azzerando la funzione "trova i file grandi" proprio nella
+    // configurazione più naturale.
+    [Fact]
+    public void ValidateRootAllowsHomeItselfBecauseExactMatchEntriesDoNotApplyToRoots()
+    {
+        Assert.True(Create().ValidateRoot(Home).IsAllowed);
+    }
+
+    // Ciò che deve restare invariato: "/Users" è una voce RICORSIVA mirata (protegge le home
+    // degli altri utenti, non la propria), quindi continua a negare una root che vi punti.
+    [Fact]
+    public void ValidateRootStillDeniesUsersDirectoryViaRecursiveRule()
+    {
+        Assert.False(Create().ValidateRoot("/Users").IsAllowed);
+    }
+
+    // Ciò che deve restare invariato, il più importante: un percorso individualmente protetto
+    // sotto la home resta negato ELEMENTO PER ELEMENTO da Validate, anche quando ValidateRoot
+    // ammette la home come root della scansione.
+    [Fact]
+    public void ValidateStillDeniesProtectedPathUnderHomeEvenThoughValidateRootAllowsHome()
+    {
+        Assert.True(Create().ValidateRoot(Home).IsAllowed);
+        Assert.False(Create().Validate($"{Home}/Documents/fattura.pdf", Home).IsAllowed);
+    }
 }

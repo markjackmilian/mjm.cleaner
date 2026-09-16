@@ -21,11 +21,14 @@ public interface IPathGuard
     /// filesystem: se la root stessa, o un suo qualsiasi antenato, è un collegamento simbolico,
     /// lo risolve alla destinazione finale invece di negarlo alla cieca (su macOS "/var", "/etc"
     /// e "/tmp" sono essi stessi collegamenti, quindi negare sempre renderebbe "$TMPDIR"
-    /// permanentemente non pulibile), e applica la deny-list e il controllo di canonicità al
-    /// percorso risolto — che <see cref="GuardVerdict.CanonicalPathValidated"/> riporta. Nega
-    /// comunque se la destinazione di un collegamento non è determinabile. Va invocata una
-    /// volta per regola, prima di iterare sugli elementi che quella regola produce — non per
-    /// ciascun elemento validato da <see cref="Validate"/>.
+    /// permanentemente non pulibile), e applica al percorso risolto — che
+    /// <see cref="GuardVerdict.CanonicalPathValidated"/> riporta — il controllo di canonicità e
+    /// solo le voci RICORSIVE della deny-list (non quelle a uguaglianza esatta, che proteggono
+    /// solo se stesse: applicarle a una root vieterebbe di guardare nell'intero albero
+    /// sottostante, non solo di cancellare quel percorso). Nega comunque se la destinazione di
+    /// un collegamento non è determinabile. Va invocata una volta per regola, prima di iterare
+    /// sugli elementi che quella regola produce — non per ciascun elemento validato da
+    /// <see cref="Validate"/>, che per ciascun elemento applica invece la deny-list per intero.
     /// </summary>
     GuardVerdict ValidateRoot(string declaredRoot);
 
@@ -114,13 +117,26 @@ public sealed class PathGuard : IPathGuard
                 return resolutionError!;
             }
 
-            if (!CanonicalPath.IsCanonical(resolved, out string canonicalResolved) || canonicalResolved == "/")
+            // Due cause distinte, due messaggi distinti: un percorso risolto non canonico (per
+            // esempio perché un collegamento fasullo punta a qualcosa di malformato) non
+            // "coincide con la radice del filesystem" — lo fa solo il caso, verificato a parte,
+            // in cui coincide letteralmente con "/".
+            if (!CanonicalPath.IsCanonical(resolved, out string canonicalResolved))
             {
-                return GuardVerdict.Deny(
-                    "root risolta non canonica o degenere: coincide con la radice del filesystem");
+                return GuardVerdict.Deny("root risolta non canonica");
             }
 
-            if (_denyList.IsDenied(canonicalResolved, out string reason))
+            if (canonicalResolved == "/")
+            {
+                return GuardVerdict.Deny("root risolta degenere: coincide con la radice del filesystem");
+            }
+
+            // Solo le voci ricorsive della deny-list, non quelle a uguaglianza esatta ("/",
+            // "/Users", la home): queste ultime proteggono solo se stesse, non il permesso di
+            // guardarci dentro — applicarle qui vieterebbe di scansionare l'intero albero sotto
+            // una root come la home stessa (es. "$TMPDIR" o "~" per LargeFileRoots), mentre gli
+            // elementi individualmente protetti al suo interno restano negati da Validate.
+            if (_denyList.IsDeniedRecursively(canonicalResolved, out string reason))
             {
                 return GuardVerdict.Deny(reason, canonicalResolved);
             }

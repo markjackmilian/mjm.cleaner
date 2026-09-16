@@ -10,13 +10,20 @@
             <TextBlock Text="Analisi in corso…" FontSize="22" FontWeight="Bold" />
             <ProgressBar IsIndeterminate="{Binding IsRunning}" Height="4" Margin="0,8,0,0" />
             <TextBlock Text="{Binding CurrentPath}" Opacity="0.55" FontSize="11" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding ErrorText}"
+                       IsVisible="{Binding HasError}"
+                       Foreground="IndianRed"
+                       FontSize="12"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0" />
         </StackPanel>
 
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,16,0,0" Spacing="12">
             <TextBlock Text="Nessun file è stato ancora toccato."
                        Opacity="0.65"
                        VerticalAlignment="Center" />
-            <Button Content="Annulla" Command="{Binding CancelCommand}" />
+            <Button Content="Annulla" Command="{Binding CancelCommand}" IsVisible="{Binding !HasError}" />
+            <Button Content="Torna al passo 1" Command="{Binding BackToStartCommand}" IsVisible="{Binding HasError}" />
         </StackPanel>
 
         <ItemsControl ItemsSource="{Binding Progress}">

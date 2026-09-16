@@ -28,6 +28,20 @@ public sealed partial class ScanStepViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isRunning = true;
 
+    /// <summary>
+    /// Vuoto finché l'analisi non fallisce. <see cref="HasError"/> le tiene sincronizzate: senza
+    /// un'eccezione diversa dall'annullamento catturata esplicitamente in <see cref="RunAsync"/>,
+    /// il task andrebbe in stato "faulted" in silenzio — IsRunning resterebbe true per sempre, la
+    /// barra continuerebbe ad animarsi, e Annulla non avrebbe più effetto (il token non incide su
+    /// un task già concluso) — intrappolando l'utente sul passo 2 senza via d'uscita se non la
+    /// chiusura forzata dell'app.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    private string _errorText = string.Empty;
+
+    public bool HasError => ErrorText.Length > 0;
+
     public ScanStepViewModel(
         AppServices services,
         MainWindowViewModel main,
@@ -60,6 +74,11 @@ public sealed partial class ScanStepViewModel : ViewModelBase
             IsRunning = false;
             _main.StartOver();
         }
+        catch (Exception ex)
+        {
+            IsRunning = false;
+            ErrorText = $"Analisi non riuscita: {ex.Message}";
+        }
     }
 
     private void OnProgress(ScanProgress progress)
@@ -72,7 +91,7 @@ public sealed partial class ScanStepViewModel : ViewModelBase
 
         CategoryProgress row = Progress.First(p => p.DisplayName == category.DisplayName);
         row.Status = progress.CurrentPath.Length == 0
-            ? $"{progress.ItemsFound} elementi · {FormatBytes(progress.BytesFound)}"
+            ? $"{progress.ItemsFound} {Plural(progress.ItemsFound, "elemento", "elementi")} · {FormatBytes(progress.BytesFound)}"
             : "in corso…";
 
         if (progress.CurrentPath.Length > 0)
@@ -83,4 +102,8 @@ public sealed partial class ScanStepViewModel : ViewModelBase
 
     [RelayCommand]
     private void Cancel() => _cts.Cancel();
+
+    /// <summary>Unica via d'uscita quando l'analisi fallisce: non c'è nulla da annullare, si torna al passo 1.</summary>
+    [RelayCommand]
+    private void BackToStart() => _main.StartOver();
 }

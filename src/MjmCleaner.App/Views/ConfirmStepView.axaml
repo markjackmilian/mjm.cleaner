@@ -29,8 +29,15 @@
                        IsVisible="{Binding ExclusionsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                        Opacity="0.7" FontSize="11" TextWrapping="Wrap" />
 
+            <TextBlock Text="{Binding DeleteProgressText}"
+                       IsVisible="{Binding IsDeleting}"
+                       Opacity="0.75" FontSize="12" HorizontalAlignment="Right" />
+
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                <Button Content="← Indietro" Command="{Binding BackCommand}" />
+                <Button Content="Ricomincia" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsDeleting}" />
+                <Button Content="Interrompi"
+                        Command="{Binding CancelDeleteCommand}"
+                        IsVisible="{Binding IsDeleting}" />
                 <Button Content="{Binding TotalText, StringFormat='Elimina {0}'}"
                         Command="{Binding DeleteCommand}"
                         Padding="18,8"
@@ -42,29 +49,48 @@
             <ItemsControl ItemsSource="{Binding Nodes}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:CategoryNode">
-                        <Expander Header="{Binding DisplayName}" IsExpanded="True" Margin="0,0,0,8">
-                            <ItemsControl ItemsSource="{Binding Paths}">
-                                <ItemsControl.ItemTemplate>
+                        <Expander IsExpanded="True" Margin="0,0,0,8">
+                            <Expander.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding SummaryText}"
+                                               Opacity="0.6"
+                                               FontSize="12"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Expander.Header>
+
+                            <!--
+                                ListBox, non ItemsControl: un ItemsControl dentro uno ScrollViewer
+                                disegna ogni riga fin da subito, mentre ListBox virtualizza per
+                                default (VirtualizingStackPanel dietro il suo ScrollViewer
+                                interno). MaxHeight è ciò che rende la virtualizzazione reale:
+                                senza un vincolo di altezza finito il pannello riceverebbe
+                                un'altezza disponibile infinita dallo ScrollViewer esterno e
+                                realizzerebbe comunque ogni riga per calcolare la dimensione
+                                totale. Con MaxHeight, il motore di layout limita l'altezza
+                                disponibile passata al ListBox PRIMA di interrogarlo, quindi la
+                                virtualizzazione ha un riquadro finito su cui operare anche per
+                                una categoria con oltre mille elementi (le cache di sistema).
+                            -->
+                            <ListBox ItemsSource="{Binding Paths}" MaxHeight="360">
+                                <ListBox.ItemTemplate>
                                     <DataTemplate DataType="vm:PathNode">
-                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="6,3">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="6,3">
                                             <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" />
                                             <TextBlock Grid.Column="1"
                                                        Text="{Binding Path}"
+                                                       Margin="6,0"
                                                        VerticalAlignment="Center"
                                                        TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2"
-                                                       Text="{Binding CountText}"
-                                                       Opacity="0.55"
-                                                       Margin="10,0"
-                                                       VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="3"
                                                        Text="{Binding SizeText}"
                                                        FontWeight="SemiBold"
                                                        VerticalAlignment="Center" />
                                         </Grid>
                                     </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </Expander>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

@@ -21,4 +21,7 @@ public abstract class ViewModelBase : ObservableObject
             ? $"{bytes} {units[unit]}"
             : string.Format(new System.Globalization.CultureInfo("it-IT"), "{0:0.#} {1}", value, units[unit]);
     }
+
+    /// <summary>Concordanza minima singolare/plurale: evita «1 elementi» quando <paramref name="count"/> è 1.</summary>
+    public static string Plural(int count, string singular, string plural) => count == 1 ? singular : plural;
 }

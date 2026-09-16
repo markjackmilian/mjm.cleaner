@@ -23,15 +23,23 @@ public sealed partial class DoneStepViewModel : ViewModelBase
         _report = report;
 
         FreedText = $"{FormatBytes(report.BytesFreed)} liberati";
-        SummaryText = $"in {report.Duration.TotalSeconds:0} secondi · {report.ItemsDeleted:N0} elementi eliminati";
+        SummaryText = $"in {report.Duration.TotalSeconds:0} secondi · " +
+                       $"{report.ItemsDeleted:N0} {Plural(report.ItemsDeleted, "elemento eliminato", "elementi eliminati")}";
+
+        // Il resoconto nomina le categorie per identificativo stabile ("project-build-output"),
+        // non per il nome visualizzato: qui si traduce nel nome usato ovunque altrove nel wizard.
+        // Il fallback sull'identificativo stesso è solo defensive — ogni CategoryId in un
+        // CleanReport reale proviene dallo stesso catalogo interrogato da BuildCategories().
+        Dictionary<string, string> displayNames = services.BuildCategories()
+            .ToDictionary(c => c.Id, c => c.DisplayName, StringComparer.Ordinal);
 
         Rows = [.. report.Categories
             .Where(c => c.ItemsDeleted > 0)
-            .Select(c => $"{c.CategoryId} — {FormatBytes(c.BytesFreed)}")];
+            .Select(c => $"{displayNames.GetValueOrDefault(c.CategoryId, c.CategoryId)} — {FormatBytes(c.BytesFreed)}")];
 
         ErrorsText = report.ItemsFailed == 0
             ? string.Empty
-            : $"{report.ItemsFailed} elementi non eliminati. {DescribeErrors(report.Errors)}";
+            : $"{report.ItemsFailed} {Plural(report.ItemsFailed, "elemento non eliminato", "elementi non eliminati")}. {DescribeErrors(report.Errors)}";
 
         _ = PersistAsync();
     }
@@ -59,9 +67,29 @@ public sealed partial class DoneStepViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Riconosce un problema di permessi anche quando l'eccezione che l'ha generato non è
+    /// classificata come tale nel nucleo. Misurato su questa macchina: <c>Directory.Delete</c>
+    /// ricorsivo su un percorso negato da una ACL (lo stesso meccanismo dietro l'Accesso completo
+    /// al disco) solleva <see cref="IOException"/>, non <see cref="UnauthorizedAccessException"/>
+    /// — <c>RuleScanner.Describe</c> lo classifica quindi "InUse" (in uso), non "AccessDenied".
+    /// Poiché quasi tutto ciò che l'app elimina è una directory (bin, obj, ogni figlio delle
+    /// cache, i pacchetti NuGet), non riconoscerlo qui significa che l'indicazione su dove
+    /// concedere il permesso non compare quasi mai. Il testo del messaggio in quel caso è
+    /// letteralmente identico a quello di UnauthorizedAccessException ("Access to the path
+    /// '...' is denied."): è l'unico segnale disponibile senza toccare la classificazione nel
+    /// nucleo, che resta fuori da questo perimetro.
+    /// </summary>
+    private static bool LooksLikePermissionError(ScanError error)
+        => error.Kind == ScanErrorKind.AccessDenied
+           || error.Message.Contains("denied", StringComparison.OrdinalIgnoreCase)
+           || error.Message.Contains("not permitted", StringComparison.OrdinalIgnoreCase)
+           || error.Message.Contains("negat", StringComparison.OrdinalIgnoreCase)
+           || error.Message.Contains("consentit", StringComparison.OrdinalIgnoreCase);
+
     private static string DescribeErrors(IReadOnlyList<ScanError> errors)
     {
-        if (errors.Any(e => e.Kind == ScanErrorKind.AccessDenied))
+        if (errors.Any(LooksLikePermissionError))
         {
             return "Alcuni richiedono l'Accesso completo al disco: " +
                    "Impostazioni di Sistema → Privacy e sicurezza → Accesso completo al disco.";

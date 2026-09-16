@@ -608,6 +608,28 @@ public class PathGuardTests
         string docker = $"{Home}/Library/Containers/com.docker.docker/Data/vms";
         Assert.False(Create().Validate(docker, $"{Home}/Library/Containers").IsAllowed);
     }
+
+    // I tre casi seguenti nascono dalla revisione del Task 3, che li aveva misurati
+    // come passanti: la radice si riduceva a stringa vuota e sfuggiva a ogni confronto.
+    [Theory]
+    [InlineData("/")]
+    [InlineData("//")]
+    public void DeniesFilesystemRoot(string root)
+    {
+        Assert.False(Create().Validate(root, "/").IsAllowed);
+    }
+
+    [Fact]
+    public void DeniesAnotherUsersHome()
+    {
+        Assert.False(Create().Validate("/Users/altro/Documents/fatture", "/Users").IsAllowed);
+    }
+
+    [Fact]
+    public void DeniesExternalVolume()
+    {
+        Assert.False(Create().Validate("/Volumes/Backup/2026", "/Volumes").IsAllowed);
+    }
 }
 ```
 

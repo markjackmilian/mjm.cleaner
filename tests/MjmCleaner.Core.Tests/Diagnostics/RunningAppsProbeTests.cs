@@ -94,4 +94,24 @@ public class RunningAppsProbeTests
 
         Assert.Equal(["Docker Desktop"], affected);
     }
+
+    // "apple" (e altre parole generiche come "com") compare in moltissime cartelle cache Apple
+    // e in moltissimi nomi di demoni di sistema, entrambi in stile reverse-DNS: senza esclusione
+    // produrrebbe segnalazioni su larga scala e prive di significato (misurato sui dati reali:
+    // 85% delle segnalazioni derivava dalla sola parola "apple" condivisa). Con l'esclusione,
+    // demoni Apple realistici non devono corrispondere a cartelle cache Apple realistiche.
+    [Fact]
+    public void GenericReverseDnsWordsDoNotCauseAppleDaemonsToMatchAppleCacheFolders()
+    {
+        IReadOnlyList<string> affected = Create("com.apple.accountsd", "com.apple.secd", "com.apple.tipsd")
+            .AffectedApps(
+            [
+                "/Users/tester/Library/Caches/com.apple.Safari",
+                "/Users/tester/Library/Caches/com.apple.Dock",
+                "/Users/tester/Library/Caches/com.apple.Mail",
+                "/Users/tester/Library/Caches/com.apple.WebKit",
+            ]);
+
+        Assert.Empty(affected);
+    }
 }

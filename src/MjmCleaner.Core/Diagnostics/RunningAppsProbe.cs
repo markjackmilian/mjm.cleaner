@@ -16,12 +16,25 @@ public sealed class RunningAppsProbe(Func<IReadOnlyList<string>> processNames) :
     private const int MinimumWordLength = 4;
     private static readonly char[] WordSeparators = ['.', ' ', '-', '_'];
 
+    /// <summary>
+    /// Parole così comuni nei nomi di cartelle cache e di processo in stile reverse-DNS
+    /// (specialmente quelli Apple, es. "com.apple.CodeSigningHelper") da non distinguere
+    /// nulla: se incluse nel confronto, quasi ogni demone di sistema risulterebbe "affetto"
+    /// da quasi ogni cartella cache Apple, e l'avviso diventerebbe un elenco che nessuno legge.
+    /// Escluse da entrambi i lati del confronto, prima di applicare la soglia di lunghezza.
+    /// </summary>
+    private static readonly HashSet<string> GenericWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "com", "org", "net", "io", "co", "apple", "helper", "agent", "service", "services", "daemon",
+        "app", "apps", "macos", "osx", "system", "core", "framework", "shared", "common", "cache", "caches",
+    };
+
     public IReadOnlyList<string> AffectedApps(IEnumerable<string> paths)
     {
         (string FullName, string[] SignificantWords)[] candidates = [.. processNames()
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(name => (FullName: name, SignificantWords: SplitIntoWords(name)
-                .Where(word => word.Length >= MinimumWordLength)
+                .Where(word => !GenericWords.Contains(word) && word.Length >= MinimumWordLength)
                 .ToArray()))
             .Where(candidate => candidate.SignificantWords.Length > 0)];
 
@@ -36,7 +49,10 @@ public sealed class RunningAppsProbe(Func<IReadOnlyList<string>> processNames) :
         {
             foreach (string word in SplitIntoWords(Path.GetFileName(path)))
             {
-                folderWords.Add(word);
+                if (!GenericWords.Contains(word))
+                {
+                    folderWords.Add(word);
+                }
             }
         }
 

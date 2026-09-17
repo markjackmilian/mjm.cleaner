@@ -4,9 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag esistente da pubblicare, per esempio v0.0.1"
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
 jobs:
   test:
@@ -15,6 +24,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
@@ -43,6 +54,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
@@ -51,7 +64,7 @@ jobs:
 
       - name: Build application bundle
         env:
-          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ env.RELEASE_TAG }}
           BUILD_NUMBER: ${{ github.run_number }}
           RUNTIME_ID: ${{ matrix.runtime }}
         run: |
@@ -63,7 +76,33 @@ jobs:
       - name: Upload application archive
         uses: actions/upload-artifact@v4
         with:
-          name: mjm.cleaner-${{ github.ref_name }}-macos-${{ matrix.architecture }}
+          name: mjm.cleaner-${{ env.RELEASE_TAG }}-macos-${{ matrix.architecture }}
           path: artifacts/*.zip
           if-no-files-found: error
           compression-level: 0
+
+  release:
+    name: Publish GitHub release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download application archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mjm.cleaner-*-macos-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/*.zip --clobber
+          else
+            gh release create "$RELEASE_TAG" release-assets/*.zip \
+              --verify-tag \
+              --generate-notes \
+              --title "$RELEASE_TAG"
+          fi

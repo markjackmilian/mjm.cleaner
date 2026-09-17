@@ -1,0 +1,69 @@
+name: Build macOS release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Run tests
+        run: dotnet test --configuration Release
+
+      - name: Test bundle configuration
+        run: bash tests/build/bundle-config.test.sh
+
+  package:
+    name: Package ${{ matrix.architecture }}
+    needs: test
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: osx-arm64
+            architecture: arm64
+          - runtime: osx-x64
+            architecture: x64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build application bundle
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          RUNTIME_ID: ${{ matrix.runtime }}
+        run: |
+          ./build/bundle.sh \
+            --runtime "$RUNTIME_ID" \
+            --version "$RELEASE_VERSION" \
+            --build-number "$BUILD_NUMBER"
+
+      - name: Upload application archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: mjm.cleaner-${{ github.ref_name }}-macos-${{ matrix.architecture }}
+          path: artifacts/*.zip
+          if-no-files-found: error
+          compression-level: 0

@@ -1,113 +1,121 @@
 # mjm.cleaner
 
-Applicazione macOS per eliminare file temporanei rigenerabili, con anteprima
-obbligatoria, storico delle pulizie e contatore cumulativo dello spazio liberato.
+A macOS application for deleting regenerable temporary files, with a mandatory
+preview, cleanup history, and a cumulative counter of the disk space recovered.
 
-L'app non decide mai da sola: ogni elemento viene prima elencato, con percorso
-esatto e dimensione, e solo dopo una conferma esplicita viene eliminato. Un
-`PathGuard` non configurabile rifiuta comunque i percorsi protetti, anche se una
-cartella di progetto mal configurata dovesse puntarci contro.
+The application never makes deletion decisions on its own: every item is listed
+with its exact path and size before it can be removed, and deletion only starts
+after explicit confirmation. A non-configurable `PathGuard` always rejects
+protected paths, even if a misconfigured project directory points to one of
+them.
 
-## Requisiti
+## Requirements
 
-- macOS 13 o successivo
-- .NET 10 SDK — su questa macchina è installato in `/usr/local/share/dotnet` e
-  **non è nel `PATH`**: ogni comando `dotnet` va preceduto da
+- macOS 13 or later
+- .NET 10 SDK — on this machine it is installed in `/usr/local/share/dotnet`
+  and is **not in `PATH`**. Prefix each `dotnet` command with:
 
   ```bash
   export PATH="/usr/local/share/dotnet:$PATH"
   ```
 
-  (`build/bundle.sh` lo fa già al proprio interno.)
+  (`build/bundle.sh` already does this internally.)
 
-## Sviluppo
+## Development
 
 ```bash
 export PATH="/usr/local/share/dotnet:$PATH"
 
-dotnet build                             # compila soluzione e test
-dotnet test                              # suite completa (262 test)
-dotnet run --project src/MjmCleaner.App  # avvio in sviluppo
-./build/bundle.sh                        # crea artifacts/mjm.cleaner.app
-open artifacts/mjm.cleaner.app           # avvia il bundle
+dotnet build                             # build the solution and tests
+dotnet test                              # run the complete test suite
+dotnet run --project src/MjmCleaner.App  # run the development build
+./build/bundle.sh                        # create the complete macOS bundle
+open artifacts/mjm.cleaner.app           # launch the bundle
 ```
 
-Il bundle è **firmato ad hoc** (`codesign --sign -`): senza firma macOS si
-rifiuterebbe di avviarlo. Non essendo notarizzato, `spctl` lo rifiuta: compilato
-in locale parte comunque, ma se venisse copiato da un altro Mac andrebbe aperto
-la prima volta con **clic destro → Apri**.
+> [!IMPORTANT]
+> Run **`./build/bundle.sh`** to create the distributable application.
+> A plain `dotnet publish` only produces the Avalonia binaries, not a complete
+> macOS bundle. The script publishes the application, creates
+> `artifacts/mjm.cleaner.app`, adds `Info.plist` and the `.icns` icon, and then
+> applies the ad hoc signature required to launch it on macOS.
 
-## Come funziona
+The bundle is **ad hoc signed** (`codesign --sign -`): macOS would refuse to
+launch it without a signature. Because it is not notarized, `spctl` rejects it.
+A locally built copy still launches normally, but a copy transferred from
+another Mac must be opened for the first time with **right-click → Open**.
 
-Wizard a quattro passi, sempre nello stesso ordine:
+## How it works
 
-| Passo | Cosa fa |
+The application uses a four-step wizard, always in the same order:
+
+| Step | What it does |
 |---|---|
-| **1 · Scegli** | Si selezionano le categorie da pulire. Ognuna dichiara il proprio livello di rischio; quelle ad alto rischio non sono mai preselezionate. |
-| **2 · Analizza** | Scansione in sola lettura, categorie in parallelo. Non elimina nulla. |
-| **3 · Conferma** | Anteprima obbligatoria: percorsi esatti, dimensioni, avviso sulle app aperte e riquadro delle esclusioni decise dal `PathGuard`. È l'ultimo punto in cui si può tornare indietro. |
-| **4 · Fatto** | Riepilogo dello spazio liberato e degli elementi che non è stato possibile eliminare. |
+| **1 · Choose** | Select the categories to clean. Each category declares its risk level; high-risk categories are never preselected. |
+| **2 · Analyze** | Performs a read-only scan, processing categories in parallel. Nothing is deleted. |
+| **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard`. This is the final point at which the operation can be abandoned. |
+| **4 · Done** | Summarizes the disk space recovered and any items that could not be deleted. |
 
-Nella barra strumenti, **Storico** mostra le pulizie precedenti e il totale
-cumulativo liberato; **Impostazioni** permette di configurare le cartelle di
-progetto in cui cercare `bin` e `obj`, le cartelle in cui cercare i file grandi,
-la soglia dei file grandi e le età minime di Download, log e pacchetti NuGet.
+In the toolbar, **History** shows previous cleanup sessions and the cumulative
+space recovered. **Settings** configures the project directories searched for
+`bin` and `obj`, the directories searched for large files, the large-file size
+threshold, and the minimum ages for Downloads, logs, and NuGet packages.
 
-### Categorie
+### Categories
 
-- **Cache utente e di sistema** — `~/Library/Caches`, `/Library/Caches`, `$TMPDIR`
-- **Cache di sviluppo** — npm, Xcode (DerivedData, Archives), Gradle, `~/.cache`
-  - **Pacchetti NuGet inutilizzati** (sottocategoria, non preselezionata)
-- **Cartelle bin e obj nei progetti** — solo se accanto alla cartella c'è un file
-  di progetto (`.csproj`, `.sln`, …)
-- **Log e crash report** — `~/Library/Logs`, `/Library/Logs`
-- **Cestino, Download e file grandi** — rischio alto, mai preselezionata
+- **User and system caches** — `~/Library/Caches`, `/Library/Caches`, `$TMPDIR`
+- **Development caches** — npm, Xcode (DerivedData and Archives), Gradle,
+  `~/.cache`
+  - **Unused NuGet packages** (sub-category, not preselected)
+- **Project bin and obj directories** — only when a project file (`.csproj`,
+  `.sln`, …) exists next to the directory
+- **Logs and crash reports** — `~/Library/Logs`, `/Library/Logs`
+- **Trash, Downloads, and large files** — high risk, never preselected
 
-## Storico e log
+## History and logs
 
-Tutto vive sotto `~/Library/Application Support/mjm.cleaner/`:
+All application data is stored under
+`~/Library/Application Support/mjm.cleaner/`:
 
-| File | Contenuto |
+| File | Contents |
 |---|---|
-| `history.db` | SQLite: una riga per sessione di pulizia, con durata, byte liberati, elementi eliminati e falliti. Alimenta lo storico e il contatore cumulativo. |
-| `settings.json` | Le impostazioni modificabili dalla pagina *Impostazioni*. |
-| `logs/session-NNNNNN.jsonl.gz` | Elenco completo dei percorsi eliminati, una riga JSON per elemento, compresso. Ne vengono conservate le ultime **20** sessioni; le più vecchie sono rimosse automaticamente. |
+| `history.db` | SQLite database with one row per cleanup session, including duration, bytes recovered, deleted items, and failed items. It powers the history view and cumulative counter. |
+| `settings.json` | Settings editable from the **Settings** page. |
+| `logs/session-NNNNNN.jsonl.gz` | Complete list of deleted paths, with one JSON record per item, compressed. Only the latest **20** sessions are retained; older files are removed automatically. |
 
-I percorsi eliminati non finiscono in SQLite di proposito: una pulizia delle
-cache tocca centinaia di migliaia di file e il database crescerebbe più in fretta
-dello spazio liberato.
+Deleted paths are deliberately not stored in SQLite: cleaning caches may touch
+hundreds of thousands of files, which would make the database grow faster than
+the disk space being recovered.
 
-Questa cartella è sotto `~/Library/Application Support`, che la deny-list
-protegge: **l'applicazione non può eliminare il proprio storico**.
+This directory is under `~/Library/Application Support`, which is protected by
+the deny list: **the application cannot delete its own history**.
 
-## Avvertenze
+## Warnings
 
-- **L'eliminazione è definitiva:** i file non passano dal Cestino e non sono
-  recuperabili. L'anteprima del passo 3 elenca i percorsi esatti; il `PathGuard`
-  blocca comunque i percorsi protetti (`/System`, `/usr`, `/bin`, `/sbin`,
-  `/Applications`, `/Volumes`, `~/Documents`, `~/.ssh`, `~/Library/Keychains`, …)
-  e non è configurabile dall'interfaccia: è l'ultima linea di difesa, non una
-  preferenza. Una cartella di progetto impostata su `/` viene rifiutata in blocco
-  e non produce alcun candidato.
-- **Full Disk Access — serve solo per il Cestino:** l'unico percorso che, alla
-  misurazione dello spike, lo richiede è `~/.Trash`; tutte le altre categorie
-  funzionano senza. Un accesso negato viene comunque sempre gestito e riportato,
-  per qualsiasi percorso, non solo per quelli noti. Se serve,
-  concederlo al bundle in *Impostazioni di Sistema → Privacy e sicurezza →
-  Accesso completo al disco* aggiungendo `artifacts/mjm.cleaner.app` con il
-  pulsante **+** (<kbd>⌘⇧G</kbd> per incollare il percorso). Essendo la firma ad
-  hoc, la concessione è legata all'impronta del bundle: **dopo una modifica al
-  codice va riconcessa**, mentre una ricompilazione a sorgente invariato la
-  conserva.
-- **Nessuna elevazione di privilegi:** l'app non usa mai `sudo` e non chiede la
-  password. Gli elementi di proprietà di `root` falliscono con accesso negato e
-  compaiono nel riepilogo finale del passo 4.
-- **Docker non viene toccato:** `~/Library/Containers/com.docker.docker` e
-  `~/.docker` sono nella deny-list. Lo spazio delle immagini e dei volumi si
-  recupera con `docker system prune`.
+- **Deletion is permanent:** files do not go through the Trash and cannot be
+  recovered. The step 3 preview lists the exact paths. `PathGuard` also blocks
+  protected locations (`/System`, `/usr`, `/bin`, `/sbin`, `/Applications`,
+  `/Volumes`, `~/Documents`, `~/.ssh`, `~/Library/Keychains`, …) and cannot be
+  configured through the UI. It is the final line of defense, not a preference.
+  A project directory set to `/` is rejected in full and produces no candidates.
+- **Full Disk Access is only required for the Trash:** during the exploratory
+  measurement, the only path requiring it was `~/.Trash`; all other categories
+  work without it. Access-denied errors are always handled and reported for any
+  path, not only known protected locations. When needed, grant access to the
+  bundle under **System Settings → Privacy & Security → Full Disk Access** by
+  adding `artifacts/mjm.cleaner.app` with the **+** button (<kbd>⌘⇧G</kbd> lets
+  you paste the path). Because the bundle uses an ad hoc signature, the grant is
+  tied to its fingerprint: **it must be granted again after a code change**,
+  while rebuilding unchanged source preserves it.
+- **No privilege elevation:** the application never uses `sudo` or asks for a
+  password. Items owned by `root` fail with an access-denied error and appear in
+  the final summary in step 4.
+- **Docker is not touched:** `~/Library/Containers/com.docker.docker` and
+  `~/.docker` are on the deny list. Reclaim image and volume space with
+  `docker system prune`.
 
-## Documentazione
+## Documentation
 
-- Specifica: `docs/superpowers/specs/2026-09-15-mjm-cleaner-design.md`
-- Piano di implementazione: `docs/superpowers/plans/2026-09-15-mjm-cleaner.md`
-- Spike sul Full Disk Access: `docs/superpowers/spikes/2026-09-15-full-disk-access.md`
+- Specification: `docs/superpowers/specs/2026-09-15-mjm-cleaner-design.md`
+- Implementation plan: `docs/superpowers/plans/2026-09-15-mjm-cleaner.md`
+- Full Disk Access spike: `docs/superpowers/spikes/2026-09-15-full-disk-access.md`

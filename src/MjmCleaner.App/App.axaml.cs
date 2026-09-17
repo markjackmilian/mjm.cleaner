@@ -12,6 +12,13 @@ namespace MjmCleaner.App;
 
 public partial class App : Application
 {
+    public App()
+    {
+        // Il menu nativo macOS viene creato prima di Initialize(): impostare il nome anche nel
+        // costruttore evita che l'avvio non impacchettato conservi "Avalonia Application".
+        Name = "mjm.cleaner";
+    }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);

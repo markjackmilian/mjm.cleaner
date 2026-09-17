@@ -31,8 +31,9 @@
                 </StackPanel>
             </Grid>
         </Border>
-        <ScrollViewer>
-            <ContentControl Content="{Binding CurrentPage}" MaxWidth="1120" HorizontalAlignment="Center" Margin="30,28" />
-        </ScrollViewer>
+        <ContentControl Content="{Binding CurrentPage}"
+                        MaxWidth="1120"
+                        HorizontalAlignment="Stretch"
+                        Margin="30,28" />
     </DockPanel>
 </Window>

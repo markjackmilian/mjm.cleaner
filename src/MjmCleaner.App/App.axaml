@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
              xmlns:views="clr-namespace:MjmCleaner.App.Views"
              x:Class="MjmCleaner.App.App"
+             Name="mjm.cleaner"
              RequestedThemeVariant="Light">
 
     <Application.Styles>

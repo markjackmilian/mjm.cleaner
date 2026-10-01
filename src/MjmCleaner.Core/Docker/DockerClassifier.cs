@@ -51,6 +51,13 @@ public static class DockerClassifier
 
         if (snapshot.Df.BuildCache > 0)
         {
+            // La parte condivisa con immagini ancora presenti non si libera finché quelle restano:
+            // la dimensione mostrata è un massimo, non una promessa.
+            DockerDfEntry? cache = snapshot.Df.Entries.FirstOrDefault(e => e.Type == DockerDfSummary.BuildCacheType);
+            string reason = cache is not null && cache.ReclaimableBytes < cache.SizeBytes
+                ? "cache di BuildKit, in parte condivisa con immagini presenti: si libera del tutto solo se anche quelle vengono eliminate"
+                : "cache di BuildKit";
+
             candidates.Add(new DockerCandidate(
                 DockerResourceKind.BuildCache,
                 BuildCacheId,
@@ -58,7 +65,7 @@ public static class DockerClassifier
                 snapshot.Df.BuildCache,
                 DockerVerdict.Delete,
                 BuildCacheId,
-                "cache di BuildKit",
+                reason,
                 "solo tempo alla build successiva"));
         }
 

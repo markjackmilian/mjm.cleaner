@@ -1,0 +1,123 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             x:Class="MjmCleaner.App.Views.DockerView"
+             x:DataType="vm:DockerViewModel">
+
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
+            <TextBlock Text="DOCKER" Classes="Eyebrow" />
+            <TextBlock Text="Pulizia Docker" Classes="PageTitle" />
+            <TextBlock Text="Anteprima: nulla viene eliminato finché non premi «Elimina»." Classes="PageSubtitle" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
+            <Border IsVisible="{Binding IsReady}"
+                    Padding="12" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}" BorderThickness="1" BorderBrush="#F0D69B">
+                <TextBlock TextWrapping="Wrap"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource WarningTextBrush}"
+                           Text="Eliminazione definitiva: immagini e volumi eliminati non sono recuperabili. I volumi contengono dati." />
+            </Border>
+
+            <TextBlock Text="{Binding DeleteProgressText}"
+                       IsVisible="{Binding IsDeleting}"
+                       Classes="Muted" FontSize="12" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
+
+            <TextBlock Text="{Binding DeleteErrorText}"
+                       IsVisible="{Binding HasDeleteError}"
+                       Foreground="{DynamicResource DangerBrush}"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}" IsEnabled="{Binding !IsDeleting}" />
+                <Button Classes="Secondary" Content="Interrompi"
+                        Command="{Binding CancelDeleteCommand}"
+                        IsVisible="{Binding IsDeleting}" />
+                <Button Classes="Destructive" Content="{Binding TotalText, StringFormat='Elimina {0}'}"
+                        Command="{Binding DeleteCommand}"
+                        IsVisible="{Binding IsReady}"
+                        Padding="18,8"
+                        FontWeight="Bold" />
+            </StackPanel>
+        </StackPanel>
+
+        <Panel>
+            <StackPanel IsVisible="{Binding IsLoading}" Spacing="10" VerticalAlignment="Center" MaxWidth="420">
+                <ProgressBar IsIndeterminate="True" />
+                <TextBlock Text="Analisi di Docker e delle cartelle progetto in corso…" Classes="Muted" HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <Border IsVisible="{Binding HasError}" Classes="SurfaceCard" Padding="16" VerticalAlignment="Center" MaxWidth="560">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="{Binding ErrorText}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                    <Button Classes="Primary" Content="Riprova" Command="{Binding RetryCommand}" HorizontalAlignment="Right" />
+                </StackPanel>
+            </Border>
+
+            <DockPanel IsVisible="{Binding IsReady}" LastChildFill="True">
+                <Border DockPanel.Dock="Top" Classes="SurfaceCard" Padding="12" Margin="0,0,0,12">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding ServerText}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding DiskText}" Classes="Muted" FontSize="12" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding DfText}" Classes="Muted" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Groups}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:DockerGroupNode">
+                                <Expander IsExpanded="{Binding IsExpanded, Mode=OneTime}" HorizontalAlignment="Stretch" Margin="0,0,0,8">
+                                    <Expander.Header>
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding SummaryText}" Classes="Muted" FontSize="12" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Expander.Header>
+
+                                    <StackPanel Spacing="6">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Description}" Classes="Muted" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                            <CheckBox Grid.Column="1"
+                                                      IsVisible="{Binding ShowGroupCheckBox}"
+                                                      IsChecked="{Binding IsSelected}"
+                                                      Content="{Binding GroupCheckBoxLabel}"
+                                                      Margin="12,0,0,0" />
+                                        </Grid>
+
+                                        <!-- Stessa scelta del passo di conferma: ListBox virtualizza, MaxHeight le dà un riquadro finito. -->
+                                        <ListBox ItemsSource="{Binding Rows}" MaxHeight="360">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate DataType="vm:DockerRow">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="8,5">
+                                                        <CheckBox Grid.Column="0"
+                                                                  IsVisible="{Binding ShowCheckBox}"
+                                                                  IsChecked="{Binding IsSelected}"
+                                                                  VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" Margin="8,0" Spacing="2">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding DetailText}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <Border Grid.Column="2" Classes="StatusPill" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                            <TextBlock Text="{Binding KindLabel}" Classes="Muted" FontSize="11" />
+                                                        </Border>
+                                                        <TextBlock Grid.Column="3"
+                                                                   Text="{Binding SizeText}"
+                                                                   FontWeight="SemiBold"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </StackPanel>
+                                </Expander>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Panel>
+    </DockPanel>
+</UserControl>

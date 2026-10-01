@@ -39,4 +39,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     [RelayCommand]
     private void ShowSettings() => CurrentPage = new SettingsViewModel(_services, this);
+
+    [RelayCommand]
+    private void ShowDocker() => CurrentPage = new DockerViewModel(_services, this);
 }

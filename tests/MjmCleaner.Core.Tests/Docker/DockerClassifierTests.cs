@@ -258,6 +258,29 @@ public class DockerClassifierTests
     }
 
     [Fact]
+    public void BuildCacheSharedWithImagesSaysItMayNotBeFreedYet()
+    {
+        // Misurato: 101,9 MB di cache, 0 B recuperabili — i layer sono condivisi con l'immagine
+        // dcptun ancora presente. Presentarla come spazio sicuramente recuperabile sarebbe falso.
+        DockerSnapshot snapshot = Snapshot() with
+        {
+            Df = new DockerDfSummary([new DockerDfEntry(DockerDfSummary.BuildCacheType, 101_900_000, 0)]),
+        };
+
+        DockerCandidate cache = DockerClassifier.Classify(snapshot, ProjectReferences.Empty).Single(c => c.Kind == DockerResourceKind.BuildCache);
+
+        Assert.Contains("condivisa con immagini presenti", cache.Reason);
+    }
+
+    [Fact]
+    public void FullyReclaimableBuildCacheHasNoSharingNote()
+    {
+        DockerCandidate cache = ClassifyRealCase().Single(c => c.Kind == DockerResourceKind.BuildCache);
+
+        Assert.DoesNotContain("condivisa", cache.Reason);
+    }
+
+    [Fact]
     public void EmptyBuildCacheIsNotProposed()
     {
         DockerSnapshot snapshot = Snapshot() with { Df = DockerDfSummary.Empty };

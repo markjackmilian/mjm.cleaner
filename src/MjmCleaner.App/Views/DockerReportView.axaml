@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             x:Class="MjmCleaner.App.Views.DockerReportView"
+             x:DataType="vm:DockerReportViewModel">
+
+    <DockPanel LastChildFill="True">
+        <TextBlock DockPanel.Dock="Top" Text="DOCKER" Classes="Eyebrow" Margin="0,0,0,20" />
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,16,0,0">
+            <TextBlock Text="{Binding HistoryWarning}"
+                       IsVisible="{Binding HistoryWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Classes="Muted" FontSize="12" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}" />
+                <Button Classes="Primary" Content="Nuova analisi" Command="{Binding AnalyzeAgainCommand}" Padding="18,8" />
+            </StackPanel>
+        </StackPanel>
+
+        <ScrollViewer>
+            <StackPanel Spacing="16">
+                <StackPanel HorizontalAlignment="Center" Spacing="6">
+                    <TextBlock Text="Pulizia Docker completata" Classes="PageTitle" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding FreedText}" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding SummaryText}" Classes="PageSubtitle" HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <Border Classes="SurfaceCard" Padding="14">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding DfText}" />
+                        <TextBlock Text="{Binding DiskText}" />
+                    </StackPanel>
+                </Border>
+
+                <Border IsVisible="{Binding DaemonLostText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        Padding="12" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}">
+                    <TextBlock Text="{Binding DaemonLostText}" Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                </Border>
+
+                <Border IsVisible="{Binding PurgeHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        Padding="12" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}">
+                    <TextBlock Text="{Binding PurgeHint}" Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" />
+                </Border>
+
+                <Border Classes="SurfaceCard" Padding="14">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Eliminate" FontWeight="SemiBold" />
+                        <ItemsControl ItemsSource="{Binding Deleted}">
+                            <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Margin="0,2" TextTrimming="CharacterEllipsis" /></DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="SurfaceCard" Padding="14" IsVisible="{Binding HasFailures}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Non eliminate" FontWeight="SemiBold" Foreground="{DynamicResource DangerBrush}" />
+                        <ItemsControl ItemsSource="{Binding Failed}">
+                            <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Margin="0,2" FontSize="12" TextWrapping="Wrap" /></DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

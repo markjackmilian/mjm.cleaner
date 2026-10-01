@@ -2,6 +2,7 @@ using System.IO.Abstractions;
 using MjmCleaner.Core.Categories;
 using MjmCleaner.Core.Cleaning;
 using MjmCleaner.Core.Diagnostics;
+using MjmCleaner.Core.Docker;
 using MjmCleaner.Core.History;
 using MjmCleaner.Core.Safety;
 using MjmCleaner.Core.Scanning;
@@ -22,6 +23,7 @@ public sealed class AppServices
         ISessionLogWriter sessionLog,
         ISettingsStore settings,
         IRunningAppsProbe runningApps,
+        DockerCleanupService docker,
         AppPaths paths)
     {
         Scan = scan;
@@ -30,6 +32,7 @@ public sealed class AppServices
         SessionLog = sessionLog;
         Settings = settings;
         RunningApps = runningApps;
+        Docker = docker;
         Paths = paths;
     }
 
@@ -39,10 +42,18 @@ public sealed class AppServices
     public ISessionLogWriter SessionLog { get; }
     public ISettingsStore Settings { get; }
     public IRunningAppsProbe RunningApps { get; }
+    public DockerCleanupService Docker { get; }
     public AppPaths Paths { get; }
 
     public IReadOnlyList<CleanupCategory> BuildCategories()
         => CategoryCatalog.Build(Settings.Load(), PathExpander.ForCurrentUser());
+
+    /// <summary>Le stesse cartelle progetto di bin/obj, espanse: dove cercare le immagini citate.</summary>
+    public IReadOnlyList<string> ExpandedProjectRoots()
+    {
+        PathExpander expander = PathExpander.ForCurrentUser();
+        return [.. Settings.Load().ProjectRoots.Select(expander.Expand)];
+    }
 
     public static async Task<AppServices> CreateAsync()
     {
@@ -54,6 +65,16 @@ public sealed class AppServices
         PathGuard guard = new(new DenyList(home), links, home);
         RuleScanner scanner = new(fileSystem, guard, links, TimeProvider.System);
 
+        // Docker passa solo dalla CLI: nessun file sotto la cartella di Docker Desktop viene mai
+        // cancellato (la deny-list resta invariata); di Docker.raw si legge soltanto la dimensione.
+        ProcessRunner processes = new();
+        DockerCli dockerCli = new(processes, DockerBinaryLocator.Find(fileSystem, home));
+        DockerCleanupService docker = new(
+            new DockerInventoryCollector(dockerCli, fileSystem),
+            new ProjectReferenceScanner(fileSystem),
+            new DiskUsageProbe(processes, fileSystem, DiskUsageProbe.DefaultPath(home)),
+            new DockerCleanExecutor(dockerCli, TimeProvider.System));
+
         HistoryStore history = new(paths.DatabaseFile);
         await history.InitializeAsync(CancellationToken.None);
 
@@ -64,6 +85,7 @@ public sealed class AppServices
             new SessionLogWriter(fileSystem, paths),
             new SettingsStore(fileSystem, paths),
             RunningAppsProbe.ForCurrentMachine(),
+            docker,
             paths);
     }
 }

@@ -18,5 +18,7 @@
         <DataTemplate DataType="vm:DoneStepViewModel"><views:DoneStepView /></DataTemplate>
         <DataTemplate DataType="vm:HistoryViewModel"><views:HistoryView /></DataTemplate>
         <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
+        <DataTemplate DataType="vm:DockerViewModel"><views:DockerView /></DataTemplate>
+        <DataTemplate DataType="vm:DockerReportViewModel"><views:DockerReportView /></DataTemplate>
     </Application.DataTemplates>
 </Application>

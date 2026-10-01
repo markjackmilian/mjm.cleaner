@@ -40,7 +40,9 @@ internal sealed class FakeDockerCli : IDockerCli
             return Task.FromResult(respond());
         }
 
-        foreach ((string prefix, Func<IReadOnlyList<string>, ProcessResult> byPrefix) in _prefixResponses)
+        // L'ultima registrata vince: un test può restringere una risposta generica ("rmi ")
+        // a un caso specifico ("rmi sha256:d4…") aggiungendola dopo.
+        foreach ((string prefix, Func<IReadOnlyList<string>, ProcessResult> byPrefix) in Enumerable.Reverse(_prefixResponses))
         {
             if (line.StartsWith(prefix, StringComparison.Ordinal))
             {

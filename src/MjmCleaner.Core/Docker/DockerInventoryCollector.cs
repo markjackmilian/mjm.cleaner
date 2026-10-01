@@ -52,12 +52,13 @@ public sealed class DockerInventoryCollector(IDockerCli cli, IFileSystem fileSys
             ? []
             : DockerJson.ParseVolumes(await cli.RunCheckedAsync(["volume", "inspect", .. volumeNames], ct), verbose.VolumeSizes);
 
-        DockerDfSummary df = await ReadDfAsync(ct);
+        DockerDfSummary df = await ReadDfAsync(cli, ct);
 
         return new DockerSnapshot(containers, images, volumes, df, ExistingComposeProjects(containers));
     }
 
-    public async Task<DockerDfSummary> ReadDfAsync(CancellationToken ct)
+    /// <summary>Riepilogo di <c>docker system df</c>: condiviso con l'esecutore per la misura prima/dopo.</summary>
+    public static async Task<DockerDfSummary> ReadDfAsync(IDockerCli cli, CancellationToken ct)
         => DockerJson.ParseDfSummary(await cli.RunCheckedAsync(["system", "df", "--format", Json], ct));
 
     /// <summary>

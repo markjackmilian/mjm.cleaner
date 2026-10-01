@@ -56,8 +56,8 @@ The application uses a four-step wizard, always in the same order:
 | **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard`. This is the final point at which the operation can be abandoned. |
 | **4 · Done** | Summarizes the disk space recovered and any items that could not be deleted. |
 
-In the toolbar, **History** shows previous cleanup sessions and the cumulative
-space recovered. **Settings** configures the project directories searched for
+In the toolbar, **Docker** opens the Docker cleanup page (see below), **History**
+shows previous cleanup sessions and the cumulative space recovered. **Settings** configures the project directories searched for
 `bin` and `obj`, the directories searched for large files, the large-file size
 threshold, and the minimum ages for Downloads, logs, and NuGet packages.
 
@@ -71,6 +71,36 @@ threshold, and the minimum ages for Downloads, logs, and NuGet packages.
   `.sln`, …) exists next to the directory
 - **Logs and crash reports** — `~/Library/Logs`, `/Library/Logs`
 - **Trash, Downloads, and large files** — high risk, never preselected
+
+### Docker
+
+The **Docker** page cleans images, volumes, and build cache through the `docker`
+CLI only — no file under Docker Desktop's folder is ever deleted. It never starts
+Docker Desktop: if the daemon is not running it says so and offers **Retry**.
+
+The analysis is read-only and is the dry run. Every resource gets an outcome
+(KEEP / DELETE / PROPOSE / ASK), a reason, and the cost of recreating it:
+
+- **Kept:** images used by any container, even stopped ones (matched by image ID,
+  not tag); images cited with repository and tag in the project directories
+  (compose files, Dockerfiles, Aspire AppHosts, Testcontainers, Kubernetes/Helm);
+  mounted volumes, volumes of compose projects that still exist, and Aspire
+  volumes whose AppHost hash is still in use.
+- **Safe, confirmed as a block:** dangling images, images that Testcontainers and
+  .NET Aspire recreate on their own (`testcontainers/ryuk`, `dcptun_*` and their
+  base image), and the build cache.
+- **To confirm one by one or by group:** locally built images (they cannot be
+  pulled again), unused or superseded images, anonymous volumes, and Aspire
+  volumes left behind by an old AppHost hash. Other named volumes can only be
+  selected individually.
+
+Images are removed by full ID (`docker rmi sha256:…`), never by tag and never
+with `-f`; `docker system prune` is never used. The report shows what was
+deleted, what failed and why, and the space recovered according to
+`docker system df` and to the real allocated size of `Docker.raw` (a sparse
+file: its apparent size is only the disk limit). If `Docker.raw` does not shrink,
+the report suggests **Docker Desktop → Troubleshoot → Clean / Purge data**, which
+deletes all Docker data and is never run automatically.
 
 ## History and logs
 
@@ -110,12 +140,14 @@ the deny list: **the application cannot delete its own history**.
 - **No privilege elevation:** the application never uses `sudo` or asks for a
   password. Items owned by `root` fail with an access-denied error and appear in
   the final summary in step 4.
-- **Docker is not touched:** `~/Library/Containers/com.docker.docker` and
-  `~/.docker` are on the deny list. Reclaim image and volume space with
-  `docker system prune`.
+- **Docker files are never deleted:** `~/Library/Containers/com.docker.docker`
+  and `~/.docker` stay on the deny list. Docker space is reclaimed only from the
+  **Docker** page, through the `docker` CLI.
 
 ## Documentation
 
 - Specification: `docs/superpowers/specs/2026-09-15-mjm-cleaner-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-09-15-mjm-cleaner.md`
 - Full Disk Access spike: `docs/superpowers/spikes/2026-09-15-full-disk-access.md`
+- Docker cleanup design: `docs/superpowers/specs/2026-10-01-docker-cleanup-design.md`
+- Docker cleanup plan: `docs/superpowers/plans/2026-10-01-docker-cleanup.md`

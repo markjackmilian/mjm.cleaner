@@ -139,7 +139,7 @@ Selezionata di default.
 
 *Limite noto:* "pacchetto non usato da N mesi" si basa su `LastAccessTimeUtc`, con ricaduta su `LastWriteTimeUtc` quando l'ultimo accesso non è attendibile. È un'euristica, e va presentata come tale nell'interfaccia.
 
-**Docker è escluso via deny-list.** Eliminare file dentro `~/Library/Containers/com.docker.docker` corrompe la macchina virtuale. Lo spazio occupato da Docker si recupera con `docker system prune`, non con la cancellazione di file.
+**Docker è escluso via deny-list.** Eliminare file dentro `~/Library/Containers/com.docker.docker` corrompe la macchina virtuale. Lo spazio occupato da Docker si recupera tramite la CLI, non con la cancellazione di file: è la pagina Docker descritta in `2026-10-01-docker-cleanup-design.md`, che lascia invariata questa esclusione.
 
 ### 6.3 Progetti .NET: `bin` / `obj` ricorsivi — rischio basso
 

@@ -1,0 +1,56 @@
+[
+  {
+    "CreatedAt": "2026-09-21T07:48:01Z",
+    "Driver": "local",
+    "Labels": null,
+    "Mountpoint": "/var/lib/docker/volumes/mssql2025-data/_data",
+    "Name": "mssql2025-data",
+    "Options": null,
+    "Scope": "local"
+  },
+  {
+    "CreatedAt": "2026-09-21T07:48:01Z",
+    "Driver": "local",
+    "Labels": null,
+    "Mountpoint": "/var/lib/docker/volumes/orbit.apphost-48d90b1972-storage-data/_data",
+    "Name": "orbit.apphost-48d90b1972-storage-data",
+    "Options": null,
+    "Scope": "local"
+  },
+  {
+    "CreatedAt": "2026-09-21T07:48:01Z",
+    "Driver": "local",
+    "Labels": null,
+    "Mountpoint": "/var/lib/docker/volumes/orbit.apphost-48d90b1972-sql-data/_data",
+    "Name": "orbit.apphost-48d90b1972-sql-data",
+    "Options": null,
+    "Scope": "local"
+  },
+  {
+    "CreatedAt": "2026-09-21T07:48:01Z",
+    "Driver": "local",
+    "Labels": null,
+    "Mountpoint": "/var/lib/docker/volumes/orbit.apphost-48d90b1972-keycloak-data/_data",
+    "Name": "orbit.apphost-48d90b1972-keycloak-data",
+    "Options": null,
+    "Scope": "local"
+  },
+  {
+    "CreatedAt": "2026-09-21T07:48:01Z",
+    "Driver": "local",
+    "Labels": null,
+    "Mountpoint": "/var/lib/docker/volumes/orbit.apphost-751ef8e8e6-storage-data/_data",
+    "Name": "orbit.apphost-751ef8e8e6-storage-data",
+    "Options": null,
+    "Scope": "local"
+  },
+  {
+    "CreatedAt": "2026-09-21T07:48:01Z",
+    "Driver": "local",
+    "Labels": null,
+    "Mountpoint": "/var/lib/docker/volumes/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/_data",
+    "Name": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "Options": null,
+    "Scope": "local"
+  }
+]

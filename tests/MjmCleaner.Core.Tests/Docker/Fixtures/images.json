@@ -1,0 +1,246 @@
+[
+  {
+    "Id": "sha256:2b5b581621126574f3d1f75e78d3eebe8d05aedb59ad0cfdf9aa42cb0634d726",
+    "RepoTags": [
+      "mcr.microsoft.com/mssql/server:2025-latest"
+    ],
+    "RepoDigests": [
+      "mcr.microsoft.com/mssql/server@sha256:2b5b581621126574f3d1f75e78d3eebe8d05aedb59ad0cfdf9aa42cb0634d726"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 2420140316,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ],
+      "Labels": {
+        "vendor": "Microsoft"
+      }
+    },
+    "Identity": {
+      "Pull": [
+        {
+          "Repository": "mcr.microsoft.com/mssql/server"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37",
+    "RepoTags": [
+      "mcr.microsoft.com/azure-storage/azurite:3.35.0"
+    ],
+    "RepoDigests": [
+      "mcr.microsoft.com/azure-storage/azurite@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 427000000,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ]
+    },
+    "Identity": {
+      "Pull": [
+        {
+          "Repository": "mcr.microsoft.com/azure-storage/azurite"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "RepoTags": [
+      "mcr.microsoft.com/mssql/server:2022-latest"
+    ],
+    "RepoDigests": [
+      "mcr.microsoft.com/mssql/server@sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 1610000000,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ],
+      "Labels": {
+        "vendor": "Microsoft"
+      }
+    },
+    "Identity": {
+      "Pull": [
+        {
+          "Repository": "mcr.microsoft.com/mssql/server"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "RepoTags": [
+      "quay.io/keycloak/keycloak:26.6"
+    ],
+    "RepoDigests": [
+      "quay.io/keycloak/keycloak@sha256:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 480000000,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ]
+    },
+    "Identity": {
+      "Pull": [
+        {
+          "Repository": "quay.io/keycloak/keycloak"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+    "RepoTags": [
+      "mcr.microsoft.com/mssql-tools:latest"
+    ],
+    "RepoDigests": [
+      "mcr.microsoft.com/mssql-tools@sha256:c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 315000000,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ]
+    },
+    "Identity": {
+      "Pull": [
+        {
+          "Repository": "mcr.microsoft.com/mssql-tools"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+    "RepoTags": [
+      "alpine:3.20"
+    ],
+    "RepoDigests": [
+      "alpine@sha256:d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+    ],
+    "Created": "1970-01-01T00:00:00Z",
+    "Size": 8800000,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ]
+    },
+    "Identity": {
+      "Pull": [
+        {
+          "Repository": "docker.io/library/alpine"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+    "RepoTags": [
+      "testcontainers/ryuk:0.14.0"
+    ],
+    "RepoDigests": [
+      "testcontainers/ryuk@sha256:e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 17000000,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ]
+    },
+    "Identity": {
+      "Pull": [
+        {
+          "Repository": "docker.io/testcontainers/ryuk"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:c1a077005187d683004cabff17b02f174db19515ec56327f38d8e3d7e2e8c04a",
+    "RepoTags": [
+      "dcptun_developer_ms:0.25.13"
+    ],
+    "RepoDigests": [
+      "dcptun_developer_ms@sha256:c1a077005187d683004cabff17b02f174db19515ec56327f38d8e3d7e2e8c04a"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 195234351,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ],
+      "Labels": {
+        "com.microsoft.developer.usvc-dev.base-image-digest": "sha256:34a22db497ff34a0f35ca5fc54bd38711d04238a2c1b2f65d35dc9d45dd82584"
+      }
+    },
+    "Identity": {
+      "Build": [
+        {
+          "Ref": "t8uouo6ity4ir4wx1jar3e3qi",
+          "CreatedAt": "2026-09-18T14:54:06Z"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:34a22db497ff34a0f35ca5fc54bd38711d04238a2c1b2f65d35dc9d45dd82584",
+    "RepoTags": [
+      "mcr.microsoft.com/azurelinux/base/core:3.0"
+    ],
+    "RepoDigests": [
+      "mcr.microsoft.com/azurelinux/base/core@sha256:34a22db497ff34a0f35ca5fc54bd38711d04238a2c1b2f65d35dc9d45dd82584"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 118000000,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ]
+    },
+    "Identity": {
+      "Pull": [
+        {
+          "Repository": "mcr.microsoft.com/azurelinux/base/core"
+        }
+      ]
+    }
+  },
+  {
+    "Id": "sha256:f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+    "RepoTags": [
+      "orbit-api:dev"
+    ],
+    "RepoDigests": [
+      "orbit-api@sha256:f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6"
+    ],
+    "Created": "2026-09-01T00:00:00Z",
+    "Size": 250000000,
+    "Config": {
+      "Env": [
+        "PATH=/usr/bin"
+      ],
+      "Labels": {
+        "org.opencontainers.image.title": "orbit-api"
+      }
+    },
+    "Identity": {
+      "Build": [
+        {
+          "Ref": "t8uouo6ity4ir4wx1jar3e3qi",
+          "CreatedAt": "2026-09-18T14:54:06Z"
+        }
+      ]
+    }
+  }
+]

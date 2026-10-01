@@ -101,3 +101,14 @@ public sealed record DockerCandidate(
     /// </summary>
     public bool SelectedByDefault => Verdict == DockerVerdict.Delete;
 }
+
+/// <summary>Un'immagine citata in un file di progetto. <paramref name="Tag"/> nullo: il file nomina solo il repository.</summary>
+public sealed record ImageReference(string Repository, string? Tag, string File, int Line);
+
+/// <summary>Ciò che la ricerca nei progetti ha trovato: immagini citate e progetti compose esistenti.</summary>
+public sealed record ProjectReferences(
+    IReadOnlyList<ImageReference> Images,
+    IReadOnlySet<string> ComposeProjects)
+{
+    public static ProjectReferences Empty { get; } = new([], new HashSet<string>());
+}

@@ -10,10 +10,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IXcodeNavigatio
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsXcodeBusy))]
+    [NotifyPropertyChangedFor(nameof(CurrentSection), nameof(IsCleanupSelected), nameof(IsDockerSelected), nameof(IsXcodeSelected), nameof(IsHistorySelected))]
     private object? _currentPage;
 
     [ObservableProperty]
-    private string _totalFreedText = "—";
+    private string _totalFreedAmount = "—";
 
     public MainWindowViewModel(AppServices services)
     {
@@ -24,6 +25,12 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IXcodeNavigatio
     public AppServices Services => _services;
     public bool IsXcodeBusy => CurrentPage is XcodeViewModel { IsDeleting: true };
 
+    public SidebarSection CurrentSection => SidebarSections.For(CurrentPage);
+    public bool IsCleanupSelected => CurrentSection == SidebarSection.Cleanup;
+    public bool IsDockerSelected => CurrentSection == SidebarSection.Docker;
+    public bool IsXcodeSelected => CurrentSection == SidebarSection.Xcode;
+    public bool IsHistorySelected => CurrentSection == SidebarSection.History;
+
     partial void OnCurrentPageChanged(object? oldValue, object? newValue)
     {
         if (oldValue is XcodeViewModel previous) previous.PropertyChanged -= OnXcodePageChanged;
@@ -33,6 +40,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IXcodeNavigatio
         ShowSettingsCommand.NotifyCanExecuteChanged();
         ShowDockerCommand.NotifyCanExecuteChanged();
         ShowXcodeCommand.NotifyCanExecuteChanged();
+        ShowCleanupCommand.NotifyCanExecuteChanged();
     }
 
     private void OnXcodePageChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -44,6 +52,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IXcodeNavigatio
             ShowSettingsCommand.NotifyCanExecuteChanged();
             ShowDockerCommand.NotifyCanExecuteChanged();
             ShowXcodeCommand.NotifyCanExecuteChanged();
+            ShowCleanupCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -56,10 +65,17 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IXcodeNavigatio
     public async Task RefreshTotalAsync()
     {
         long total = await _services.History.GetTotalBytesFreedAsync(CancellationToken.None);
-        TotalFreedText = $"{FormatBytes(total)} liberati finora";
+        TotalFreedAmount = FormatBytes(total);
     }
 
     private bool CanNavigateGlobally() => !IsXcodeBusy;
+
+    /// <summary>«Pulizia» non interrompe un ciclo in corso; dalle altre sezioni riparte dal passo 1, come faceva «Chiudi».</summary>
+    [RelayCommand(CanExecute = nameof(CanNavigateGlobally))]
+    private void ShowCleanup()
+    {
+        if (!SidebarSections.IsWizardPage(CurrentPage)) StartOver();
+    }
 
     [RelayCommand(CanExecute = nameof(CanNavigateGlobally))]
     private void ShowHistory() => CurrentPage = new HistoryViewModel(_services, this);

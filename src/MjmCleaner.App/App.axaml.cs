@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Microsoft.Data.Sqlite;
 using MjmCleaner.App.Services;
@@ -33,6 +34,16 @@ public partial class App : Application
 
             if (mainWindow is MainWindow { DataContext: MainWindowViewModel viewModel })
             {
+                // Su macOS le voci del menu dell'applicazione finiscono nel menu «mjm.cleaner»,
+                // dove l'utente si aspetta Impostazioni… con ⌘,.
+                NativeMenu.SetMenu(this, new NativeMenu
+                {
+                    new NativeMenuItem("Impostazioni…")
+                    {
+                        Command = viewModel.ShowSettingsCommand,
+                        Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Meta),
+                    },
+                });
                 await viewModel.RefreshTotalAsync();
             }
         }

@@ -15,14 +15,12 @@ public sealed class MainWindowLayoutTests
     {
         MainWindow window = new()
         {
-            Width = 900,
-            Height = 640,
+            Width = 1120,
+            Height = 700,
         };
         window.Show();
 
-        ContentControl pageHost = window.GetVisualDescendants()
-            .OfType<ContentControl>()
-            .Single(control => control.MaxWidth == 1120);
+        ContentControl pageHost = window.FindControl<ContentControl>("PageHost")!;
         Border footer = new()
         {
             Height = 44,
@@ -55,10 +53,26 @@ public sealed class MainWindowLayoutTests
 
         window.UpdateLayout();
 
-        Assert.InRange(pageHost.Bounds.Width, 1, window.ClientSize.Width - 60);
+        Assert.InRange(pageHost.Bounds.Width, 1, window.ClientSize.Width - 232);
         Assert.True(
             footer.TranslatePoint(new Point(0, footer.Bounds.Height), window)?.Y <= window.ClientSize.Height,
             "Il footer deve restare visibile nel viewport della finestra.");
+    }
+
+    [AvaloniaFact]
+    public void ShellHasSidebarAndNoCloseButtons()
+    {
+        MainWindow window = new() { Width = 1120, Height = 700 };
+        window.Show();
+        window.UpdateLayout();
+
+        string[] texts = [.. window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text ?? "")];
+        Assert.Contains("Pulizia", texts);
+        Assert.Contains("Docker", texts);
+        Assert.Contains("Xcode", texts);
+        Assert.Contains("Storico", texts);
+        Assert.Contains("Impostazioni…", texts);
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Content as string == "Chiudi");
     }
 }
 

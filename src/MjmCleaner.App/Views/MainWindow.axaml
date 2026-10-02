@@ -1,48 +1,68 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="MjmCleaner.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="mjm.cleaner"
-        Width="900" Height="640"
-        MinWidth="720" MinHeight="520">
-    <DockPanel Background="{DynamicResource CanvasBrush}">
-        <Border DockPanel.Dock="Top" Height="64" Padding="28,10"
-                BorderThickness="0,0,0,1" Background="{DynamicResource ToolbarBrush}"
-                BorderBrush="{DynamicResource BorderBrush}">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-                <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
-                    <TextBlock Text="SPAZIO LIBERATO" Classes="Eyebrow" FontSize="10" />
-                    <TextBlock Text="{Binding TotalFreedText}" FontWeight="SemiBold" />
+        Width="1120" Height="700" MinWidth="900" MinHeight="600"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="52">
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Meta+OemComma" Command="{Binding ShowSettingsCommand}" />
+    </Window.KeyBindings>
+    <Grid ColumnDefinitions="232,*">
+        <Border Grid.Column="0" Background="{DynamicResource SidebarBrush}"
+                BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0,0.5,0">
+            <DockPanel Margin="10,0,10,12">
+                <!-- Area dei semafori: trascinabile come una titlebar. -->
+                <Border DockPanel.Dock="Top" Height="52" Background="Transparent"
+                        chrome:WindowDecorationProperties.ElementRole="TitleBar" />
+                <StackPanel DockPanel.Dock="Top" Spacing="2" AutomationProperties.Name="Sezioni">
+                    <TextBlock Text="mjm.cleaner" Classes="SidebarHeading" />
+                    <Button Classes="SidebarItem" Classes.selected="{Binding IsCleanupSelected}" Command="{Binding ShowCleanupCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconSparkle}" /></Viewbox>
+                            <TextBlock Text="Pulizia" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="SidebarItem" Classes.selected="{Binding IsDockerSelected}" Command="{Binding ShowDockerCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconCube}" /></Viewbox>
+                            <TextBlock Text="Docker" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="SidebarItem" Classes.selected="{Binding IsXcodeSelected}" Command="{Binding ShowXcodeCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconHammer}" /></Viewbox>
+                            <TextBlock Text="Xcode" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="SidebarItem" Classes.selected="{Binding IsHistorySelected}" Command="{Binding ShowHistoryCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconClock}" /></Viewbox>
+                            <TextBlock Text="Storico" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
-                    <Button Classes="ToolbarButton" Command="{Binding ShowDockerCommand}" IsEnabled="{Binding !IsXcodeBusy}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Path Width="15" Height="15" Data="M2,8 L13,8 L13,13 L2,13 Z M3,4 L6,4 L6,8 M6.5,4 L9.5,4 L9.5,8 M5,1 L8,1 L8,4" Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
-                            <TextBlock Text="Docker" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="ToolbarButton" Command="{Binding ShowXcodeCommand}" IsEnabled="{Binding !IsXcodeBusy}">
-                        <TextBlock Text="Xcode" />
-                    </Button>
-                    <Button Classes="ToolbarButton" Command="{Binding ShowHistoryCommand}" IsEnabled="{Binding !IsXcodeBusy}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Path Width="15" Height="15" Data="M3,2 L12,2 L12,13 L3,13 Z M5,5 L10,5 M5,8 L10,8 M5,11 L8,11" Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
-                            <TextBlock Text="Storico" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="ToolbarButton" Command="{Binding ShowSettingsCommand}" IsEnabled="{Binding !IsXcodeBusy}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Path Width="15" Height="15" Data="M7.5,2.5 A5,5 0 1,0 7.51,2.5 M7.5,5.4 A2.1,2.1 0 1,0 7.51,5.4" Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
-                            <TextBlock Text="Impostazioni" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Grid>
+                <Button DockPanel.Dock="Bottom" Classes="SidebarItem" Command="{Binding ShowSettingsCommand}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconGear}" Stroke="{DynamicResource SecondaryTextBrush}" /></Viewbox>
+                        <TextBlock Grid.Column="1" Text="Impostazioni…" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="⌘," Classes="Caption" VerticalAlignment="Center" />
+                    </Grid>
+                </Button>
+                <Border DockPanel.Dock="Bottom" Classes="SurfaceCard" Margin="4,0,4,10" Padding="12,12,12,11">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Spazio liberato" Classes="Caption" />
+                        <TextBlock Text="{Binding TotalFreedAmount}" Classes="Numeric" FontSize="20" FontWeight="Bold" LetterSpacing="-0.2" />
+                        <TextBlock Text="liberati finora" Classes="Caption" />
+                    </StackPanel>
+                </Border>
+                <Panel />
+            </DockPanel>
         </Border>
-        <ContentControl Content="{Binding CurrentPage}"
-                        MaxWidth="1120"
-                        HorizontalAlignment="Stretch"
-                        Margin="30,28" />
-    </DockPanel>
+        <!-- Margine provvisorio (Task 5): 52 in alto lascia libera l'area della titlebar finché le view non hanno toolbar e padding propri. -->
+        <ContentControl x:Name="PageHost" Grid.Column="1" Margin="32,52,32,24" Content="{Binding CurrentPage}" />
+    </Grid>
 </Window>

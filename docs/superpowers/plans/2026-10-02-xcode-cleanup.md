@@ -130,9 +130,11 @@ App in `Xcode/`. Modifiche di integrazione elencate nei task sotto.
 
 **Files:** Modify plan checkboxes with actual completion evidence; fix only defects discovered within this feature.
 
-- [ ] Run `/usr/local/share/dotnet/dotnet build`; require exit 0.
-- [ ] Run `/usr/local/share/dotnet/dotnet test`; require all tests pass. Fix failures with a targeted regression test, then repeat affected checks.
+Task evidence: `.superpowers/sdd/2026-10-02-xcode-cleanup/task-6-report.md`. Build, full test, diff hygiene and status inspection are complete. Bundle creation, codesign verification and process launch smoke succeeded. Live visual inspection was unavailable, so the combined bundle/UI-inspection step remains unchecked. Final independent review/handoff remains with the controller.
+
+- [x] Run `/usr/local/share/dotnet/dotnet build`; exit 0 (0 warnings, 0 errors).
+- [x] Run `/usr/local/share/dotnet/dotnet test`; exit 0 (492 Core + 17 App tests passed).
 - [ ] Run `./build/bundle.sh`; require a complete macOS bundle. Launch and inspect Xcode navigation, empty and error states, expansion, selection and confirmation; use fixtures in tests to cover nonempty inventories. Do not trigger a destructive real cleanup.
-- [ ] Run `git diff --check` and inspect `git status --short`; require no whitespace errors and clearly identify preexisting user changes.
+- [x] Run `git diff --check` and inspect `git status --short`; no whitespace errors. Preexisting catalog/test changes are identified in task-6-report.md and remain untouched.
 - [ ] Review the completed change against the spec, especially CLI-only deletion, booted dependencies, partial inventory and estimates. If independent review is selected, give the reviewer spec, plan and owned diff; resolve findings before delivery.
 - [ ] Report implemented behavior, verification results and the limitation that deletion was validated with fake CLI/filesystem rather than real user data. Follow the finishing-branch workflow without merging or pushing unless authorized.

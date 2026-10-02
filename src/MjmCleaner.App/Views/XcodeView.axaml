@@ -1,17 +1,32 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="MjmCleaner.App.Views.XcodeView"
              x:DataType="vm:XcodeViewModel">
     <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
-            <TextBlock Text="XCODE" Classes="Eyebrow" />
-            <TextBlock Text="Pulizia cache e simulatori" Classes="PageTitle" />
-            <TextBlock Text="Tutte le voci partono deselezionate. L’anteprima non elimina nulla." Classes="PageSubtitle" />
-        </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
+        <Border DockPanel.Dock="Top" Classes="Toolbar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+                <TextBlock Text="Pulizia cache e simulatori" Classes="ToolbarTitle" />
+                <TextBlock Text="Tutte le voci partono deselezionate. L’anteprima non elimina nulla." Classes="ToolbarSubtitle" />
+            </StackPanel>
+        </Border>
+
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Text="{Binding ProgressText}" IsVisible="{Binding IsDeleting}" Classes="Muted" FontSize="12"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                    <Button Classes="Secondary" Content="Interrompi" Command="{Binding CancelDeleteCommand}" IsVisible="{Binding IsDeleting}" />
+                    <Button Classes="Secondary" Content="Riprova analisi" Command="{Binding RetryCommand}" IsEnabled="{Binding !IsDeleting}" />
+                    <Button Classes="Primary" Content="Anteprima selezione" Command="{Binding PreviewCommand}" IsEnabled="{Binding !IsDeleting}" IsVisible="{Binding !HasConfirmation}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="32,0,32,12" Spacing="10">
             <TextBlock Text="{Binding WarningText}" IsVisible="{Binding HasWarnings}" Classes="Muted" TextWrapping="Wrap" />
-            <Border IsVisible="{Binding HasConfirmation}" Padding="14" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}" BorderThickness="1" BorderBrush="#F0D69B" MaxHeight="330">
+            <Border IsVisible="{Binding HasConfirmation}" Classes="Banner" MaxHeight="330">
                 <Grid RowDefinitions="*,Auto" RowSpacing="8">
                     <ScrollViewer Grid.Row="0" MaxHeight="220" VerticalScrollBarVisibility="Auto">
                         <StackPanel Spacing="8">
@@ -56,28 +71,21 @@
                     </StackPanel>
                 </Grid>
             </Border>
-            <TextBlock Text="{Binding ProgressText}" IsVisible="{Binding IsDeleting}" Classes="Muted" HorizontalAlignment="Right" />
             <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-                <Button Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}" IsEnabled="{Binding !IsDeleting}" />
-                <Button Classes="Secondary" Content="Interrompi" Command="{Binding CancelDeleteCommand}" IsVisible="{Binding IsDeleting}" />
-                <Button Classes="Secondary" Content="Riprova analisi" Command="{Binding RetryCommand}" IsEnabled="{Binding !IsDeleting}" />
-                <Button Classes="Primary" Content="Anteprima selezione" Command="{Binding PreviewCommand}" IsEnabled="{Binding !IsDeleting}" IsVisible="{Binding !HasConfirmation}" />
-            </StackPanel>
         </StackPanel>
         <Panel>
             <StackPanel IsVisible="{Binding IsLoading}" Spacing="10" VerticalAlignment="Center" MaxWidth="420">
                 <ProgressBar IsIndeterminate="True" />
                 <TextBlock Text="Analisi delle cartelle Xcode e dei simulatori…" Classes="Muted" HorizontalAlignment="Center" />
             </StackPanel>
-            <Border IsVisible="{Binding HasError}" Classes="SurfaceCard" Padding="16" VerticalAlignment="Center" MaxWidth="560">
+            <Border IsVisible="{Binding HasError}" Classes="SurfaceCard" Padding="16" Margin="32,0" VerticalAlignment="Center" MaxWidth="560">
                 <TextBlock Text="{Binding ErrorText}" TextWrapping="Wrap" />
             </Border>
-            <DockPanel IsVisible="{Binding !IsLoading}" LastChildFill="True">
-                <Border DockPanel.Dock="Top" Classes="SurfaceCard" Padding="12" Margin="0,0,0,12">
-                    <TextBlock Text="{Binding TotalText}" FontWeight="SemiBold" />
-                </Border>
-                <ScrollViewer>
+            <ScrollViewer IsVisible="{Binding !IsLoading}">
+                <StackPanel Margin="32,24,32,20" Spacing="12">
+                    <Border Classes="SurfaceCard" Padding="16,12">
+                        <TextBlock Text="{Binding TotalText}" FontWeight="SemiBold" />
+                    </Border>
                     <ItemsControl ItemsSource="{Binding Groups}" IsEnabled="{Binding !IsDeleting}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="vm:XcodeGroupNode">
@@ -113,8 +121,8 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </ScrollViewer>
-            </DockPanel>
+                </StackPanel>
+            </ScrollViewer>
         </Panel>
     </DockPanel>
 </UserControl>

@@ -1,48 +1,53 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="MjmCleaner.App.Views.DockerReportView"
              x:DataType="vm:DockerReportViewModel">
 
     <DockPanel LastChildFill="True">
-        <TextBlock DockPanel.Dock="Top" Text="DOCKER" Classes="Eyebrow" Margin="0,0,0,20" />
+        <Border DockPanel.Dock="Top" Classes="Toolbar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+                <TextBlock Text="Pulizia Docker" Classes="ToolbarTitle" />
+                <TextBlock Text="{Binding SummaryText}" Classes="ToolbarSubtitle" />
+            </StackPanel>
+        </Border>
 
-        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,16,0,0">
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Classes="Primary" Content="Nuova analisi" Command="{Binding AnalyzeAgainCommand}" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="32,0,32,12" Spacing="10">
             <TextBlock Text="{Binding HistoryWarning}"
                        IsVisible="{Binding HistoryWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                        Classes="Muted" FontSize="12" TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                <Button Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}" />
-                <Button Classes="Primary" Content="Nuova analisi" Command="{Binding AnalyzeAgainCommand}" Padding="18,8" />
-            </StackPanel>
         </StackPanel>
 
         <ScrollViewer>
-            <StackPanel Spacing="16">
+            <StackPanel Margin="32,24,32,20" Spacing="16">
                 <StackPanel HorizontalAlignment="Center" Spacing="6">
                     <TextBlock Text="Pulizia Docker completata" Classes="PageTitle" HorizontalAlignment="Center" />
                     <TextBlock Text="{Binding FreedText}" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center" />
-                    <TextBlock Text="{Binding SummaryText}" Classes="PageSubtitle" HorizontalAlignment="Center" />
                 </StackPanel>
 
-                <Border Classes="SurfaceCard" Padding="14">
+                <Border Classes="SurfaceCard" Padding="16,12">
                     <StackPanel Spacing="4">
                         <TextBlock Text="{Binding DfText}" />
                         <TextBlock Text="{Binding DiskText}" />
                     </StackPanel>
                 </Border>
 
-                <Border IsVisible="{Binding DaemonLostText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                        Padding="12" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}">
-                    <TextBlock Text="{Binding DaemonLostText}" Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                <Border IsVisible="{Binding DaemonLostText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Classes="Banner">
+                    <TextBlock Text="{Binding DaemonLostText}" TextWrapping="Wrap" FontWeight="SemiBold" />
                 </Border>
 
-                <Border IsVisible="{Binding PurgeHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                        Padding="12" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}">
-                    <TextBlock Text="{Binding PurgeHint}" Foreground="{DynamicResource WarningTextBrush}" TextWrapping="Wrap" />
+                <Border IsVisible="{Binding PurgeHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Classes="Banner">
+                    <TextBlock Text="{Binding PurgeHint}" TextWrapping="Wrap" />
                 </Border>
 
-                <Border Classes="SurfaceCard" Padding="14">
+                <Border Classes="SurfaceCard" Padding="16,12">
                     <StackPanel Spacing="6">
                         <TextBlock Text="Eliminate" FontWeight="SemiBold" />
                         <ItemsControl ItemsSource="{Binding Deleted}">
@@ -51,7 +56,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Classes="SurfaceCard" Padding="14" IsVisible="{Binding HasFailures}">
+                <Border Classes="SurfaceCard" Padding="16,12" IsVisible="{Binding HasFailures}">
                     <StackPanel Spacing="6">
                         <TextBlock Text="Non eliminate" FontWeight="SemiBold" Foreground="{DynamicResource DangerBrush}" />
                         <ItemsControl ItemsSource="{Binding Failed}">

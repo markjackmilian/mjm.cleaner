@@ -1,46 +1,66 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="MjmCleaner.App.Views.DockerView"
              x:DataType="vm:DockerViewModel">
 
-    <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
-            <TextBlock Text="DOCKER" Classes="Eyebrow" />
-            <TextBlock Text="Pulizia Docker" Classes="PageTitle" />
-            <TextBlock Text="Anteprima: nulla viene eliminato finché non premi «Elimina»." Classes="PageSubtitle" />
-        </StackPanel>
+    <UserControl.Styles>
+        <!-- Pallino di stato «motore non raggiungibile»: pulsa lentamente tra opacità piena e 0,35. -->
+        <Style Selector="Ellipse.StatusDot">
+            <Style.Animations>
+                <Animation Duration="0:0:1.6" IterationCount="INFINITE" PlaybackDirection="Alternate">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.35" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
 
-        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
-            <Border IsVisible="{Binding IsReady}"
-                    Padding="12" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}" BorderThickness="1" BorderBrush="#F0D69B">
+    <DockPanel LastChildFill="True">
+        <Border DockPanel.Dock="Top" Classes="Toolbar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel VerticalAlignment="Center" Spacing="1">
+                    <TextBlock Text="Pulizia Docker" Classes="ToolbarTitle" />
+                    <TextBlock Text="Anteprima: nulla viene eliminato finché non premi «Elimina»." Classes="ToolbarSubtitle" />
+                </StackPanel>
+                <Border Grid.Column="1" Classes="StatusPill" IsVisible="{Binding HasError}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Classes="StatusDot" Width="7" Height="7" Fill="#8E8E93" VerticalAlignment="Center" />
+                        <TextBlock Text="Motore non raggiungibile" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Text="{Binding DeleteProgressText}"
+                           IsVisible="{Binding IsDeleting}"
+                           Classes="Muted" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                    <Button Classes="Secondary" Content="Interrompi"
+                            Command="{Binding CancelDeleteCommand}"
+                            IsVisible="{Binding IsDeleting}" />
+                    <Button Classes="Destructive" Content="{Binding TotalText, StringFormat='Elimina {0}'}"
+                            Command="{Binding DeleteCommand}"
+                            IsVisible="{Binding IsReady}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="32,0,32,12" Spacing="10">
+            <Border IsVisible="{Binding IsReady}" Classes="Banner">
                 <TextBlock TextWrapping="Wrap"
                            FontWeight="SemiBold"
-                           Foreground="{DynamicResource WarningTextBrush}"
                            Text="Eliminazione definitiva: immagini e volumi eliminati non sono recuperabili. I volumi contengono dati." />
             </Border>
-
-            <TextBlock Text="{Binding DeleteProgressText}"
-                       IsVisible="{Binding IsDeleting}"
-                       Classes="Muted" FontSize="12" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
 
             <TextBlock Text="{Binding DeleteErrorText}"
                        IsVisible="{Binding HasDeleteError}"
                        Foreground="{DynamicResource DangerBrush}"
                        FontSize="12"
                        TextWrapping="Wrap" />
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                <Button Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}" IsEnabled="{Binding !IsDeleting}" />
-                <Button Classes="Secondary" Content="Interrompi"
-                        Command="{Binding CancelDeleteCommand}"
-                        IsVisible="{Binding IsDeleting}" />
-                <Button Classes="Destructive" Content="{Binding TotalText, StringFormat='Elimina {0}'}"
-                        Command="{Binding DeleteCommand}"
-                        IsVisible="{Binding IsReady}"
-                        Padding="18,8"
-                        FontWeight="Bold" />
-            </StackPanel>
         </StackPanel>
 
         <Panel>
@@ -49,23 +69,31 @@
                 <TextBlock Text="Analisi di Docker e delle cartelle progetto in corso…" Classes="Muted" HorizontalAlignment="Center" />
             </StackPanel>
 
-            <Border IsVisible="{Binding HasError}" Classes="SurfaceCard" Padding="16" VerticalAlignment="Center" MaxWidth="560">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="{Binding ErrorText}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                    <Button Classes="Primary" Content="Riprova" Command="{Binding RetryCommand}" HorizontalAlignment="Right" />
-                </StackPanel>
-            </Border>
-
-            <DockPanel IsVisible="{Binding IsReady}" LastChildFill="True">
-                <Border DockPanel.Dock="Top" Classes="SurfaceCard" Padding="12" Margin="0,0,0,12">
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="{Binding ServerText}" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding DiskText}" Classes="Muted" FontSize="12" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding DfText}" Classes="Muted" FontSize="12" TextWrapping="Wrap" />
-                    </StackPanel>
+            <!-- Stato vuoto: motore non raggiungibile. -->
+            <StackPanel IsVisible="{Binding HasError}" Width="380" Margin="0,-24,0,0" Spacing="14"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border Width="72" Height="72" CornerRadius="18" Background="{DynamicResource WellBrush}" HorizontalAlignment="Center">
+                    <Viewbox Width="36" Height="36">
+                        <Path Classes="Icon" Data="{StaticResource IconCube}"
+                              Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
+                    </Viewbox>
                 </Border>
+                <TextBlock Text="{Binding ErrorText}" FontSize="17" FontWeight="SemiBold"
+                           TextWrapping="Wrap" TextAlignment="Center" />
+                <Button Classes="Primary" Content="Riprova" Command="{Binding RetryCommand}"
+                        HorizontalAlignment="Center" Margin="0,6,0,0" />
+            </StackPanel>
 
-                <ScrollViewer>
+            <ScrollViewer IsVisible="{Binding IsReady}">
+                <StackPanel Margin="32,24,32,20" Spacing="12">
+                    <Border Classes="SurfaceCard" Padding="16,12">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding ServerText}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding DiskText}" Classes="Muted" FontSize="12" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding DfText}" Classes="Muted" FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
                     <ItemsControl ItemsSource="{Binding Groups}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="vm:DockerGroupNode">
@@ -116,8 +144,8 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </ScrollViewer>
-            </DockPanel>
+                </StackPanel>
+            </ScrollViewer>
         </Panel>
     </DockPanel>
 </UserControl>

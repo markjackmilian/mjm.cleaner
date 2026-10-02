@@ -1,40 +1,55 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="MjmCleaner.App.Views.XcodeReportView"
              x:DataType="vm:XcodeReportViewModel">
     <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
-            <TextBlock Text="XCODE" Classes="Eyebrow" />
-            <TextBlock Text="Report pulizia" Classes="PageTitle" />
-            <TextBlock Text="{Binding SummaryText}" Classes="PageSubtitle" />
-        </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+        <Border DockPanel.Dock="Top" Classes="Toolbar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+                <TextBlock Text="Report pulizia" Classes="ToolbarTitle" />
+                <TextBlock Text="{Binding SummaryText}" Classes="ToolbarSubtitle" />
+            </StackPanel>
+        </Border>
+
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Classes="Primary" Content="Nuova analisi Xcode" Command="{Binding AnalyzeAgainCommand}" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="32,0,32,12" Spacing="6">
             <TextBlock Text="{Binding FreedText}" FontWeight="SemiBold" />
             <TextBlock Text="{Binding FreeSpaceText}" Classes="Muted" TextWrapping="Wrap" />
             <TextBlock Text="{Binding WarningsText}" IsVisible="{Binding HasWarnings}" Classes="Muted" TextWrapping="Wrap" />
             <TextBlock Text="{Binding HistoryWarning}" IsVisible="{Binding HasHistoryWarning}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-                <Button Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}" />
-                <Button Classes="Primary" Content="Nuova analisi Xcode" Command="{Binding AnalyzeAgainCommand}" />
-            </StackPanel>
         </StackPanel>
+
         <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding Items}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="vm:XcodeResultRow">
-                        <Border Classes="SurfaceCard" Padding="10" Margin="0,0,0,6">
-                            <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto,Auto">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                <TextBlock Grid.Column="1" Text="{Binding OutcomeText}" Classes="Muted" Margin="8,0" />
-                                <TextBlock Grid.Column="2" Text="{Binding SizeText}" FontWeight="SemiBold" />
-                                <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Identity}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
-                                <TextBlock Grid.Row="2" Grid.ColumnSpan="3" Text="{Binding Detail}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <Border Classes="SurfaceCard" Margin="32,24,32,20" VerticalAlignment="Top">
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.Styles>
+                        <!-- Il separatore sta sopra ogni riga tranne la prima. -->
+                        <Style Selector="ContentPresenter:nth-child(1) Border.Separator">
+                            <Setter Property="IsVisible" Value="False" />
+                        </Style>
+                    </ItemsControl.Styles>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:XcodeResultRow">
+                            <StackPanel>
+                                <Border Classes="Separator" Margin="16,0,0,0" />
+                                <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto,Auto" Margin="16,10">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{Binding OutcomeText}" Classes="Muted" Margin="8,0" />
+                                    <TextBlock Grid.Column="2" Text="{Binding SizeText}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Identity}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="2" Grid.ColumnSpan="3" Text="{Binding Detail}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                                </Grid>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
         </ScrollViewer>
     </DockPanel>
 </UserControl>

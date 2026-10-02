@@ -34,6 +34,27 @@ public sealed class XcodeFileScanner(
             ct.ThrowIfCancellationRequested();
             if (!fileSystem.Directory.Exists(root))
             {
+                try
+                {
+                    _ = fileSystem.Directory.EnumerateFileSystemEntries(root).Take(1).ToArray();
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    // The known root is genuinely absent.
+                }
+                catch (FileNotFoundException)
+                {
+                    // The known root is genuinely absent.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    warnings.Add(new XcodeInventoryWarning(kind, $"Root Xcode non accessibile: {root}"));
+                }
+                catch (IOException)
+                {
+                    warnings.Add(new XcodeInventoryWarning(kind, $"Impossibile verificare la root Xcode: {root}"));
+                }
+
                 return;
             }
 
@@ -85,7 +106,9 @@ public sealed class XcodeFileScanner(
                 }
 
                 long? allocated = await sizeProbe.MeasureAsync(canonical, ct);
-                XcodeFileIdentity identity = new(canonical, true, creation, modified, item.SizeBytes);
+                bool partial = outcome.Errors.Any(error => IsAtOrBelow(error.Path, canonical));
+                long? logicalSize = partial ? null : item.SizeBytes;
+                XcodeFileIdentity identity = new(canonical, true, creation, modified, logicalSize);
                 ScanItem guardedItem = item with { Path = canonical, DeclaredRoot = root };
                 inventory.Add(key, new XcodeFileEntry(guardedItem, identity));
                 string name = fileSystem.Path.GetFileName(canonical);
@@ -94,10 +117,15 @@ public sealed class XcodeFileScanner(
                     Kind: kind,
                     Name: platform is null ? name : $"{platform}: {name}",
                     Path: canonical,
-                    SizeBytes: allocated));
+                    SizeBytes: allocated,
+                    BlockReason: partial ? "Scansione parziale: impossibile verificare l'identità completa della cartella." : null));
             }
         }
     }
+
+    private static bool IsAtOrBelow(string candidatePath, string rootPath)
+        => candidatePath.Equals(rootPath, StringComparison.OrdinalIgnoreCase)
+           || candidatePath.StartsWith(rootPath.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Measures reported runtime backing images, never their mounted volume paths.</summary>
     public async Task<XcodeSnapshot> MeasureRuntimeBackingImagesAsync(XcodeSnapshot snapshot, CancellationToken ct)
@@ -154,4 +182,5 @@ public sealed class XcodeFileScanner(
 public interface IXcodeFileScanner
 {
     Task<XcodeSnapshot> ScanAsync(CancellationToken ct);
+    Task<XcodeSnapshot> MeasureRuntimeBackingImagesAsync(XcodeSnapshot snapshot, CancellationToken ct);
 }

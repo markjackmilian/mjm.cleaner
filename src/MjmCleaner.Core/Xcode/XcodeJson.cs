@@ -11,6 +11,7 @@ public static class XcodeJson
         List<XcodeInventoryWarning> warnings = [];
         List<LogicalRuntime> logicalRuntimes = [];
         List<XcodeCandidate> devices = [];
+        HashSet<string> conflictingDeviceRuntimes = new(StringComparer.Ordinal);
         bool deviceInventorySafe = true;
         bool logicalRuntimeInventorySafe = true;
         bool runtimeInventorySafe = true;
@@ -123,6 +124,37 @@ public static class XcodeJson
             warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, "Inventario simulatori incompleto; la rimozione dei simulatori e dei runtime è disabilitata."));
         }
 
+        List<XcodeCandidate> uniqueDevices = [];
+        foreach (IGrouping<string, XcodeCandidate> sameUuid in devices.GroupBy(device => device.Key, StringComparer.Ordinal))
+        {
+            XcodeCandidate first = sameUuid.First();
+            XcodeCandidate[] duplicates = sameUuid.Skip(1).ToArray();
+            bool conflicts = duplicates.Any(other =>
+                other.Name != first.Name
+                || other.RuntimeIdentifier != first.RuntimeIdentifier
+                || other.State != first.State
+                || other.SizeBytes != first.SizeBytes);
+
+            if (conflicts)
+            {
+                foreach (string? runtimeIdentifier in sameUuid.Select(device => device.RuntimeIdentifier).Where(identifier => identifier is not null))
+                {
+                    conflictingDeviceRuntimes.Add(runtimeIdentifier!);
+                }
+
+                first = first with
+                {
+                    SizeBytes = null,
+                    BlockReason = "UUID dispositivo ripetuto con metadati in conflitto; ripeti l'analisi prima di rimuoverlo.",
+                };
+                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, $"UUID dispositivo ripetuto con metadati in conflitto: {first.Key}."));
+            }
+
+            uniqueDevices.Add(first);
+        }
+
+        devices = uniqueDevices;
+
         if (!deviceInventorySafe)
         {
             devices = devices.Select(device => device with
@@ -197,6 +229,10 @@ public static class XcodeJson
             else if (!logicalRuntimeInventorySafe)
             {
                 blockReason = "Metadati dei runtime logici incompleti; ripeti l'analisi.";
+            }
+            else if (image.RuntimeIdentifier is not null && conflictingDeviceRuntimes.Contains(image.RuntimeIdentifier))
+            {
+                blockReason = "Dipendenza non verificabile: un UUID dispositivo ripetuto ha metadati in conflitto.";
             }
             else if (image.RuntimeIdentifier is null || image.Build is null || exactMatches.Count != 1)
             {

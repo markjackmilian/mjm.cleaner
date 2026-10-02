@@ -47,7 +47,7 @@ public sealed record XcodeFileIdentity(
     bool IsDirectory,
     DateTime CreationTimeUtc,
     DateTime LastWriteTimeUtc,
-    long LogicalSizeBytes);
+    long? LogicalSizeBytes);
 
 public sealed record XcodeFileEntry(ScanItem Item, XcodeFileIdentity Identity);
 

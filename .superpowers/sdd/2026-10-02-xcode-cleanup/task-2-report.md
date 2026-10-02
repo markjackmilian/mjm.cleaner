@@ -22,3 +22,11 @@
 ## Scope
 
 Owned files are the Xcode scanner, size probe, models, parser adjustment, their focused tests, and this report. The pre-existing dirty `CategoryCatalog.cs` and `CategoryCatalogTests.cs` were left untouched and excluded from the commit.
+
+## Round-one review fixes
+
+- Exposed runtime backing-image enrichment through `IXcodeFileScanner` and wired the collector to combine CLI and file inventories, then measure runtime backing paths when a scanner is supplied. The original one-argument collector construction remains valid for existing callers.
+- Deduplicated device rows by UUID. Exact repeats collapse to one row; conflicting metadata collapses to one blocked row with unknown size, and every runtime named by the conflicting rows is blocked because its dependencies cannot be verified.
+- Made logical size nullable in the captured identity. A candidate whose recursive scan has an error beneath its path is blocked and stores unknown logical size, so later revalidation cannot mistake a partial traversal for a complete fingerprint.
+- When `Directory.Exists` returns false, the scanner now performs a narrow direct enumeration probe. Not-found stays empty; access-denied and other I/O errors produce warnings. Added a simulated filesystem test for the hidden access-denied case.
+- RED evidence: the new collector integration test initially failed to compile because the injectable scanner constructor was absent; the conflict test then failed because neither associated runtime was blocked. Focused Xcode tests pass 35/35, and the full Core suite passes 452/452.

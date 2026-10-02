@@ -105,3 +105,15 @@ Those are the preexisting user catalog/test changes recorded in `progress.md`; I
 ## Remaining controller review
 
 The final independent Sol review and handoff remain with the controller. Live GUI inspection also remains unavailable; do not treat the launch smoke as a visual UI inspection.
+
+## Final review and controller verification
+
+Sol final review identified unavailable-device integration and logical/allocated byte accounting; both were corrected with regressions, along with report identity and empty-group copy. Scoped review of e44b475..22e6282 approved all four corrections with no remaining blockers. Controller reran standard dotnet test successfully: 499 Core + 19 App = 518 passing. Strict bundle signature verification also passed. A preliminary --no-restore Debug run after Release publishing lacked its configuration-specific diagnostics dependency; standard restore resolved the assets without source changes.
+
+## Decisions during execution
+
+- Ruling: Use user-requested Luna implementers and Sol reviewers including final review — explicit user preference overrides skill tier defaults — if insufficient, additional fix rounds may be needed.
+- Ruling: Task 2 may extend runtime parser to retain verified backing-image paths and add size enrichment seam — required runtime measurement is absent from Task 1 path contract — if wrong, size remains unknown rather than guessing mounted payload.
+- Ruling: Task 4 uses a dedicated tri-state Xcode-running probe if existing generic app heuristic cannot distinguish enumeration failure — unknown process state must not permit guarded file cleanup — a failed probe may conservatively block files until Retry.
+
+Implementation remains on feat/xcode-cleanup in /private/tmp/mjm-cleaner-xcode; no merge or push performed. The original catalog/test changes remain uncommitted and preserved. Manual interactive GUI inspection and destructive real-data tests were not performed.

@@ -1,6 +1,6 @@
 # Xcode Cleanup Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Aggiungere una pagina Xcode per pulire DerivedData e Device Support e rimuovere dispositivi simulati e runtime scelti esplicitamente.
 
@@ -56,11 +56,11 @@ App in `Xcode/`. Modifiche di integrazione elencate nei task sotto.
 - `IXcodeCli.DeleteDeviceAsync(string uuid, CancellationToken) -> Task<ProcessResult>`; `DeleteRuntimeAsync(string uuid, CancellationToken) -> Task<ProcessResult>`.
 - `IXcodeInventoryCollector.CollectAsync(CancellationToken) -> Task<XcodeSnapshot>`.
 
-- [ ] Write failing tests: `EmptyInventoryIsSuccessful`, `MalformedDevicesProducesWarningAndBlocksRuntimes`, `SameVersionDifferentBuildDoesNotGuess`, `MissingRemovalUuidBlocksRuntime`, `DeleteUsesOnlyValidatedUuid`, `RuntimeDeleteUnsupportedIsReported`. Assert blocked runtimes cannot be selected and aliases `all`, `unavailable` and non-UUID arguments never launch a process.
-- [ ] Run `/usr/local/share/dotnet/dotnet test tests/MjmCleaner.Core.Tests --filter 'FullyQualifiedName~Xcode'`; expect failures for missing contracts/implementation.
-- [ ] Implement models and CLI using existing `IProcessRunner`, argument lists, 30-second inventory timeout and 5-minute deletion timeout. Detect runtime-delete support from help, capture inventory sources independently, map runtime identifiers/builds to image UUIDs, and block ambiguous mappings. Keep known resources visible on partial failure, with unsafe simulator deletion disabled.
-- [ ] Run the same filtered tests; expect all pass. Verify local help and read-only JSON parsing; keep nonempty synthetic fixtures because the local inventory is empty.
-- [ ] Commit only Task 1 files: `feat(xcode): add read-only simulator inventory`.
+- [x] Write failing tests: `EmptyInventoryIsSuccessful`, `MalformedDevicesProducesWarningAndBlocksRuntimes`, `SameVersionDifferentBuildDoesNotGuess`, `MissingRemovalUuidBlocksRuntime`, `DeleteUsesOnlyValidatedUuid`, `RuntimeDeleteUnsupportedIsReported`. Assert blocked runtimes cannot be selected and aliases `all`, `unavailable` and non-UUID arguments never launch a process.
+- [x] Run `/usr/local/share/dotnet/dotnet test tests/MjmCleaner.Core.Tests --filter 'FullyQualifiedName~Xcode'`; expect failures for missing contracts/implementation.
+- [x] Implement models and CLI using existing `IProcessRunner`, argument lists, 30-second inventory timeout and 5-minute deletion timeout. Detect runtime-delete support from help, capture inventory sources independently, map runtime identifiers/builds to image UUIDs, and block ambiguous mappings. Keep known resources visible on partial failure, with unsafe simulator deletion disabled.
+- [x] Run the same filtered tests; expect all pass. Verify local help and read-only JSON parsing; keep nonempty synthetic fixtures because the local inventory is empty.
+- [x] Commit only Task 1 files: `feat(xcode): add read-only simulator inventory`.
 
 ### Task 2: File inventory and space estimates
 
@@ -72,11 +72,11 @@ App in `Xcode/`. Modifiche di integrazione elencate nei task sotto.
 - `IXcodeSizeProbe.GetFreeBytesAsync(CancellationToken) -> Task<long?>` measures the volume holding the user home.
 - File candidates retain guarded `ScanItem` values in a separate `XcodeFileInventory` keyed by candidate Key; extend the snapshot with this immutable mapping.
 
-- [ ] Write failing tests: `DerivedDataIsGroupedByProjectFolder`, `ArchivesAndUserDataAreNeverCandidates`, `AbsentSupportFolderIsEmpty`, `LinkedRootIsRejected`, `AccessDeniedSizeIsUnknown`, `SharedBackingImageCountedOnce`. Assert protected paths never become file candidates and unknown size remains null.
-- [ ] Run filtered Xcode tests; expect new tests fail.
-- [ ] Implement scanning with `RuleScanner`, `PathGuard` and existing link inspection. Use exact roots `~/Library/Developer/Xcode/DerivedData`, `iOS DeviceSupport`, `watchOS DeviceSupport`, `tvOS DeviceSupport`, `visionOS DeviceSupport` under the same Xcode directory. Confirm directory conventions read-only; absent roots are empty, inaccessible roots warn. Enumerate direct child directories only; exclude unrecognized files. Use allocated-size probing without traversing symlinks; failed or partial measurement returns null. Runtime size uses backing image, never mounted runtime contents. Deduplicate by canonical backing path and device UUID; label all totals as estimates due to APFS clones.
-- [ ] Run filtered tests; expect pass. Read-only inspect known roots on the Mac to validate supported locations.
-- [ ] Commit only Task 2 files: `feat(xcode): scan guarded cache and support folders`.
+- [x] Write failing tests: `DerivedDataIsGroupedByProjectFolder`, `ArchivesAndUserDataAreNeverCandidates`, `AbsentSupportFolderIsEmpty`, `LinkedRootIsRejected`, `AccessDeniedSizeIsUnknown`, `SharedBackingImageCountedOnce`. Assert protected paths never become file candidates and unknown size remains null.
+- [x] Run filtered Xcode tests; expect new tests fail.
+- [x] Implement scanning with `RuleScanner`, `PathGuard` and existing link inspection. Use exact roots `~/Library/Developer/Xcode/DerivedData`, `iOS DeviceSupport`, `watchOS DeviceSupport`, `tvOS DeviceSupport`, `visionOS DeviceSupport` under the same Xcode directory. Confirm directory conventions read-only; absent roots are empty, inaccessible roots warn. Enumerate direct child directories only; exclude unrecognized files. Use allocated-size probing without traversing symlinks; failed or partial measurement returns null. Runtime size uses backing image, never mounted runtime contents. Deduplicate by canonical backing path and device UUID; label all totals as estimates due to APFS clones.
+- [x] Run filtered tests; expect pass. Read-only inspect known roots on the Mac to validate supported locations.
+- [x] Commit only Task 2 files: `feat(xcode): scan guarded cache and support folders`.
 
 ### Task 3: Classification and immutable confirmation
 
@@ -88,11 +88,11 @@ App in `Xcode/`. Modifiche di integrazione elencate nei task sotto.
 - `XcodeConfirmation`: selected candidates, retained dependent devices, estimated bytes, unknown-size count.
 - `XcodeSelection.Confirm(XcodeConfirmation preview, bool acknowledgeDependencies) -> XcodeConfirmedPlan`; throws on invalid selection or unacknowledged retained dependencies. Plan includes copied candidates and guarded file inventory from the source snapshot.
 
-- [ ] Write failing tests: `AllRowsStartDeselected`, `BootedDeviceAndItsRuntimeAreBlocked`, `XcodeRunningBlocksFileCleanup`, `UnknownKeyIsRejected`, `RetainedDependenciesRequireAcknowledgement`, `ConfirmDoesNotSelectDependentDevices`, `UnknownSizesRemainVisible`.
-- [ ] Run filtered Xcode tests; expect new failures.
-- [ ] Implement deterministic classification; only explicit keys may enter confirmation, duplicate keys collapse, blocked/unknown keys reject the plan. Show retained dependent devices by name, runtime and UUID; unavailable devices remain individually selectable if their identity is verified.
-- [ ] Run filtered tests; expect pass.
-- [ ] Commit only Task 3 files: `feat(xcode): add explicit selection and dependency confirmation`.
+- [x] Write failing tests: `AllRowsStartDeselected`, `BootedDeviceAndItsRuntimeAreBlocked`, `XcodeRunningBlocksFileCleanup`, `UnknownKeyIsRejected`, `RetainedDependenciesRequireAcknowledgement`, `ConfirmDoesNotSelectDependentDevices`, `UnknownSizesRemainVisible`.
+- [x] Run filtered Xcode tests; expect new failures.
+- [x] Implement deterministic classification; only explicit keys may enter confirmation, duplicate keys collapse, blocked/unknown keys reject the plan. Show retained dependent devices by name, runtime and UUID; unavailable devices remain individually selectable if their identity is verified.
+- [x] Run filtered tests; expect pass.
+- [x] Commit only Task 3 files: `feat(xcode): add explicit selection and dependency confirmation`.
 
 ### Task 4: Execution, revalidation and report
 
@@ -105,11 +105,11 @@ App in `Xcode/`. Modifiche di integrazione elencate nei task sotto.
 - `IXcodeCleanupService.AnalyzeAsync(CancellationToken) -> Task<XcodeSnapshot>` combines file/CLI inventories and current Xcode-running state.
 - `IXcodeCleanupService.ExecuteAsync(XcodeConfirmedPlan plan, IProgress<CleanProgress>? progress, CancellationToken ct) -> Task<XcodeCleanResult>`.
 
-- [ ] Write failing tests: `RevalidationNeverAddsItems`, `ChangedIdentityIsSkipped`, `DeviceBootedAfterConfirmationIsSkipped`, `XcodeStartedAfterConfirmationBlocksFiles`, `DevicesRunBeforeRuntimes`, `DeviceFailureSkipsDependentRuntime`, `TimeoutWithUnreadableInventoryIsUncertain`, `CancellationRetainsCompletedResults`, `FailedAndUnknownSizesDoNotIncreaseHistoryBytes`, `IndependentFailureDoesNotStopOtherItems`. Assert exact fake runner calls and no filesystem deletion for simulator paths.
-- [ ] Run filtered tests; expect new failures.
-- [ ] Implement per-operation fresh inventory/state checks, comparing UUID, build, runtime identity, dependencies and file identity metadata captured at analysis (creation/last-write timestamps and guarded path). Guarded files delegate to `ICleanEngine`; CLI resources require command success plus verified absence for Deleted. After timeout/cancel, read inventory with a separate bounded token and classify verified absence versus Uncertain. Never retry deletion automatically. Process selected devices before runtimes; skip runtime after dependent device failure or identity changes. Continue unrelated operations, preserve partial reports on exceptions/cancel, record unknown estimates as zero only in the legacy numeric history field, visibly flagged in the detailed report. Free-space delta is displayed separately and never credited to history.
-- [ ] Run filtered tests; expect pass. Ensure a CLI runtime delete cannot auto-shutdown devices because fresh state checks block booted dependents.
-- [ ] Commit only Task 4 files: `feat(xcode): execute confirmed cleanup with revalidation`.
+- [x] Write failing tests: `RevalidationNeverAddsItems`, `ChangedIdentityIsSkipped`, `DeviceBootedAfterConfirmationIsSkipped`, `XcodeStartedAfterConfirmationBlocksFiles`, `DevicesRunBeforeRuntimes`, `DeviceFailureSkipsDependentRuntime`, `TimeoutWithUnreadableInventoryIsUncertain`, `CancellationRetainsCompletedResults`, `FailedAndUnknownSizesDoNotIncreaseHistoryBytes`, `IndependentFailureDoesNotStopOtherItems`. Assert exact fake runner calls and no filesystem deletion for simulator paths.
+- [x] Run filtered tests; expect new failures.
+- [x] Implement per-operation fresh inventory/state checks, comparing UUID, build, runtime identity, dependencies and file identity metadata captured at analysis (creation/last-write timestamps and guarded path). Guarded files delegate to `ICleanEngine`; CLI resources require command success plus verified absence for Deleted. After timeout/cancel, read inventory with a separate bounded token and classify verified absence versus Uncertain. Never retry deletion automatically. Process selected devices before runtimes; skip runtime after dependent device failure or identity changes. Continue unrelated operations, preserve partial reports on exceptions/cancel, record unknown estimates as zero only in the legacy numeric history field, visibly flagged in the detailed report. Free-space delta is displayed separately and never credited to history.
+- [x] Run filtered tests; expect pass. Ensure a CLI runtime delete cannot auto-shutdown devices because fresh state checks block booted dependents.
+- [x] Commit only Task 4 files: `feat(xcode): execute confirmed cleanup with revalidation`.
 
 ### Task 5: Page, confirmation, report and integration
 
@@ -120,11 +120,11 @@ App in `Xcode/`. Modifiche di integrazione elencate nei task sotto.
 - `XcodeReportViewModel` consumes `XcodeCleanResult`; persists report/log exactly once, refreshes cumulative total, and exposes per-resource results plus separately labeled free-space delta.
 - `AppServices.Xcode` exposes `IXcodeCleanupService`; `MainWindowViewModel.ShowXcodeCommand` navigates to the page.
 
-- [ ] Write failing tests: `GroupSelectionOnlyAffectsCaches`, `DeleteRequiresPreviewAndAcknowledgement`, `DoubleClickExecutesOnce`, `RetryClearsOldSelection`, `CannotNavigateDuringDelete`, `CancelledPartialReportIsSavedOnce`, `UnknownSizeUsesUnavailableLabel`, `PersistenceFailureShowsReportAndError`, `GeneralCategoryNoLongerContainsDerivedData`. Preserve the existing Archives exclusion tests.
-- [ ] Run `/usr/local/share/dotnet/dotnet test tests/MjmCleaner.App.Tests --filter 'FullyQualifiedName~Xcode'` and Core category tests; expect new failures.
-- [ ] Implement four expanding groups with inline warnings, explicit selection, final confirmation panel, dependency acknowledgement and disabled unsafe actions. Disable navigation and selection while executing; cancel requests stop new operations and await the report. Wire page templates, toolbar and service composition; move DerivedData out of the general catalog, preserve the user's existing Archives modifications and adjust development-cache description. Report persistence errors must keep results readable and prevent duplicate save retries. Update README with consequences, CLI compatibility and estimated-space limits.
-- [ ] Run both focused suites; expect pass. Read diffs of locally modified catalog/test files against the pre-task snapshot so commits include only this task's additions; if hunks cannot be isolated, leave those files uncommitted and report them.
-- [ ] Commit only owned changes: `feat(xcode): add cleanup page and report`.
+- [x] Write failing tests: `GroupSelectionOnlyAffectsCaches`, `DeleteRequiresPreviewAndAcknowledgement`, `DoubleClickExecutesOnce`, `RetryClearsOldSelection`, `CannotNavigateDuringDelete`, `CancelledPartialReportIsSavedOnce`, `UnknownSizeUsesUnavailableLabel`, `PersistenceFailureShowsReportAndError`, `GeneralCategoryNoLongerContainsDerivedData`. Preserve the existing Archives exclusion tests.
+- [x] Run `/usr/local/share/dotnet/dotnet test tests/MjmCleaner.App.Tests --filter 'FullyQualifiedName~Xcode'` and Core category tests; expect new failures.
+- [x] Implement four expanding groups with inline warnings, explicit selection, final confirmation panel, dependency acknowledgement and disabled unsafe actions. Disable navigation and selection while executing; cancel requests stop new operations and await the report. Wire page templates, toolbar and service composition; move DerivedData out of the general catalog, preserve the user's existing Archives modifications and adjust development-cache description. Report persistence errors must keep results readable and prevent duplicate save retries. Update README with consequences, CLI compatibility and estimated-space limits.
+- [x] Run both focused suites; expect pass. Read diffs of locally modified catalog/test files against the pre-task snapshot so commits include only this task's additions; if hunks cannot be isolated, leave those files uncommitted and report them.
+- [x] Commit only owned changes: `feat(xcode): add cleanup page and report`.
 
 ### Task 6: Complete verification and delivery
 
@@ -137,5 +137,5 @@ Task evidence: `docs/superpowers/verification/2026-10-02-xcode-cleanup.md`. Buil
 - [x] Run `./build/bundle.sh`; complete macOS bundle produced, signed and verified; app launch smoke succeeded. Fixture-backed tests cover nonempty inventories. No destructive real cleanup was performed.
 - [ ] Manually inspect live Xcode navigation, empty and error states, expansion, selection and confirmation; unavailable in this environment.
 - [x] Run `git diff --check` and inspect `git status --short`; no whitespace errors. Preexisting catalog/test changes are identified in the verification report and remain untouched.
-- [ ] Review the completed change against the spec, especially CLI-only deletion, booted dependencies, partial inventory and estimates. If independent review is selected, give the reviewer spec, plan and owned diff; resolve findings before delivery.
+- [x] Review the completed change against the spec, especially CLI-only deletion, booted dependencies, partial inventory and estimates. If independent review is selected, give the reviewer spec, plan and owned diff; resolve findings before delivery.
 - [ ] Report implemented behavior, verification results and the limitation that deletion was validated with fake CLI/filesystem rather than real user data. Follow the finishing-branch workflow without merging or pushing unless authorized.

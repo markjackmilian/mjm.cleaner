@@ -29,7 +29,7 @@ public static class CategoryCatalog
             new CleanupCategory(
                 Id: "dev-caches",
                 DisplayName: "Cache di sviluppo",
-                Description: "Cache di npm, Xcode e Gradle. Tutto rigenerabile alla prossima compilazione.",
+                Description: "Cache di npm e Gradle. Xcode DerivedData si gestisce dalla pagina Xcode dedicata.",
                 Risk: RiskLevel.Low,
                 SelectedByDefault: true,
                 ParentId: null,
@@ -37,7 +37,6 @@ public static class CategoryCatalog
                 [
                     new CleanupRule(E("~/.npm/_cacache"), ScanMode.ClearContents, All, []),
                     new CleanupRule(E("~/.cache"), ScanMode.ClearContents, All, []),
-                    new CleanupRule(E("~/Library/Developer/Xcode/DerivedData"), ScanMode.ClearContents, All, []),
                     // Niente regola su "Archives": a differenza di DerivedData (output di
                     // compilazione, rigenerabile), un archivio Xcode contiene il binario e il
                     // dSYM di una build già spedita. Senza quel dSYM non si simbolicano più i

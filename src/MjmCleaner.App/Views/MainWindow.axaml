@@ -16,19 +16,22 @@
                     <TextBlock Text="{Binding TotalFreedText}" FontWeight="SemiBold" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
-                    <Button Classes="ToolbarButton" Command="{Binding ShowDockerCommand}">
+                    <Button Classes="ToolbarButton" Command="{Binding ShowDockerCommand}" IsEnabled="{Binding !IsXcodeBusy}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <Path Width="15" Height="15" Data="M2,8 L13,8 L13,13 L2,13 Z M3,4 L6,4 L6,8 M6.5,4 L9.5,4 L9.5,8 M5,1 L8,1 L8,4" Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
                             <TextBlock Text="Docker" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="ToolbarButton" Command="{Binding ShowHistoryCommand}">
+                    <Button Classes="ToolbarButton" Command="{Binding ShowXcodeCommand}" IsEnabled="{Binding !IsXcodeBusy}">
+                        <TextBlock Text="Xcode" />
+                    </Button>
+                    <Button Classes="ToolbarButton" Command="{Binding ShowHistoryCommand}" IsEnabled="{Binding !IsXcodeBusy}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <Path Width="15" Height="15" Data="M3,2 L12,2 L12,13 L3,13 Z M5,5 L10,5 M5,8 L10,8 M5,11 L8,11" Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
                             <TextBlock Text="Storico" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="ToolbarButton" Command="{Binding ShowSettingsCommand}">
+                    <Button Classes="ToolbarButton" Command="{Binding ShowSettingsCommand}" IsEnabled="{Binding !IsXcodeBusy}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <Path Width="15" Height="15" Data="M7.5,2.5 A5,5 0 1,0 7.51,2.5 M7.5,5.4 A2.1,2.1 0 1,0 7.51,5.4" Stroke="{DynamicResource SecondaryTextBrush}" StrokeThickness="1.4" />
                             <TextBlock Text="Impostazioni" />

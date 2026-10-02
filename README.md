@@ -56,7 +56,8 @@ The application uses a four-step wizard, always in the same order:
 | **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard`. This is the final point at which the operation can be abandoned. |
 | **4 · Done** | Summarizes the disk space recovered and any items that could not be deleted. |
 
-In the toolbar, **Docker** opens the Docker cleanup page (see below), **History**
+In the toolbar, **Docker** opens the Docker cleanup page, **Xcode** opens the Xcode
+cache and simulator page (see below), and **History**
 shows previous cleanup sessions and the cumulative space recovered. **Settings** configures the project directories searched for
 `bin` and `obj`, the directories searched for large files, the large-file size
 threshold, and the minimum ages for Downloads, logs, and NuGet packages.
@@ -64,13 +65,36 @@ threshold, and the minimum ages for Downloads, logs, and NuGet packages.
 ### Categories
 
 - **User and system caches** — `~/Library/Caches`, `/Library/Caches`, `$TMPDIR`
-- **Development caches** — npm, Xcode (DerivedData and Archives), Gradle,
+- **Development caches** — npm, Gradle,
   `~/.cache`
   - **Unused NuGet packages** (sub-category, not preselected)
 - **Project bin and obj directories** — only when a project file (`.csproj`,
   `.sln`, …) exists next to the directory
 - **Logs and crash reports** — `~/Library/Logs`, `/Library/Logs`
 - **Trash, Downloads, and large files** — high risk, never preselected
+
+### Xcode
+
+The **Xcode** page analyzes DerivedData by project folder, iOS/watchOS/tvOS/visionOS
+Device Support, simulated devices, and installed simulator runtimes. Every item
+starts deselected. Only the two cache groups support group selection; devices
+and runtimes require individual selection. Archives are excluded because they
+contain shipped app binaries and debug symbols.
+
+The page shows a final preview before deletion. Removing a simulated device also
+removes its apps and test data. Removing a runtime can make dependent devices
+unavailable; those devices are listed and require acknowledgement, and the app
+never removes them automatically. Running devices and Xcode block affected
+operations. File caches use the app's guarded cleanup engine; simulator and
+runtime removal uses UUID-targeted `xcrun simctl` commands only. If the installed
+Xcode does not support runtime removal through the CLI, the page reports that
+limit and points to Xcode Settings.
+
+Sizes are estimates. Unknown sizes remain unavailable, APFS clones can make
+allocated-space estimates differ from space ultimately reclaimed, and the
+before/after free-space measurement is shown separately because other processes
+can change it during cleanup. Only verified, measurable removals are credited
+to the cumulative history total.
 
 ### Docker
 

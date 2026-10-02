@@ -7,6 +7,7 @@ using MjmCleaner.Core.History;
 using MjmCleaner.Core.Safety;
 using MjmCleaner.Core.Scanning;
 using MjmCleaner.Core.Settings;
+using MjmCleaner.Core.Xcode;
 
 namespace MjmCleaner.App.Services;
 
@@ -24,6 +25,7 @@ public sealed class AppServices
         ISettingsStore settings,
         IRunningAppsProbe runningApps,
         DockerCleanupService docker,
+        IXcodeCleanupService xcode,
         AppPaths paths)
     {
         Scan = scan;
@@ -33,6 +35,7 @@ public sealed class AppServices
         Settings = settings;
         RunningApps = runningApps;
         Docker = docker;
+        Xcode = xcode;
         Paths = paths;
     }
 
@@ -43,6 +46,7 @@ public sealed class AppServices
     public ISettingsStore Settings { get; }
     public IRunningAppsProbe RunningApps { get; }
     public DockerCleanupService Docker { get; }
+    public IXcodeCleanupService Xcode { get; }
     public AppPaths Paths { get; }
 
     public IReadOnlyList<CleanupCategory> BuildCategories()
@@ -75,6 +79,14 @@ public sealed class AppServices
             new DiskUsageProbe(processes, fileSystem, DiskUsageProbe.DefaultPath(home)),
             new DockerCleanExecutor(dockerCli, TimeProvider.System));
 
+        XcodeCli xcodeCli = new(processes, fileSystem.File.Exists("/usr/bin/xcrun") ? "/usr/bin/xcrun" : null);
+        XcodeSizeProbe xcodeMeasures = new(fileSystem, processes, links, home);
+        XcodeFileScanner xcodeFiles = new(fileSystem, scanner, guard, links, xcodeMeasures, home);
+        XcodeInventoryCollector xcodeInventory = new(xcodeCli, xcodeFiles);
+        XcodeRunningProbe xcodeRunning = new(processes);
+        XcodeCleanupService xcode = new(xcodeInventory, xcodeRunning,
+            new XcodeCleanExecutor(xcodeCli, xcodeInventory, new CleanEngine(fileSystem, guard, TimeProvider.System), xcodeMeasures, xcodeRunning, TimeProvider.System));
+
         HistoryStore history = new(paths.DatabaseFile);
         await history.InitializeAsync(CancellationToken.None);
 
@@ -86,6 +98,7 @@ public sealed class AppServices
             new SettingsStore(fileSystem, paths),
             RunningAppsProbe.ForCurrentMachine(),
             docker,
+            xcode,
             paths);
     }
 }

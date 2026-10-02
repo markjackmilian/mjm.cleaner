@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             x:Class="MjmCleaner.App.Views.XcodeReportView"
+             x:DataType="vm:XcodeReportViewModel">
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
+            <TextBlock Text="XCODE" Classes="Eyebrow" />
+            <TextBlock Text="Report pulizia" Classes="PageTitle" />
+            <TextBlock Text="{Binding SummaryText}" Classes="PageSubtitle" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+            <TextBlock Text="{Binding FreedText}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding FreeSpaceText}" Classes="Muted" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding WarningsText}" IsVisible="{Binding HasWarnings}" Classes="Muted" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding HistoryWarning}" IsVisible="{Binding HasHistoryWarning}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}" />
+                <Button Classes="Primary" Content="Nuova analisi Xcode" Command="{Binding AnalyzeAgainCommand}" />
+            </StackPanel>
+        </StackPanel>
+        <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:XcodeResultRow">
+                        <Border Classes="SurfaceCard" Padding="10" Margin="0,0,0,6">
+                            <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" Text="{Binding OutcomeText}" Classes="Muted" Margin="8,0" />
+                                <TextBlock Grid.Column="2" Text="{Binding SizeText}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Detail}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

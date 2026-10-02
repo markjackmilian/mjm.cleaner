@@ -20,5 +20,7 @@
         <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
         <DataTemplate DataType="vm:DockerViewModel"><views:DockerView /></DataTemplate>
         <DataTemplate DataType="vm:DockerReportViewModel"><views:DockerReportView /></DataTemplate>
+        <DataTemplate DataType="vm:XcodeViewModel"><views:XcodeView /></DataTemplate>
+        <DataTemplate DataType="vm:XcodeReportViewModel"><views:XcodeReportView /></DataTemplate>
     </Application.DataTemplates>
 </Application>

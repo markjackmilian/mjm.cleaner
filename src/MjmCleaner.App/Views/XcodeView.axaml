@@ -1,0 +1,116 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             x:Class="MjmCleaner.App.Views.XcodeView"
+             x:DataType="vm:XcodeViewModel">
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
+            <TextBlock Text="XCODE" Classes="Eyebrow" />
+            <TextBlock Text="Pulizia cache e simulatori" Classes="PageTitle" />
+            <TextBlock Text="Tutte le voci partono deselezionate. L’anteprima non elimina nulla." Classes="PageSubtitle" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
+            <TextBlock Text="{Binding WarningText}" IsVisible="{Binding HasWarnings}" Classes="Muted" TextWrapping="Wrap" />
+            <Border IsVisible="{Binding HasConfirmation}" Padding="14" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}" BorderThickness="1" BorderBrush="#F0D69B">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Conferma finale" FontWeight="Bold" />
+                    <TextBlock Text="{Binding PreviewSummaryText}" />
+                    <TextBlock Text="{Binding PreviewEstimateText}" Classes="Muted" />
+                    <ItemsControl ItemsSource="{Binding Confirmation.SelectedCandidates}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Path}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding CliId}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="Eliminare un dispositivo rimuove anche le sue app e i dati di test."
+                               IsVisible="{Binding HasSelectedDevices}" TextWrapping="Wrap" />
+                    <TextBlock Text="Rimuovere un runtime può rendere indisponibili i dispositivi che lo usano."
+                               IsVisible="{Binding HasSelectedRuntimes}" TextWrapping="Wrap" />
+                    <TextBlock Text="I dispositivi elencati resteranno sul disco, ma potrebbero non avviarsi se rimuovi il runtime."
+                               IsVisible="{Binding HasRetainedDependencies}" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding Confirmation.RetainedDependentDevices}" IsVisible="{Binding HasRetainedDependencies}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding CliId}" Classes="Muted" FontSize="11" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <CheckBox Content="Ho capito che i dispositivi elencati potrebbero non essere più disponibili finché non reinstallo il runtime."
+                              IsVisible="{Binding HasRetainedDependencies}"
+                              IsChecked="{Binding AcknowledgeDependencies}" IsEnabled="{Binding !IsDeleting}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                        <Button Classes="Secondary" Content="Torna alla selezione" Command="{Binding BackToSelectionCommand}" IsEnabled="{Binding !IsDeleting}" />
+                        <Button Classes="Destructive" Content="Conferma ed elimina" Command="{Binding ConfirmDeleteCommand}" IsEnabled="{Binding !IsDeleting}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="{Binding ProgressText}" IsVisible="{Binding IsDeleting}" Classes="Muted" HorizontalAlignment="Right" />
+            <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}" IsEnabled="{Binding !IsDeleting}" />
+                <Button Classes="Secondary" Content="Interrompi" Command="{Binding CancelDeleteCommand}" IsVisible="{Binding IsDeleting}" />
+                <Button Classes="Secondary" Content="Riprova analisi" Command="{Binding RetryCommand}" IsEnabled="{Binding !IsDeleting}" />
+                <Button Classes="Primary" Content="Anteprima selezione" Command="{Binding PreviewCommand}" IsEnabled="{Binding !IsDeleting}" IsVisible="{Binding !HasConfirmation}" />
+            </StackPanel>
+        </StackPanel>
+        <Panel>
+            <StackPanel IsVisible="{Binding IsLoading}" Spacing="10" VerticalAlignment="Center" MaxWidth="420">
+                <ProgressBar IsIndeterminate="True" />
+                <TextBlock Text="Analisi delle cartelle Xcode e dei simulatori…" Classes="Muted" HorizontalAlignment="Center" />
+            </StackPanel>
+            <Border IsVisible="{Binding HasError}" Classes="SurfaceCard" Padding="16" VerticalAlignment="Center" MaxWidth="560">
+                <TextBlock Text="{Binding ErrorText}" TextWrapping="Wrap" />
+            </Border>
+            <DockPanel IsVisible="{Binding !IsLoading}" LastChildFill="True">
+                <Border DockPanel.Dock="Top" Classes="SurfaceCard" Padding="12" Margin="0,0,0,12">
+                    <TextBlock Text="{Binding TotalText}" FontWeight="SemiBold" />
+                </Border>
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Groups}" IsEnabled="{Binding !IsDeleting}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:XcodeGroupNode">
+                                <Expander IsExpanded="{Binding IsExpanded, Mode=OneTime}" Margin="0,0,0,8">
+                                    <Expander.Header>
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Summary}" Classes="Muted" FontSize="12" />
+                                        </StackPanel>
+                                    </Expander.Header>
+                                    <StackPanel Spacing="6">
+                                        <ItemsControl ItemsSource="{Binding Warnings}">
+                                            <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" Classes="Muted" TextWrapping="Wrap" /></DataTemplate></ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <CheckBox IsVisible="{Binding ShowGroupCheckBox}" IsChecked="{Binding IsSelected}" Content="Seleziona tutte le voci di cache" />
+                                        <ListBox ItemsSource="{Binding Rows}" MaxHeight="360">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate DataType="vm:XcodeRow">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,5">
+                                                        <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanSelect}" VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" Margin="8,0" Spacing="2">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding IdentityText}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding StateText}" Classes="Muted" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasState}" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="2" Text="{Binding SizeText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </StackPanel>
+                                </Expander>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Panel>
+    </DockPanel>
+</UserControl>

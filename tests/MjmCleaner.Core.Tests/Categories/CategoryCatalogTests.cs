@@ -92,4 +92,13 @@ public class CategoryCatalogTests
             Build().SelectMany(c => c.Rules),
             r => r.Root.Contains("docker", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void GeneralDevelopmentCacheCategoryDoesNotContainDerivedData()
+    {
+        CleanupCategory development = Build().Single(c => c.Id == "dev-caches");
+
+        Assert.DoesNotContain(development.Rules, rule => rule.Root.Contains("DerivedData", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("pagina Xcode", development.Description, StringComparison.OrdinalIgnoreCase);
+    }
 }

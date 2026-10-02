@@ -62,7 +62,6 @@
                 <Panel />
             </DockPanel>
         </Border>
-        <!-- Margine provvisorio (Task 5): 52 in alto lascia libera l'area della titlebar finché le view non hanno toolbar e padding propri. -->
-        <ContentControl x:Name="PageHost" Grid.Column="1" Margin="32,52,32,24" Content="{Binding CurrentPage}" />
+        <ContentControl x:Name="PageHost" Grid.Column="1" Content="{Binding CurrentPage}" />
     </Grid>
 </Window>

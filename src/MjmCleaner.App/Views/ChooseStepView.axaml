@@ -1,53 +1,99 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             xmlns:views="clr-namespace:MjmCleaner.App.Views"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="MjmCleaner.App.Views.ChooseStepView"
              x:DataType="vm:ChooseStepViewModel">
 
-    <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,20">
-            <TextBlock Text="1 · Scegli   —   2 Analizza   —   3 Conferma   —   4 Fatto" Classes="Eyebrow" />
-            <TextBlock Text="Cosa vuoi pulire?" Classes="PageTitle" />
-            <TextBlock Text="Seleziona solo ciò che vuoi analizzare. Vedrai ogni elemento prima della rimozione." Classes="PageSubtitle" />
-        </StackPanel>
+    <UserControl.Styles>
+        <!-- Tutta la riga commuta la casella: il ToggleButton resta trasparente e FluentTheme non deve colorare lo stato checked. -->
+        <Style Selector="ToggleButton.ChoiceRow">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <Style Selector="ToggleButton.ChoiceRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.ChoiceRow:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.ChoiceRow:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+        </Style>
+        <Style Selector="ToggleButton.ChoiceRow:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </Style>
+    </UserControl.Styles>
 
-        <Border DockPanel.Dock="Bottom" Classes="SurfaceCard" Padding="12" Margin="0,18,0,0">
+    <DockPanel LastChildFill="True">
+        <Border DockPanel.Dock="Top" Classes="Toolbar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
             <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="L'analisi non elimina alcun file." Classes="Muted" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Classes="Primary" Content="Analizza →" Command="{Binding AnalyzeCommand}" />
+                <StackPanel VerticalAlignment="Center" Spacing="1">
+                    <TextBlock Text="Pulizia" Classes="ToolbarTitle" />
+                    <TextBlock Text="Passo 1 di 4" Classes="ToolbarSubtitle" />
+                </StackPanel>
+                <views:StepIndicator Grid.Column="1" CurrentStep="1" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="12">
+                <Viewbox Width="15" Height="15" VerticalAlignment="Center"><Path Classes="Icon" Data="{StaticResource IconShield}" Stroke="{DynamicResource SecondaryTextBrush}" /></Viewbox>
+                <TextBlock Grid.Column="1" Text="L'analisi non elimina alcun file." Classes="Muted" FontSize="12" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="3" Text="{Binding SelectedCountText}" Classes="Muted Numeric" FontSize="12" VerticalAlignment="Center" />
+                <Button Grid.Column="4" Classes="Primary" Command="{Binding AnalyzeCommand}" Padding="14,5,12,5">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Analizza" />
+                        <Viewbox Width="12" Height="12" VerticalAlignment="Center"><Path Classes="Icon" Data="{StaticResource IconChevronRight}" Stroke="White" StrokeThickness="2.4" /></Viewbox>
+                    </StackPanel>
+                </Button>
             </Grid>
         </Border>
 
         <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding Choices}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="vm:CategoryChoice">
-                        <Border Margin="{Binding Indent}" Padding="14,12" Classes="SurfaceCard">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                <CheckBox Grid.Column="0"
-                                          IsChecked="{Binding IsSelected}"
-                                          VerticalAlignment="Center"
-                                          Margin="0,0,10,0" />
-                                <StackPanel Grid.Column="1" Spacing="3">
-                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding Description}"
-                                               Classes="Muted"
-                                               FontSize="12"
-                                               TextWrapping="Wrap" />
+            <StackPanel Margin="32,24,32,20" Spacing="16">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Cosa vuoi pulire?" Classes="PageTitle" />
+                    <TextBlock Text="Seleziona solo ciò che vuoi analizzare. Vedrai ogni elemento prima della rimozione." Classes="PageSubtitle" />
+                </StackPanel>
+
+                <Border Classes="SurfaceCard">
+                    <ItemsControl ItemsSource="{Binding Choices}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:CategoryChoice">
+                                <StackPanel>
+                                    <Border Classes="Separator" Margin="{Binding SeparatorMargin}" IsVisible="{Binding ShowSeparator}" />
+                                    <!-- Tutta la riga commuta la casella: un ToggleButton trasparente con la CheckBox non interattiva dentro. -->
+                                    <ToggleButton Classes="ChoiceRow" IsChecked="{Binding IsSelected}" Padding="{Binding RowPadding}"
+                                                  AutomationProperties.Name="{Binding DisplayName}">
+                                        <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
+                                            <CheckBox IsChecked="{Binding IsSelected}" IsHitTestVisible="False" Focusable="False" VerticalAlignment="Center" />
+                                            <Border Grid.Column="1" Classes="Tile" Background="{Binding TileBrush}" VerticalAlignment="Center">
+                                                <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{Binding Icon}" Stroke="White" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}" Classes="RowTitle" />
+                                                <TextBlock Text="{Binding Description}" Classes="RowDescription" />
+                                            </StackPanel>
+                                            <Border Grid.Column="3" Classes="RiskPill" Classes.Low="{Binding IsLowRisk}" Classes.Medium="{Binding IsMediumRisk}" Classes.High="{Binding IsHighRisk}" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding RiskLabel}" />
+                                            </Border>
+                                        </Grid>
+                                    </ToggleButton>
                                 </StackPanel>
-                                <Border Grid.Column="2" Classes="StatusPill" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding RiskLabel}" Classes="Muted" FontSize="11" />
-                                </Border>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Spacing="7" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-            </ItemsControl>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
         </ScrollViewer>
     </DockPanel>
 </UserControl>

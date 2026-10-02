@@ -74,6 +74,20 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("Impostazioni…", texts);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Content as string == "Chiudi");
     }
+    [AvaloniaFact]
+    public void WizardViewsHaveToolbarAndActionBar()
+    {
+        foreach (UserControl view in new UserControl[] { new ChooseStepView(), new ScanStepView(), new ConfirmStepView(), new DoneStepView() })
+        {
+            Window window = new() { Width = 888, Height = 700, Content = view };
+            window.Show();
+            window.UpdateLayout();
+            Assert.Contains(view.GetVisualDescendants().OfType<Border>(), b => b.Classes.Contains("Toolbar"));
+            Assert.Contains(view.GetVisualDescendants().OfType<Border>(), b => b.Classes.Contains("ActionBar"));
+            Assert.Contains(view.GetVisualDescendants().OfType<StepIndicator>(), s => s.CurrentStep >= 1);
+            window.Close();
+        }
+    }
 }
 
 file static class LayoutTestExtensions

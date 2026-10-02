@@ -1,21 +1,42 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             xmlns:views="clr-namespace:MjmCleaner.App.Views"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="MjmCleaner.App.Views.ConfirmStepView"
              x:DataType="vm:ConfirmStepViewModel">
 
     <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,18">
-            <TextBlock Text="1 Scegli   —   2 Analizza   —   3 · Conferma   —   4 Fatto" Classes="Eyebrow" />
-            <TextBlock Text="Verifica prima di eliminare" Classes="PageTitle" />
-            <TextBlock Text="{Binding TotalText}" Classes="PageSubtitle" />
-        </StackPanel>
+        <Border DockPanel.Dock="Top" Classes="Toolbar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel VerticalAlignment="Center" Spacing="1">
+                    <TextBlock Text="Pulizia" Classes="ToolbarTitle" />
+                    <TextBlock Text="Passo 3 di 4" Classes="ToolbarSubtitle" />
+                </StackPanel>
+                <views:StepIndicator Grid.Column="1" CurrentStep="3" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
 
-        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
-            <Border Padding="12" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}" BorderThickness="1" BorderBrush="#F0D69B">
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Text="{Binding DeleteProgressText}"
+                           IsVisible="{Binding IsDeleting}"
+                           Classes="Muted" FontSize="12" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                    <Button Classes="Secondary" Content="Ricomincia" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsDeleting}" />
+                    <Button Classes="Secondary" Content="Interrompi"
+                            Command="{Binding CancelDeleteCommand}"
+                            IsVisible="{Binding IsDeleting}" />
+                    <Button Classes="Destructive" Content="{Binding TotalText, StringFormat='Elimina {0}'}"
+                            Command="{Binding DeleteCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="32,0,32,12" Spacing="10">
+            <Border Classes="Banner">
                 <TextBlock TextWrapping="Wrap"
-                          FontWeight="SemiBold"
-                          Foreground="{DynamicResource WarningTextBrush}"
+                           FontWeight="SemiBold"
                            Text="Eliminazione definitiva: questi file non finiscono nel Cestino e non sono recuperabili." />
             </Border>
 
@@ -27,78 +48,69 @@
                        IsVisible="{Binding ExclusionsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                        Classes="Muted" FontSize="11" TextWrapping="Wrap" />
 
-            <TextBlock Text="{Binding DeleteProgressText}"
-                       IsVisible="{Binding IsDeleting}"
-                       Classes="Muted" FontSize="12" HorizontalAlignment="Right" />
-
             <TextBlock Text="{Binding DeleteErrorText}"
                        IsVisible="{Binding HasDeleteError}"
                        Foreground="{DynamicResource DangerBrush}"
                        FontSize="12"
                        TextWrapping="Wrap" />
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                <Button Classes="Secondary" Content="Ricomincia" Command="{Binding RestartCommand}" IsEnabled="{Binding !IsDeleting}" />
-                <Button Classes="Secondary" Content="Interrompi"
-                        Command="{Binding CancelDeleteCommand}"
-                        IsVisible="{Binding IsDeleting}" />
-                <Button Classes="Destructive" Content="{Binding TotalText, StringFormat='Elimina {0}'}"
-                        Command="{Binding DeleteCommand}"
-                        Padding="18,8"
-                        FontWeight="Bold" />
-            </StackPanel>
         </StackPanel>
 
         <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding Nodes}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="vm:CategoryNode">
-                        <Expander IsExpanded="True" Margin="0,0,0,8">
-                            <Expander.Header>
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding SummaryText}"
-                                               Classes="Muted"
-                                               FontSize="12"
-                                               VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Expander.Header>
+            <StackPanel Margin="32,24,32,20" Spacing="16">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Verifica prima di eliminare" Classes="PageTitle" />
+                    <TextBlock Text="{Binding TotalText}" Classes="PageSubtitle" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Nodes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:CategoryNode">
+                            <Expander IsExpanded="True" Margin="0,0,0,8">
+                                <Expander.Header>
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding SummaryText}"
+                                                   Classes="Muted"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Expander.Header>
 
-                            <!--
-                                ListBox, non ItemsControl: un ItemsControl dentro uno ScrollViewer
-                                disegna ogni riga fin da subito, mentre ListBox virtualizza per
-                                default (VirtualizingStackPanel dietro il suo ScrollViewer
-                                interno). MaxHeight è ciò che rende la virtualizzazione reale:
-                                senza un vincolo di altezza finito il pannello riceverebbe
-                                un'altezza disponibile infinita dallo ScrollViewer esterno e
-                                realizzerebbe comunque ogni riga per calcolare la dimensione
-                                totale. Con MaxHeight, il motore di layout limita l'altezza
-                                disponibile passata al ListBox PRIMA di interrogarlo, quindi la
-                                virtualizzazione ha un riquadro finito su cui operare anche per
-                                una categoria con oltre mille elementi (le cache di sistema).
-                            -->
-                            <ListBox ItemsSource="{Binding Paths}" MaxHeight="360">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate DataType="vm:PathNode">
-                                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,5">
-                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" />
-                                            <TextBlock Grid.Column="1"
-                                                       Text="{Binding Path}"
-                                                       Margin="8,0"
-                                                       VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Grid.Column="2"
-                                                       Text="{Binding SizeText}"
-                                                       FontWeight="SemiBold"
-                                                       VerticalAlignment="Center" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Expander>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                                <!--
+                                    ListBox, non ItemsControl: un ItemsControl dentro uno ScrollViewer
+                                    disegna ogni riga fin da subito, mentre ListBox virtualizza per
+                                    default (VirtualizingStackPanel dietro il suo ScrollViewer
+                                    interno). MaxHeight è ciò che rende la virtualizzazione reale:
+                                    senza un vincolo di altezza finito il pannello riceverebbe
+                                    un'altezza disponibile infinita dallo ScrollViewer esterno e
+                                    realizzerebbe comunque ogni riga per calcolare la dimensione
+                                    totale. Con MaxHeight, il motore di layout limita l'altezza
+                                    disponibile passata al ListBox PRIMA di interrogarlo, quindi la
+                                    virtualizzazione ha un riquadro finito su cui operare anche per
+                                    una categoria con oltre mille elementi (le cache di sistema).
+                                -->
+                                <ListBox ItemsSource="{Binding Paths}" MaxHeight="360">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate DataType="vm:PathNode">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,5">
+                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Path}"
+                                                           Margin="8,0"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding SizeText}"
+                                                           FontWeight="SemiBold"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </ScrollViewer>
     </DockPanel>
 </UserControl>

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Avalonia;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MjmCleaner.App.Services;
@@ -20,14 +21,30 @@ public sealed partial class CategoryChoice(CleanupCategory category, bool isSele
 
     public string RiskLabel => Category.Risk switch
     {
-        RiskLevel.Low => "rischio basso",
-        RiskLevel.Medium => "rischio medio",
-        RiskLevel.High => "rischio alto",
+        RiskLevel.Low => "Rischio basso",
+        RiskLevel.Medium => "Rischio medio",
+        RiskLevel.High => "Rischio alto",
         _ => string.Empty,
     };
 
+    public bool IsLowRisk => Category.Risk == RiskLevel.Low;
+    public bool IsMediumRisk => Category.Risk == RiskLevel.Medium;
+    public bool IsHighRisk => Category.Risk == RiskLevel.High;
+
     /// <summary>I pacchetti NuGet compaiono rientrati sotto le cache di sviluppo.</summary>
-    public Thickness Indent => Category.ParentId is null ? new Thickness(0) : new Thickness(28, 0, 0, 0);
+    public bool IsChild => Category.ParentId is not null;
+
+    /// <summary>La prima riga del gruppo non ha separatore sopra.</summary>
+    public bool ShowSeparator { get; init; }
+
+    /// <summary>Separatore allineato al titolo della riga: più rientrato sopra una riga figlia.</summary>
+    public Thickness SeparatorMargin => new(IsChild ? 116 : 72, 0, 0, 0);
+
+    public Thickness RowPadding => IsChild ? new Thickness(60, 11, 16, 11) : new Thickness(16, 11);
+
+    public IBrush TileBrush => new SolidColorBrush(Color.Parse(CategoryVisuals.For(Category.Id).TileColor));
+
+    public Geometry Icon => StreamGeometry.Parse(CategoryVisuals.For(Category.Id).IconData);
 }
 
 public sealed partial class ChooseStepViewModel : ViewModelBase
@@ -43,13 +60,40 @@ public sealed partial class ChooseStepViewModel : ViewModelBase
         CleanerSettings settings = services.Settings.Load();
         HashSet<string> remembered = new(settings.SelectedCategoryIds, StringComparer.Ordinal);
 
-        Choices = [.. services.BuildCategories().Select(category =>
-            new CategoryChoice(category, remembered.Contains(category.Id)))];
+        Choices = [.. services.BuildCategories().Select((category, index) =>
+            new CategoryChoice(category, remembered.Contains(category.Id)) { ShowSeparator = index > 0 })];
+        foreach (CategoryChoice choice in Choices)
+        {
+            choice.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(CategoryChoice.IsSelected))
+                {
+                    return;
+                }
+
+                OnPropertyChanged(nameof(SelectedCount));
+                OnPropertyChanged(nameof(SelectedCountText));
+                AnalyzeCommand.NotifyCanExecuteChanged();
+            };
+        }
     }
 
     public ObservableCollection<CategoryChoice> Choices { get; }
 
-    [RelayCommand]
+    public int SelectedCount => Choices.Count(c => c.IsSelected);
+
+    public string SelectedCountText => CountText(SelectedCount);
+
+    public static string CountText(int count) => count switch
+    {
+        0 => "Nessuna categoria selezionata",
+        1 => "1 categoria selezionata",
+        _ => $"{count} categorie selezionate",
+    };
+
+    private bool CanAnalyze() => SelectedCount > 0;
+
+    [RelayCommand(CanExecute = nameof(CanAnalyze))]
     private void Analyze()
     {
         CleanupCategory[] selected = [.. Choices.Where(c => c.IsSelected).Select(c => c.Category)];

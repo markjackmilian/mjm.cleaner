@@ -1,43 +1,70 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             xmlns:views="clr-namespace:MjmCleaner.App.Views"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="MjmCleaner.App.Views.ScanStepView"
              x:DataType="vm:ScanStepViewModel">
 
+    <UserControl.Styles>
+        <!-- Il separatore sta in testa a ogni riga: sulla prima non serve. -->
+        <Style Selector="ItemsControl.Rows > ContentPresenter:nth-child(1) Border.Separator">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+    </UserControl.Styles>
+
     <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,20">
-            <TextBlock Text="1 Scegli   —   2 · Analizza   —   3 Conferma   —   4 Fatto" Classes="Eyebrow" />
-            <TextBlock Text="Analisi in corso…" Classes="PageTitle" />
-        </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,18,0,0" Spacing="12" HorizontalAlignment="Right">
-            <Button Classes="Secondary" Content="Annulla" Command="{Binding CancelCommand}" IsVisible="{Binding !HasError}" />
-            <Button Classes="Secondary" Content="Torna al passo 1" Command="{Binding BackToStartCommand}" IsVisible="{Binding HasError}" />
-        </StackPanel>
-        <StackPanel Spacing="14">
-            <Border Classes="SurfaceCard" Padding="18">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Stiamo controllando le categorie selezionate." FontWeight="SemiBold" />
-                    <ProgressBar IsIndeterminate="{Binding IsRunning}" Height="6" />
-                    <TextBlock Text="{Binding CurrentPath}" Classes="Muted" FontSize="12" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap" />
+        <Border DockPanel.Dock="Top" Classes="Toolbar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel VerticalAlignment="Center" Spacing="1">
+                    <TextBlock Text="Pulizia" Classes="ToolbarTitle" />
+                    <TextBlock Text="Passo 2 di 4" Classes="ToolbarSubtitle" />
                 </StackPanel>
-            </Border>
-            <Border Classes="SurfaceCard" Padding="8,4">
-                <StackPanel>
-                    <TextBlock Text="CATEGORIE" Classes="Eyebrow" Margin="8,8,8,4" />
-                    <ItemsControl ItemsSource="{Binding Progress}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:CategoryProgress">
-                                <Grid ColumnDefinitions="*,Auto" Margin="8,8">
-                                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Status}" Classes="Muted" FontSize="12" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Border>
-            <TextBlock Text="Nessun file è stato ancora toccato." Classes="Muted" FontSize="12" HorizontalAlignment="Center" />
-        </StackPanel>
+                <views:StepIndicator Grid.Column="1" CurrentStep="2" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Classes="Secondary" Content="Annulla" Command="{Binding CancelCommand}" IsVisible="{Binding !HasError}" />
+                <Button Classes="Secondary" Content="Torna al passo 1" Command="{Binding BackToStartCommand}" IsVisible="{Binding HasError}" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer>
+            <StackPanel Margin="32,24,32,20" Spacing="16">
+                <TextBlock Text="Analisi in corso…" Classes="PageTitle" />
+
+                <Border Classes="SurfaceCard" Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Stiamo controllando le categorie selezionate." FontWeight="SemiBold" />
+                        <ProgressBar IsIndeterminate="{Binding IsRunning}" Height="6" />
+                        <TextBlock Text="{Binding CurrentPath}" Classes="Muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="SurfaceCard">
+                    <StackPanel>
+                        <TextBlock Text="CATEGORIE" Classes="Eyebrow" Margin="16,12,16,4" />
+                        <ItemsControl Classes="Rows" ItemsSource="{Binding Progress}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:CategoryProgress">
+                                    <StackPanel>
+                                        <Border Classes="Separator" Margin="16,0,0,0" />
+                                        <Grid ColumnDefinitions="*,Auto" Margin="16,9">
+                                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Status}" Classes="Muted" FontSize="12" />
+                                        </Grid>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="Nessun file è stato ancora toccato." Classes="Muted" FontSize="12" HorizontalAlignment="Center" />
+            </StackPanel>
+        </ScrollViewer>
     </DockPanel>
 </UserControl>

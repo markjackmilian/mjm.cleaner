@@ -80,8 +80,20 @@ public sealed partial class MainWindowViewModel : ViewModelBase, IXcodeNavigatio
     [RelayCommand(CanExecute = nameof(CanNavigateGlobally))]
     private void ShowHistory() => CurrentPage = new HistoryViewModel(_services, this);
 
+    /// <summary>
+    /// Assegnato dalla finestra: il ViewModel non crea finestre. Riceve la fabbrica del ViewModel delle
+    /// impostazioni, perché il selettore cartelle appartiene alla finestra modale che sta per aprirsi.
+    /// </summary>
+    public Func<Func<IFolderPicker, SettingsViewModel>, Task>? OpenSettingsWindow { get; set; }
+
+    /// <remarks>AsyncRelayCommand non ammette esecuzioni concorrenti: un secondo ⌘, a finestra aperta non ne apre un'altra.</remarks>
     [RelayCommand(CanExecute = nameof(CanNavigateGlobally))]
-    private void ShowSettings() => CurrentPage = new SettingsViewModel(_services, this);
+    private async Task ShowSettingsAsync()
+    {
+        if (OpenSettingsWindow is null) return;
+        await OpenSettingsWindow(picker => new SettingsViewModel(
+            _services.Settings, new AppearanceController(Avalonia.Application.Current!), picker, StartOver));
+    }
 
     [RelayCommand(CanExecute = nameof(CanNavigateGlobally))]
     private void ShowDocker() => CurrentPage = new DockerViewModel(_services, this);

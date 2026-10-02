@@ -142,6 +142,8 @@
     <Style Selector="Button.SidebarItem.selected /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource SelectedBrush}" /></Style>
     <Style Selector="Button.SidebarItem.selected TextBlock"><Setter Property="FontWeight" Value="Medium" /></Style>
     <Style Selector="Button.Mini"><Setter Property="MinWidth" Value="28" /><Setter Property="MinHeight" Value="24" /><Setter Property="Width" Value="28" /><Setter Property="Height" Value="24" /><Setter Property="Padding" Value="0" /><Setter Property="CornerRadius" Value="0" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+    <Style Selector="Button.Mini:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
+    <!-- Da disabilitato Mini si attenua con l'opacità 0.4 generica di Button:disabled, icona compresa. -->
     <!-- Anello esterno (accento al 50%): resta visibile anche su Primary, dove il riempimento è già AccentBrush. -->
     <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
 

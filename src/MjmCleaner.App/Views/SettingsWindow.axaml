@@ -1,0 +1,242 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
+        x:Class="MjmCleaner.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Impostazioni"
+        Width="700" Height="820"
+        CanResize="False" CanMinimize="False" CanMaximize="False"
+        WindowStartupLocation="CenterOwner"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="52">
+    <Window.Styles>
+        <!-- Selettore dell'aspetto: nessun pallino, solo l'anteprima con il suo anello di selezione. -->
+        <Style Selector="RadioButton.AppearanceOption">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" Background="Transparent" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.AppearanceOption Border.Preview"><Setter Property="BoxShadow" Value="0 0 0 0.5 #73808080" /></Style>
+        <Style Selector="RadioButton.AppearanceOption:checked Border.Preview"><Setter Property="BoxShadow" Value="0 0 0 2 #0A66D8" /></Style>
+        <Style Selector="RadioButton.AppearanceOption:checked TextBlock.OptionLabel"><Setter Property="FontWeight" Value="SemiBold" /></Style>
+        <Style Selector="RadioButton.AppearanceOption:focus-visible Border.Preview"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
+    </Window.Styles>
+
+    <DockPanel LastChildFill="True">
+        <Border DockPanel.Dock="Top" Classes="Toolbar" Padding="16,0"
+                chrome:WindowDecorationProperties.ElementRole="TitleBar">
+            <TextBlock Text="Impostazioni" FontSize="13" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar" Background="{DynamicResource ContentBrush}" Padding="20,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="10">
+                <Button Content="Annulla" Command="{Binding CancelCommand}" IsCancel="True" />
+                <Button Classes="Primary" Content="Salva" Command="{Binding SaveCommand}" IsDefault="True" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer>
+            <StackPanel Margin="28,20,28,8" Spacing="22">
+                <TextBlock Text="Personalizza i percorsi e le soglie usate durante l'analisi." FontSize="12" Classes="Muted" />
+
+                <!-- Aspetto -->
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="SectionTitle" Text="Aspetto" />
+                    <Border Classes="SurfaceCard" Padding="16,14,16,12">
+                        <StackPanel Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="20">
+                                <RadioButton Classes="AppearanceOption" GroupName="Appearance"
+                                             IsChecked="{Binding IsAuto}" AutomationProperties.Name="Automatico">
+                                    <StackPanel Spacing="6">
+                                        <Border Classes="Preview" Width="88" Height="56" CornerRadius="7" ClipToBounds="True" Background="#FFFFFF">
+                                            <Grid ColumnDefinitions="*,*">
+                                                <DockPanel Grid.Column="0">
+                                                    <Border DockPanel.Dock="Left" Width="22" Background="#E4E4E8" />
+                                                    <StackPanel Margin="5,8" Spacing="4">
+                                                        <Border Height="4" CornerRadius="2" Width="12" HorizontalAlignment="Left" Background="{DynamicResource AccentBrush}" />
+                                                        <Border Height="4" CornerRadius="2" Background="#D8D8DC" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                                <Border Grid.Column="1" Background="#2B2B2E">
+                                                    <StackPanel Margin="7,8" Spacing="4">
+                                                        <Border Height="4" CornerRadius="2" Width="18" HorizontalAlignment="Left" Background="{DynamicResource AccentBrush}" />
+                                                        <Border Height="4" CornerRadius="2" Background="#4A4A4E" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                        <TextBlock Classes="OptionLabel" Text="Automatico" FontSize="12" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <RadioButton Classes="AppearanceOption" GroupName="Appearance"
+                                             IsChecked="{Binding IsLight}" AutomationProperties.Name="Chiaro">
+                                    <StackPanel Spacing="6">
+                                        <Border Classes="Preview" Width="88" Height="56" CornerRadius="7" ClipToBounds="True" Background="#FFFFFF">
+                                            <DockPanel>
+                                                <Border DockPanel.Dock="Left" Width="26" Background="#E4E4E8" />
+                                                <StackPanel Margin="7,8" Spacing="4">
+                                                    <Border Height="4" CornerRadius="2" Width="29" HorizontalAlignment="Left" Background="{DynamicResource AccentBrush}" />
+                                                    <Border Height="4" CornerRadius="2" Background="#D8D8DC" />
+                                                    <Border Height="4" CornerRadius="2" Background="#D8D8DC" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                        <TextBlock Classes="OptionLabel" Text="Chiaro" FontSize="12" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <RadioButton Classes="AppearanceOption" GroupName="Appearance"
+                                             IsChecked="{Binding IsDark}" AutomationProperties.Name="Scuro">
+                                    <StackPanel Spacing="6">
+                                        <Border Classes="Preview" Width="88" Height="56" CornerRadius="7" ClipToBounds="True" Background="#232325">
+                                            <DockPanel>
+                                                <Border DockPanel.Dock="Left" Width="26" Background="#3A3A3D" />
+                                                <StackPanel Margin="7,8" Spacing="4">
+                                                    <Border Height="4" CornerRadius="2" Width="29" HorizontalAlignment="Left" Background="{DynamicResource AccentBrush}" />
+                                                    <Border Height="4" CornerRadius="2" Background="#4A4A4E" />
+                                                    <Border Height="4" CornerRadius="2" Background="#4A4A4E" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                        <TextBlock Classes="OptionLabel" Text="Scuro" FontSize="12" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </StackPanel>
+                            <TextBlock Classes="Caption" FontSize="11.5" Margin="4,0" TextWrapping="Wrap"
+                                       Text="Automatico segue l'aspetto scelto in Impostazioni di Sistema." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Progetti .NET -->
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="SectionTitle" Text="Progetti .NET" />
+                    <Border Classes="SurfaceCard" Padding="12">
+                        <Border CornerRadius="7" Background="{DynamicResource FieldBrush}" BorderBrush="{DynamicResource ControlBorderBrush}"
+                                BorderThickness="0.5" ClipToBounds="True">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Bottom" Height="24" Background="{DynamicResource WellBrush}"
+                                        BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0.5,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Classes="Mini" Command="{Binding AddProjectRootCommand}" AutomationProperties.Name="Aggiungi cartella">
+                                            <Viewbox Width="11" Height="11"><Path Classes="Icon" Data="{StaticResource IconPlus}" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2.6" /></Viewbox>
+                                        </Button>
+                                        <Border Width="0.5" Background="{DynamicResource SeparatorBrush}" />
+                                        <Button Classes="Mini" Command="{Binding RemoveProjectRootCommand}" AutomationProperties.Name="Rimuovi cartella selezionata">
+                                            <Viewbox Width="11" Height="11"><Path Classes="Icon" Data="{StaticResource IconMinus}" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2.6" /></Viewbox>
+                                        </Button>
+                                        <Border Width="0.5" Background="{DynamicResource SeparatorBrush}" />
+                                    </StackPanel>
+                                </Border>
+                                <Panel Height="84">
+                                    <TextBlock Text="Nessuna cartella. Premi + per aggiungerne una." FontSize="12" Classes="Muted"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               IsVisible="{Binding !ProjectRoots.Count}" />
+                                    <ListBox ItemsSource="{Binding ProjectRoots}" SelectedItem="{Binding SelectedProjectRoot}"
+                                             IsVisible="{Binding !!ProjectRoots.Count}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <TextBlock Text="{Binding}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Panel>
+                            </DockPanel>
+                        </Border>
+                    </Border>
+                    <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap" Text="Cartelle di progetto in cui cercare bin e obj." />
+                </StackPanel>
+
+                <!-- File grandi -->
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="SectionTitle" Text="File grandi" />
+                    <Border Classes="SurfaceCard">
+                        <StackPanel>
+                            <StackPanel Margin="12" Spacing="8">
+                                <TextBlock Text="Cartelle in cui cercare" />
+                                <Border CornerRadius="7" Background="{DynamicResource FieldBrush}" BorderBrush="{DynamicResource ControlBorderBrush}"
+                                        BorderThickness="0.5" ClipToBounds="True">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Bottom" Height="24" Background="{DynamicResource WellBrush}"
+                                                BorderBrush="{DynamicResource SeparatorBrush}" BorderThickness="0,0.5,0,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Classes="Mini" Command="{Binding AddLargeFileRootCommand}" AutomationProperties.Name="Aggiungi cartella">
+                                                    <Viewbox Width="11" Height="11"><Path Classes="Icon" Data="{StaticResource IconPlus}" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2.6" /></Viewbox>
+                                                </Button>
+                                                <Border Width="0.5" Background="{DynamicResource SeparatorBrush}" />
+                                                <Button Classes="Mini" Command="{Binding RemoveLargeFileRootCommand}" AutomationProperties.Name="Rimuovi cartella selezionata">
+                                                    <Viewbox Width="11" Height="11"><Path Classes="Icon" Data="{StaticResource IconMinus}" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="2.6" /></Viewbox>
+                                                </Button>
+                                                <Border Width="0.5" Background="{DynamicResource SeparatorBrush}" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Panel Height="84">
+                                            <TextBlock Text="Nessuna cartella. Premi + per aggiungerne una." FontSize="12" Classes="Muted"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       IsVisible="{Binding !LargeFileRoots.Count}" />
+                                            <ListBox ItemsSource="{Binding LargeFileRoots}" SelectedItem="{Binding SelectedLargeFileRoot}"
+                                                     IsVisible="{Binding !!LargeFileRoots.Count}">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <TextBlock Text="{Binding}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                        </Panel>
+                                    </DockPanel>
+                                </Border>
+                            </StackPanel>
+                            <Border Classes="Separator" Margin="12,0" />
+                            <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
+                                <TextBlock Grid.Column="0" Text="Soglia file grandi" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Column="1" Value="{Binding LargeFileThresholdMegabytes}" Minimum="1" Maximum="100000"
+                                               AutomationProperties.Name="Soglia file grandi" />
+                                <TextBlock Grid.Column="2" Text="MB" Classes="Muted" Margin="8,0,0,0" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap" Text="Vengono proposti solo i file più grandi della soglia." />
+                </StackPanel>
+
+                <!-- Età minima -->
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="SectionTitle" Text="Età minima" />
+                    <TextBlock Classes="Caption" Margin="4,0,4,2" TextWrapping="Wrap" Text="I file più recenti restano esclusi dall'analisi." />
+                    <Border Classes="SurfaceCard">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
+                                <TextBlock Grid.Column="0" Text="Download" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Column="1" Value="{Binding DownloadsMinAgeDays}" Minimum="0" Maximum="3650"
+                                               AutomationProperties.Name="Età minima dei download" />
+                                <TextBlock Grid.Column="2" Text="giorni" Classes="Muted" Margin="8,0,0,0" VerticalAlignment="Center" />
+                            </Grid>
+                            <Border Classes="Separator" Margin="12,0" />
+                            <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
+                                <TextBlock Grid.Column="0" Text="Log" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Column="1" Value="{Binding LogsMinAgeDays}" Minimum="0" Maximum="3650"
+                                               AutomationProperties.Name="Età minima dei log" />
+                                <TextBlock Grid.Column="2" Text="giorni" Classes="Muted" Margin="8,0,0,0" VerticalAlignment="Center" />
+                            </Grid>
+                            <Border Classes="Separator" Margin="12,0" />
+                            <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
+                                <TextBlock Grid.Column="0" Text="Pacchetti NuGet" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Column="1" Value="{Binding NuGetMinAgeDays}" Minimum="0" Maximum="3650"
+                                               AutomationProperties.Name="Età minima dei pacchetti NuGet" />
+                                <TextBlock Grid.Column="2" Text="giorni" Classes="Muted" Margin="8,0,0,0" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap"
+                               Text="L'età dei pacchetti NuGet si basa sull'ultimo accesso registrato dal filesystem: è un'euristica, non una certezza." />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

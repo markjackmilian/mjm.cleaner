@@ -28,8 +28,12 @@
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
         </Style>
         <Style Selector="ToggleButton.ChoiceRow:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="BorderThickness" Value="2" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <!-- Anello interno: non incide sul layout (un bordo spingerebbe in basso le righe seguenti) e la card ritaglia l'esterno. -->
+            <Setter Property="BoxShadow" Value="inset 0 0 0 2 #800A66D8" />
+        </Style>
+        <Style Selector="ToggleButton.ChoiceRow:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
         </Style>
     </UserControl.Styles>
 
@@ -49,7 +53,7 @@
                 <Viewbox Width="15" Height="15" VerticalAlignment="Center"><Path Classes="Icon" Data="{StaticResource IconShield}" Stroke="{DynamicResource SecondaryTextBrush}" /></Viewbox>
                 <TextBlock Grid.Column="1" Text="L'analisi non elimina alcun file." Classes="Muted" FontSize="12" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="3" Text="{Binding SelectedCountText}" Classes="Muted Numeric" FontSize="12" VerticalAlignment="Center" />
-                <Button Grid.Column="4" Classes="Primary" Command="{Binding AnalyzeCommand}" Padding="14,5,12,5">
+                <Button Grid.Column="4" Classes="Primary" Command="{Binding AnalyzeCommand}" Padding="14,5,12,5" AutomationProperties.Name="Analizza">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="Analizza" />
                         <Viewbox Width="12" Height="12" VerticalAlignment="Center"><Path Classes="Icon" Data="{StaticResource IconChevronRight}" Stroke="White" StrokeThickness="2.4" /></Viewbox>
@@ -75,7 +79,7 @@
                                     <ToggleButton Classes="ChoiceRow" IsChecked="{Binding IsSelected}" Padding="{Binding RowPadding}"
                                                   AutomationProperties.Name="{Binding DisplayName}">
                                         <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="12">
-                                            <CheckBox IsChecked="{Binding IsSelected}" IsHitTestVisible="False" Focusable="False" VerticalAlignment="Center" />
+                                            <CheckBox IsChecked="{Binding IsSelected}" IsHitTestVisible="False" Focusable="False" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
                                             <Border Grid.Column="1" Classes="Tile" Background="{Binding TileBrush}" VerticalAlignment="Center">
                                                 <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{Binding Icon}" Stroke="White" /></Viewbox>
                                             </Border>

@@ -81,6 +81,9 @@ selezionata», «Motore non raggiungibile», «X in N pulizie», «Nessuna carte
 aggiungerne una.», «Automatico segue l'aspetto scelto in Impostazioni di Sistema.», etichette
 Aspetto (Automatico/Chiaro/Scuro), pill con iniziale maiuscola, colonna Elementi solo numerica.
 La didascalia «una per riga» di Progetti .NET diventa «Cartelle di progetto in cui cercare bin e obj.»
+Altri testi delle Impostazioni: la didascalia «Vengono proposti solo i file più grandi della soglia.»,
+l'etichetta «Cartelle in cui cercare» (File grandi) e i titoli dei pannelli di scelta cartella
+(«Scegli una cartella di progetto», «Scegli una cartella in cui cercare file grandi»).
 
 ## Accessibilità
 

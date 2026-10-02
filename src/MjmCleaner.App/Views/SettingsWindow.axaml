@@ -59,7 +59,7 @@
                                                 <DockPanel Grid.Column="0">
                                                     <Border DockPanel.Dock="Left" Width="22" Background="#E4E4E8" />
                                                     <StackPanel Margin="5,8" Spacing="4">
-                                                        <Border Height="4" CornerRadius="2" Width="12" HorizontalAlignment="Left" Background="{DynamicResource AccentBrush}" />
+                                                        <Border Height="4" CornerRadius="2" Width="7" HorizontalAlignment="Left" Background="{DynamicResource AccentBrush}" />
                                                         <Border Height="4" CornerRadius="2" Background="#D8D8DC" />
                                                     </StackPanel>
                                                 </DockPanel>
@@ -208,7 +208,6 @@
                 <!-- Età minima -->
                 <StackPanel Spacing="6">
                     <TextBlock Classes="SectionTitle" Text="Età minima" />
-                    <TextBlock Classes="Caption" Margin="4,0,4,2" TextWrapping="Wrap" Text="I file più recenti restano esclusi dall'analisi." />
                     <Border Classes="SurfaceCard">
                         <StackPanel>
                             <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
@@ -233,6 +232,8 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+                    <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap"
+                               Text="I file più recenti restano esclusi dall'analisi." />
                     <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap"
                                Text="L'età dei pacchetti NuGet si basa sull'ultimo accesso registrato dal filesystem: è un'euristica, non una certezza." />
                 </StackPanel>

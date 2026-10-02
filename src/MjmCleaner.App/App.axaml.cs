@@ -20,9 +20,21 @@ public partial class App : Application
         Name = "mjm.cleaner";
     }
 
+    /// <summary>
+    /// Voce «Impostazioni…» del menu dell'applicazione. Senza comando né gestori di clic resta disabilitata:
+    /// il comando arriva quando esiste il ViewModel della finestra principale.
+    /// </summary>
+    public NativeMenuItem SettingsMenuItem { get; } = new("Impostazioni…") { Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Meta) };
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+
+        // Su macOS il menu dell'applicazione è quello impostato qui: Avalonia lo legge una sola volta, appena
+        // dopo Initialize(), e se non c'è lo sostituisce con il menu predefinito («About Avalonia»). Impostarlo
+        // più tardi, per esempio in OnFrameworkInitializationCompleted, non ha alcun effetto sul menu mostrato.
+        // Voci standard (Servizi, Nascondi, Esci) vengono accodate da Avalonia a questo menu.
+        NativeMenu.SetMenu(this, new NativeMenu { SettingsMenuItem });
     }
 
     public override async void OnFrameworkInitializationCompleted()
@@ -34,16 +46,8 @@ public partial class App : Application
 
             if (mainWindow is MainWindow { DataContext: MainWindowViewModel viewModel })
             {
-                // Su macOS le voci del menu dell'applicazione finiscono nel menu «mjm.cleaner»,
-                // dove l'utente si aspetta Impostazioni… con ⌘,.
-                NativeMenu.SetMenu(this, new NativeMenu
-                {
-                    new NativeMenuItem("Impostazioni…")
-                    {
-                        Command = viewModel.ShowSettingsCommand,
-                        Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Meta),
-                    },
-                });
+                // Il comando rispetta CanExecute: ⌘, e la voce di menu si disabilitano durante l'eliminazione di Xcode.
+                SettingsMenuItem.Command = viewModel.ShowSettingsCommand;
                 await viewModel.RefreshTotalAsync();
             }
         }

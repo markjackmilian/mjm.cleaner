@@ -59,11 +59,12 @@ public sealed class AppServices
         return [.. Settings.Load().ProjectRoots.Select(expander.Expand)];
     }
 
-    public static async Task<AppServices> CreateAsync()
+    /// <param name="paths">Posizione dei dati dell'app; solo i test la sostituiscono, per non toccare quelli reali.</param>
+    public static async Task<AppServices> CreateAsync(AppPaths? paths = null)
     {
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         FileSystem fileSystem = new();
-        AppPaths paths = AppPaths.ForCurrentUser();
+        paths ??= AppPaths.ForCurrentUser();
 
         FileSystemLinkInspector links = new(fileSystem);
         PathGuard guard = new(new DenyList(home), links, home);

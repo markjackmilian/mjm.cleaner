@@ -50,6 +50,8 @@ public sealed class SettingsWindowTests
         Assert.Contains("Età minima", texts);
         Assert.Contains("Nessuna cartella. Premi + per aggiungerne una.", texts);
         Assert.Equal(700, window.Width);
+
+        window.Close();
     }
 
     [AvaloniaFact]

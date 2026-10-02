@@ -56,6 +56,38 @@ public class SettingsStoreTests
     }
 
     [Fact]
+    public void AppearanceDefaultsToAuto()
+    {
+        Assert.Equal(AppearancePreference.Auto, new CleanerSettings().Appearance);
+    }
+
+    [Fact]
+    public void LegacyFileWithoutAppearanceLoadsAsAuto()
+    {
+        MockFileSystem fs = new();
+        AppPaths paths = new(Home);
+        fs.AddFile(paths.SettingsFile, new MockFileData("""{ "DownloadsMinAgeDays": 12 }"""));
+
+        CleanerSettings settings = new SettingsStore(fs, paths).Load();
+
+        Assert.Equal(12, settings.DownloadsMinAgeDays);
+        Assert.Equal(AppearancePreference.Auto, settings.Appearance);
+    }
+
+    [Fact]
+    public void AppearanceRoundTripsAsReadableString()
+    {
+        MockFileSystem fs = new();
+        AppPaths paths = new(Home);
+        SettingsStore store = new(fs, paths);
+
+        store.Save(new CleanerSettings { Appearance = AppearancePreference.Dark });
+
+        Assert.Contains("\"Appearance\": \"Dark\"", fs.File.ReadAllText(paths.SettingsFile));
+        Assert.Equal(AppearancePreference.Dark, store.Load().Appearance);
+    }
+
+    [Fact]
     public void AppPathsLiveUnderApplicationSupport()
     {
         AppPaths paths = new(Home);

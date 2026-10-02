@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MjmCleaner.Core.Settings;
 
 public sealed record CleanerSettings
@@ -12,4 +14,8 @@ public sealed record CleanerSettings
     /// <summary>Selezione dell'ultimo utilizzo: riduce il costo dei quattro passi nella pulizia di routine.</summary>
     public IReadOnlyList<string> SelectedCategoryIds { get; init; } =
         ["system-caches", "dev-caches", "project-build-output", "logs"];
+
+    /// <summary>Salvato come testo («Auto», «Light», «Dark») perché il file resti leggibile.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<AppearancePreference>))]
+    public AppearancePreference Appearance { get; init; } = AppearancePreference.Auto;
 }

@@ -84,9 +84,10 @@ public static class XcodeJson
                         foreach (JsonElement device in group.Value.EnumerateArray())
                         {
                             string? uuid = String(device, "udid");
+                            string? canonicalUuid = uuid is null ? null : CanonicalUuid(uuid);
                             string? name = String(device, "name");
                             string? state = String(device, "state");
-                            if (uuid is null || !IsUuid(uuid) || name is null)
+                            if (canonicalUuid is null || name is null)
                             {
                                 deviceInventorySafe = false;
                                 continue;
@@ -105,10 +106,10 @@ public static class XcodeJson
                             }
 
                             devices.Add(new XcodeCandidate(
-                                Key: uuid,
+                                Key: canonicalUuid,
                                 Kind: XcodeResourceKind.Device,
                                 Name: name,
-                                CliId: uuid,
+                                CliId: canonicalUuid,
                                 RuntimeIdentifier: group.Name,
                                 State: state,
                                 SizeBytes: sizeBytes,
@@ -125,7 +126,7 @@ public static class XcodeJson
         }
 
         List<XcodeCandidate> uniqueDevices = [];
-        foreach (IGrouping<string, XcodeCandidate> sameUuid in devices.GroupBy(device => device.Key, StringComparer.Ordinal))
+        foreach (IGrouping<string, XcodeCandidate> sameUuid in devices.GroupBy(device => device.Key, StringComparer.OrdinalIgnoreCase))
         {
             XcodeCandidate first = sameUuid.First();
             XcodeCandidate[] duplicates = sameUuid.Skip(1).ToArray();
@@ -182,14 +183,15 @@ public static class XcodeJson
                 string? build = String(image, "build");
                 string? version = String(image, "version");
                 string? backingPath = String(image, "path") ?? String(image, "diskImagePath");
-                bool hasUuid = IsUuid(id);
+                string? canonicalId = CanonicalUuid(id);
+                bool hasUuid = canonicalId is not null;
 
                 if (!hasUuid || runtimeIdentifier is null || build is null)
                 {
                     runtimeInventorySafe = false;
                 }
 
-                images.Add(new RuntimeImage(id, hasUuid ? id : null, runtimeIdentifier, build, version, String(image, "state"), backingPath, Bool(image, "deletable")));
+                images.Add(new RuntimeImage(hasUuid ? canonicalId! : id, hasUuid ? canonicalId : null, runtimeIdentifier, build, version, String(image, "state"), backingPath, Bool(image, "deletable")));
             }
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
@@ -311,7 +313,8 @@ public static class XcodeJson
             ? value.GetBoolean()
             : null;
 
-    private static bool IsUuid(string value) => Guid.TryParseExact(value, "D", out _);
+    private static string? CanonicalUuid(string value)
+        => Guid.TryParseExact(value, "D", out Guid uuid) ? uuid.ToString("D") : null;
 
     private static bool IsRunning(string? state)
         => state is not null && (state.Equals("Booted", StringComparison.OrdinalIgnoreCase)

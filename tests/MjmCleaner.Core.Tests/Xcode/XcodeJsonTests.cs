@@ -167,16 +167,18 @@ public class XcodeJsonTests
         XcodeCandidate runtime = Assert.Single(snapshot.Candidates, candidate => candidate.Kind == XcodeResourceKind.Runtime);
         Assert.Equal(path, runtime.Path);
         Assert.Null(runtime.SizeBytes);
+        Assert.Equal("runtime:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", runtime.Key);
+        Assert.Equal("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", runtime.CliId);
     }
 
     [Fact]
     public void ConflictingRepeatedDeviceUuidIsDeduplicatedAndBlocked()
     {
-        const string uuid = "11111111-1111-4111-8111-111111111111";
+        const string uuid = "abcdefab-cdef-4abc-8def-abcdefabcdef";
         const string simctl = """
             {"devices":{
-              "com.apple.CoreSimulator.SimRuntime.iOS-18-0":[{"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Shutdown","dataPathSize":100}],
-              "com.apple.CoreSimulator.SimRuntime.watchOS-11-0":[{"udid":"11111111-1111-4111-8111-111111111111","name":"Apple Watch","state":"Shutdown","dataPathSize":200}]},
+              "com.apple.CoreSimulator.SimRuntime.iOS-18-0":[{"udid":"abcdefab-cdef-4abc-8def-abcdefabcdef","name":"iPhone 16","state":"Shutdown","dataPathSize":100}],
+              "com.apple.CoreSimulator.SimRuntime.watchOS-11-0":[{"udid":"ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF","name":"iPhone 16","state":"Shutdown","dataPathSize":200}]},
              "runtimes":[
                {"identifier":"com.apple.CoreSimulator.SimRuntime.iOS-18-0","name":"iOS 18.0","version":"18.0","buildversion":"22A000","platform":"iOS"},
                {"identifier":"com.apple.CoreSimulator.SimRuntime.watchOS-11-0","name":"watchOS 11.0","version":"11.0","buildversion":"22B000","platform":"watchOS"}]}
@@ -192,11 +194,13 @@ public class XcodeJsonTests
 
         XcodeCandidate device = Assert.Single(snapshot.Candidates, candidate => candidate.Kind == XcodeResourceKind.Device);
         Assert.Equal(uuid, device.Key);
+        Assert.Equal(uuid, device.CliId);
         Assert.False(device.CanSelect);
         Assert.Null(device.SizeBytes);
         Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device && warning.Message.Contains("UUID", StringComparison.OrdinalIgnoreCase));
         XcodeCandidate[] runtimes = snapshot.Candidates.Where(candidate => candidate.Kind == XcodeResourceKind.Runtime).ToArray();
         Assert.Equal(2, runtimes.Length);
         Assert.All(runtimes, runtime => Assert.Contains("UUID", runtime.BlockReason!, StringComparison.OrdinalIgnoreCase));
+        Assert.All(runtimes.SelectMany(runtime => runtime.DependentDeviceKeys), dependency => Assert.Equal(uuid, dependency));
     }
 }

@@ -30,3 +30,9 @@ Owned files are the Xcode scanner, size probe, models, parser adjustment, their 
 - Made logical size nullable in the captured identity. A candidate whose recursive scan has an error beneath its path is blocked and stores unknown logical size, so later revalidation cannot mistake a partial traversal for a complete fingerprint.
 - When `Directory.Exists` returns false, the scanner now performs a narrow direct enumeration probe. Not-found stays empty; access-denied and other I/O errors produce warnings. Added a simulated filesystem test for the hidden access-denied case.
 - RED evidence: the new collector integration test initially failed to compile because the injectable scanner constructor was absent; the conflict test then failed because neither associated runtime was blocked. Focused Xcode tests pass 35/35, and the full Core suite passes 452/452.
+
+## Round-two UUID normalization
+
+- Valid UUIDs from simulator and runtime inventory are now normalized with `Guid.ToString("D")`. Device keys and CLI IDs, runtime keys and CLI IDs, and dependent-device keys all use the same canonical form; UUID grouping also compares case-insensitively as a guard.
+- RED evidence: the mixed-case duplicate fixture initially produced two device rows, while the runtime-path fixture retained an uppercase runtime key. Both regressions pass after normalization.
+- Verification: focused Xcode tests pass 35/35; full Core tests pass 452/452.

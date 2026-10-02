@@ -37,6 +37,10 @@ public sealed class ThemeTests
     [InlineData("Dark", "CanvasBrush", "#FF1E1E20")]
     [InlineData("Light", "ToolbarBrush", "#FFFFFFFF")]
     [InlineData("Dark", "ToolbarBrush", "#FF232325")]
+    [InlineData("Light", "BorderBrush", "#14000000")]
+    [InlineData("Dark", "BorderBrush", "#14FFFFFF")]
+    [InlineData("Light", "SubtleSurfaceBrush", "#0E000000")]
+    [InlineData("Dark", "SubtleSurfaceBrush", "#14FFFFFF")]
     public void LegacyAliasesFollowVariant(string variant, string key, string expected)
     {
         ThemeVariant theme = variant == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
@@ -50,10 +54,18 @@ public sealed class ThemeTests
     public void ApplySetsApplicationVariant()
     {
         AppearanceController controller = new(Application.Current!);
-        controller.Apply(AppearancePreference.Dark);
-        Assert.Equal(ThemeVariant.Dark, Application.Current!.RequestedThemeVariant);
-        controller.Apply(AppearancePreference.Auto);
-        Assert.Equal(ThemeVariant.Default, Application.Current!.RequestedThemeVariant);
+        try
+        {
+            controller.Apply(AppearancePreference.Dark);
+            Assert.Equal(ThemeVariant.Dark, Application.Current!.RequestedThemeVariant);
+            controller.Apply(AppearancePreference.Auto);
+            Assert.Equal(ThemeVariant.Default, Application.Current!.RequestedThemeVariant);
+        }
+        finally
+        {
+            // Lo stato è globale all'applicazione di test: non va lasciato Dark agli altri test.
+            Application.Current!.RequestedThemeVariant = ThemeVariant.Default;
+        }
     }
 
     [AvaloniaFact]
@@ -71,15 +83,22 @@ public sealed class ThemeTests
     {
         StepIndicator indicator = new() { CurrentStep = 3 };
         Window window = new() { Content = indicator };
-        window.Show();
+        try
+        {
+            window.Show();
 
-        Assert.DoesNotContain("current", indicator.FindControl<Control>("Step1")!.Classes);
-        Assert.Contains("current", indicator.FindControl<Control>("Step3")!.Classes);
-        Assert.Contains("current", indicator.FindControl<Control>("Label3")!.Classes);
+            Assert.DoesNotContain("current", indicator.FindControl<Control>("Step1")!.Classes);
+            Assert.Contains("current", indicator.FindControl<Control>("Step3")!.Classes);
+            Assert.Contains("current", indicator.FindControl<Control>("Label3")!.Classes);
 
-        indicator.CurrentStep = 2;
-        Assert.DoesNotContain("current", indicator.FindControl<Control>("Step3")!.Classes);
-        Assert.Contains("current", indicator.FindControl<Control>("Step2")!.Classes);
-        Assert.DoesNotContain("current", indicator.FindControl<Control>("Label3")!.Classes);
+            indicator.CurrentStep = 2;
+            Assert.DoesNotContain("current", indicator.FindControl<Control>("Step3")!.Classes);
+            Assert.Contains("current", indicator.FindControl<Control>("Step2")!.Classes);
+            Assert.DoesNotContain("current", indicator.FindControl<Control>("Label3")!.Classes);
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 }

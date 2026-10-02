@@ -85,6 +85,7 @@
             <SolidColorBrush x:Key="AccentPressedBrush" Color="#0957BA" />
             <SolidColorBrush x:Key="DestructiveBrush" Color="#D70015" />
             <SolidColorBrush x:Key="DestructiveHoverBrush" Color="#B00012" />
+            <SolidColorBrush x:Key="DestructivePressedBrush" Color="#9A0010" />
         </ResourceDictionary>
     </Styles.Resources>
 
@@ -134,6 +135,8 @@
     <Style Selector="Button.Primary:disabled /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Foreground" Value="White" /></Style>
     <Style Selector="Button.Destructive"><Setter Property="Background" Value="{DynamicResource DestructiveBrush}" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Foreground" Value="White" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
     <Style Selector="Button.Destructive:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource DestructiveHoverBrush}" /><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="Button.Destructive:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource DestructivePressedBrush}" /><Setter Property="Foreground" Value="White" /></Style>
+    <Style Selector="Button.Destructive:disabled /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource DestructiveBrush}" /><Setter Property="Foreground" Value="White" /></Style>
     <Style Selector="Button.SidebarItem"><Setter Property="MinWidth" Value="0" /><Setter Property="Height" Value="30" /><Setter Property="Padding" Value="10,0" /><Setter Property="CornerRadius" Value="7" /><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="HorizontalAlignment" Value="Stretch" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style>
     <Style Selector="Button.SidebarItem:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
     <Style Selector="Button.SidebarItem.selected /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource SelectedBrush}" /></Style>
@@ -142,7 +145,8 @@
     <!-- Temporaneo: MainWindow usa ancora ToolbarButton; sparisce con la sidebar (Task 3). -->
     <Style Selector="Button.ToolbarButton"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
     <Style Selector="Button.ToolbarButton:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
-    <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" /></Style>
+    <!-- Anello esterno (accento al 50%): resta visibile anche su Primary, dove il riempimento è già AccentBrush. -->
+    <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
 
     <Style Selector="CheckBox"><Setter Property="MinHeight" Value="0" /></Style>
     <Style Selector="TextBox"><Setter Property="Background" Value="{DynamicResource FieldBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" /><Setter Property="BorderThickness" Value="0.5" /><Setter Property="CornerRadius" Value="5" /></Style>

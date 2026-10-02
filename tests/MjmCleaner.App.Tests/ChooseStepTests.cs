@@ -1,5 +1,6 @@
 using MjmCleaner.App.ViewModels;
 using MjmCleaner.Core.Categories;
+using MjmCleaner.Core.Settings;
 using Xunit;
 
 namespace MjmCleaner.App.Tests;
@@ -45,4 +46,27 @@ public sealed class ChooseStepTests
     [InlineData("downloads-large", "#E8833A")]
     public void TilesUseTheDesignColors(string id, string color)
         => Assert.Equal(color, CategoryVisuals.For(id).TileColor);
+
+    [Fact]
+    public async Task AnalyzeIsDisabledWithoutSelectionAndFollowsTheToggles()
+    {
+        using TestHome home = await TestHome.CreateAsync(new CleanerSettings { SelectedCategoryIds = [] });
+        ChooseStepViewModel vm = new(home.Services, new MainWindowViewModel(home.Services));
+        int canExecuteChanged = 0;
+        vm.AnalyzeCommand.CanExecuteChanged += (_, _) => canExecuteChanged++;
+
+        Assert.False(vm.AnalyzeCommand.CanExecute(null));
+        Assert.Equal("Nessuna categoria selezionata", vm.SelectedCountText);
+
+        vm.Choices[0].IsSelected = true;
+
+        Assert.True(vm.AnalyzeCommand.CanExecute(null));
+        Assert.Equal("1 categoria selezionata", vm.SelectedCountText);
+        Assert.True(canExecuteChanged > 0);
+
+        vm.Choices[0].IsSelected = false;
+
+        Assert.False(vm.AnalyzeCommand.CanExecute(null));
+        Assert.Equal("Nessuna categoria selezionata", vm.SelectedCountText);
+    }
 }

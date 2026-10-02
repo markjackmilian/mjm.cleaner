@@ -77,14 +77,18 @@ public sealed class MainWindowLayoutTests
     [AvaloniaFact]
     public void WizardViewsHaveToolbarAndActionBar()
     {
-        foreach (UserControl view in new UserControl[] { new ChooseStepView(), new ScanStepView(), new ConfirmStepView(), new DoneStepView() })
+        UserControl[] views = [new ChooseStepView(), new ScanStepView(), new ConfirmStepView(), new DoneStepView()];
+        for (int i = 0; i < views.Length; i++)
         {
+            UserControl view = views[i];
             Window window = new() { Width = 888, Height = 700, Content = view };
             window.Show();
             window.UpdateLayout();
             Assert.Contains(view.GetVisualDescendants().OfType<Border>(), b => b.Classes.Contains("Toolbar"));
             Assert.Contains(view.GetVisualDescendants().OfType<Border>(), b => b.Classes.Contains("ActionBar"));
-            Assert.Contains(view.GetVisualDescendants().OfType<StepIndicator>(), s => s.CurrentStep >= 1);
+            // Ogni vista indica il proprio passo: 1, 2, 3, 4 nell'ordine del wizard.
+            StepIndicator indicator = Assert.Single(view.GetVisualDescendants().OfType<StepIndicator>());
+            Assert.Equal(i + 1, indicator.CurrentStep);
             window.Close();
         }
     }

@@ -18,34 +18,39 @@
                 <!-- Area dei semafori: trascinabile come una titlebar. -->
                 <Border DockPanel.Dock="Top" Height="52" Background="Transparent"
                         chrome:WindowDecorationProperties.ElementRole="TitleBar" />
-                <StackPanel DockPanel.Dock="Top" Spacing="2" AutomationProperties.Name="Sezioni">
+                <StackPanel DockPanel.Dock="Top" Spacing="2">
                     <TextBlock Text="mjm.cleaner" Classes="SidebarHeading" />
-                    <Button Classes="SidebarItem" Classes.selected="{Binding IsCleanupSelected}" Command="{Binding ShowCleanupCommand}">
+                    <Button Classes="SidebarItem" Classes.selected="{Binding IsCleanupSelected}" Command="{Binding ShowCleanupCommand}"
+                            AutomationProperties.Name="Pulizia">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconSparkle}" /></Viewbox>
                             <TextBlock Text="Pulizia" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="SidebarItem" Classes.selected="{Binding IsDockerSelected}" Command="{Binding ShowDockerCommand}">
+                    <Button Classes="SidebarItem" Classes.selected="{Binding IsDockerSelected}" Command="{Binding ShowDockerCommand}"
+                            AutomationProperties.Name="Docker">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconCube}" /></Viewbox>
                             <TextBlock Text="Docker" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="SidebarItem" Classes.selected="{Binding IsXcodeSelected}" Command="{Binding ShowXcodeCommand}">
+                    <Button Classes="SidebarItem" Classes.selected="{Binding IsXcodeSelected}" Command="{Binding ShowXcodeCommand}"
+                            AutomationProperties.Name="Xcode">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconHammer}" /></Viewbox>
                             <TextBlock Text="Xcode" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="SidebarItem" Classes.selected="{Binding IsHistorySelected}" Command="{Binding ShowHistoryCommand}">
+                    <Button Classes="SidebarItem" Classes.selected="{Binding IsHistorySelected}" Command="{Binding ShowHistoryCommand}"
+                            AutomationProperties.Name="Storico">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconClock}" /></Viewbox>
                             <TextBlock Text="Storico" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
-                <Button DockPanel.Dock="Bottom" Classes="SidebarItem" Command="{Binding ShowSettingsCommand}">
+                <Button DockPanel.Dock="Bottom" Classes="SidebarItem" Command="{Binding ShowSettingsCommand}"
+                        AutomationProperties.Name="Impostazioni…">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                         <Viewbox Width="16" Height="16"><Path Classes="Icon" Data="{StaticResource IconGear}" Stroke="{DynamicResource SecondaryTextBrush}" /></Viewbox>
                         <TextBlock Grid.Column="1" Text="Impostazioni…" VerticalAlignment="Center" />

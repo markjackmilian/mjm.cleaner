@@ -58,6 +58,31 @@ public sealed class SettingsWindowTests
     }
 
     [AvaloniaFact]
+    public void DefaultHeightFitsA13InchDisplay()
+    {
+        // Il valore dichiarato nello XAML, prima che l'apertura lo adatti allo schermo.
+        Assert.Equal(680, new SettingsWindow().Height);
+
+        var (window, _) = Create();
+
+        // 680 pt stanno nell'area utile di un 1440x900 con il Dock; il contenuto scorre, la barra azioni resta visibile.
+        Assert.Equal(680, window.Height);
+        Assert.False(window.CanResize);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void HeightIsCappedToTheWorkingAreaOfTheScreen()
+    {
+        double capped = SettingsWindow.FitHeight(680, workingAreaHeight: 600, margin: 40);
+        Assert.Equal(560, capped);
+        Assert.Equal(680, SettingsWindow.FitHeight(680, workingAreaHeight: 1000, margin: 40));
+        // Mai sotto una soglia utilizzabile, anche su schermi minuscoli.
+        Assert.Equal(400, SettingsWindow.FitHeight(680, workingAreaHeight: 200, margin: 40));
+    }
+
+    [AvaloniaFact]
     public void ClosingTheWindowRestoresTheAppearance()
     {
         var (window, appearance) = Create();

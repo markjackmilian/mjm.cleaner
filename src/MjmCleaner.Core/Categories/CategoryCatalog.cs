@@ -95,15 +95,26 @@ public static class CategoryCatalog
                 ]),
 
             new CleanupCategory(
-                Id: "trash-downloads-large",
-                DisplayName: "Cestino, Download e file grandi",
-                Description: "Contiene dati reali, non file rigenerabili. Ogni voce va selezionata manualmente.",
+                Id: "trash",
+                DisplayName: "Cestino",
+                Description: "Contiene dati reali, non file rigenerabili. Va selezionato manualmente.",
                 Risk: RiskLevel.High,
                 SelectedByDefault: false,
                 ParentId: null,
                 Rules:
                 [
                     new CleanupRule(E("~/.Trash"), ScanMode.ClearContents, All, []),
+                ]),
+
+            new CleanupCategory(
+                Id: "downloads-large",
+                DisplayName: "Download e file grandi",
+                Description: "Contiene dati reali, non file rigenerabili. Ogni voce va selezionata manualmente.",
+                Risk: RiskLevel.High,
+                SelectedByDefault: false,
+                ParentId: null,
+                Rules:
+                [
                     new CleanupRule(E("~/Downloads"), ScanMode.MatchingFiles, All, [], MinAge: TimeSpan.FromDays(settings.DownloadsMinAgeDays)),
                     .. settings.LargeFileRoots.Select(root => new CleanupRule(
                         E(root),

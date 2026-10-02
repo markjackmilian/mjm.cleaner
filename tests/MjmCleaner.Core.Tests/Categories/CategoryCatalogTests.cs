@@ -11,12 +11,12 @@ public class CategoryCatalogTests
         => CategoryCatalog.Build(settings ?? new CleanerSettings(), Expander);
 
     [Fact]
-    public void DefinesTheSixCategories()
+    public void DefinesTheSevenCategories()
     {
         string[] ids = [.. Build().Select(c => c.Id)];
 
         Assert.Equal(
-            ["system-caches", "dev-caches", "nuget-packages", "project-build-output", "logs", "trash-downloads-large"],
+            ["system-caches", "dev-caches", "nuget-packages", "project-build-output", "logs", "trash", "downloads-large"],
             ids);
     }
 
@@ -32,7 +32,7 @@ public class CategoryCatalogTests
     [Fact]
     public void HighRiskCategoryIsNeverSelectedByDefault()
     {
-        CleanupCategory risky = Build().Single(c => c.Id == "trash-downloads-large");
+        CleanupCategory risky = Build().Single(c => c.Id == "trash");
 
         Assert.Equal(RiskLevel.High, risky.Risk);
         Assert.False(risky.SelectedByDefault);
@@ -76,7 +76,7 @@ public class CategoryCatalogTests
 
         CleanupRule logRule = categories.Single(c => c.Id == "logs").Rules[0];
         CleanupRule downloadsRule = categories
-            .Single(c => c.Id == "trash-downloads-large").Rules
+            .Single(c => c.Id == "downloads-large").Rules
             .Single(r => r.Root == "/Users/tester/Downloads");
         CleanupRule nugetRule = categories.Single(c => c.Id == "nuget-packages").Rules[0];
 

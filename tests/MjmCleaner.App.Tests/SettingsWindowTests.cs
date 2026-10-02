@@ -134,4 +134,53 @@ public sealed class SettingsWindowTests
 
         window.Close();
     }
+
+    [AvaloniaFact]
+    public void AllSectionCaptionsUseTheSameSize()
+    {
+        var (window, _) = Create();
+
+        TextBlock[] captions = [.. window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("Caption"))];
+        Assert.Equal(5, captions.Length);
+        Assert.All(captions, c => Assert.Equal(11.5, c.FontSize));
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SelectedAppearancePreviewHasAnUnclippedAccentRing()
+    {
+        var (window, _) = Create();
+
+        Border[] rings = [.. window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("Ring"))];
+        Assert.Equal(3, rings.Length);
+        // Automatico è selezionato per default: anello pieno da 2 px; gli altri hanno solo il filetto.
+        Assert.Equal(2, rings[0].BoxShadow[0].Spread);
+        Assert.Equal(0.5, rings[1].BoxShadow[0].Spread);
+        Assert.Equal(0.5, rings[2].BoxShadow[0].Spread);
+        // L'ombra non deve essere ritagliata dal Border che la disegna.
+        Assert.All(rings, r => Assert.False(r.ClipToBounds));
+        Assert.All(rings, r => Assert.True(((Border)r.Child!).ClipToBounds));
+
+        window.Close();
+    }
+
+    [AvaloniaTheory]
+    [InlineData(":pointerover")]
+    [InlineData(":focus")]
+    [InlineData(":disabled")]
+    public void CompactFieldDoesNotPaintFluentTextBoxChrome(string pseudoClass)
+    {
+        var (window, _) = Create();
+        TextBox box = window.GetVisualDescendants().OfType<NumericUpDown>().First().GetVisualDescendants().OfType<TextBox>().Single();
+        ((IPseudoClasses)box.Classes).Set(pseudoClass, true);
+        window.UpdateLayout();
+
+        Border chrome = box.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "PART_BorderElement");
+        Assert.Equal(0, ((Avalonia.Media.ISolidColorBrush?)chrome.Background)?.Color.A ?? 0);
+        Assert.Equal(0, ((Avalonia.Media.ISolidColorBrush?)chrome.BorderBrush)?.Color.A ?? 0);
+        Assert.Equal(new Avalonia.Thickness(0), chrome.BorderThickness);
+
+        window.Close();
+    }
 }

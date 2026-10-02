@@ -21,10 +21,11 @@
                 </ControlTemplate>
             </Setter>
         </Style>
-        <Style Selector="RadioButton.AppearanceOption Border.Preview"><Setter Property="BoxShadow" Value="0 0 0 0.5 #73808080" /></Style>
-        <Style Selector="RadioButton.AppearanceOption:checked Border.Preview"><Setter Property="BoxShadow" Value="0 0 0 2 #0A66D8" /></Style>
+        <!-- L'anello sta su un Border esterno senza ritaglio: il ClipToBounds dell'anteprima ritaglierebbe la propria ombra. -->
+        <Style Selector="RadioButton.AppearanceOption Border.Ring"><Setter Property="BoxShadow" Value="0 0 0 0.5 #73808080" /></Style>
+        <Style Selector="RadioButton.AppearanceOption:checked Border.Ring"><Setter Property="BoxShadow" Value="0 0 0 2 #0A66D8" /></Style>
         <Style Selector="RadioButton.AppearanceOption:checked TextBlock.OptionLabel"><Setter Property="FontWeight" Value="SemiBold" /></Style>
-        <Style Selector="RadioButton.AppearanceOption:focus-visible Border.Preview"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
+        <Style Selector="RadioButton.AppearanceOption:focus-visible Border.Ring"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
     </Window.Styles>
 
     <DockPanel LastChildFill="True">
@@ -48,13 +49,15 @@
                 <!-- Aspetto -->
                 <StackPanel Spacing="6">
                     <TextBlock Classes="SectionTitle" Text="Aspetto" />
-                    <Border Classes="SurfaceCard" Padding="16,14">
+                    <Border Classes="SurfaceCard" Padding="16,14,16,12">
                         <StackPanel Spacing="12">
-                            <StackPanel Orientation="Horizontal" Spacing="20">
+                            <!-- Il margine 3 dell'anello lascia spazio all'ombra; margine negativo e spaziature ridotte mantengono la geometria della bozza. -->
+                            <StackPanel Orientation="Horizontal" Spacing="14" Margin="-3,-3,0,0">
                                 <RadioButton Classes="AppearanceOption" GroupName="Appearance"
                                              IsChecked="{Binding IsAuto}" AutomationProperties.Name="Automatico">
-                                    <StackPanel Spacing="6">
-                                        <Border Classes="Preview" Width="88" Height="56" CornerRadius="7" ClipToBounds="True" Background="#FFFFFF">
+                                    <StackPanel Spacing="3">
+                                        <Border Classes="Ring" Width="88" Height="56" CornerRadius="7" Margin="3">
+                                            <Border Classes="Preview" CornerRadius="7" ClipToBounds="True" Background="#FFFFFF">
                                             <Grid ColumnDefinitions="*,*">
                                                 <DockPanel Grid.Column="0">
                                                     <Border DockPanel.Dock="Left" Width="22" Background="#E4E4E8" />
@@ -70,15 +73,16 @@
                                                     </StackPanel>
                                                 </Border>
                                             </Grid>
-                                        </Border>
+                                        </Border></Border>
                                         <TextBlock Classes="OptionLabel" Text="Automatico" FontSize="12" HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
 
                                 <RadioButton Classes="AppearanceOption" GroupName="Appearance"
                                              IsChecked="{Binding IsLight}" AutomationProperties.Name="Chiaro">
-                                    <StackPanel Spacing="6">
-                                        <Border Classes="Preview" Width="88" Height="56" CornerRadius="7" ClipToBounds="True" Background="#FFFFFF">
+                                    <StackPanel Spacing="3">
+                                        <Border Classes="Ring" Width="88" Height="56" CornerRadius="7" Margin="3">
+                                            <Border Classes="Preview" CornerRadius="7" ClipToBounds="True" Background="#FFFFFF">
                                             <DockPanel>
                                                 <Border DockPanel.Dock="Left" Width="26" Background="#E4E4E8" />
                                                 <StackPanel Margin="7,8" Spacing="4">
@@ -87,15 +91,16 @@
                                                     <Border Height="4" CornerRadius="2" Background="#D8D8DC" />
                                                 </StackPanel>
                                             </DockPanel>
-                                        </Border>
+                                        </Border></Border>
                                         <TextBlock Classes="OptionLabel" Text="Chiaro" FontSize="12" HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
 
                                 <RadioButton Classes="AppearanceOption" GroupName="Appearance"
                                              IsChecked="{Binding IsDark}" AutomationProperties.Name="Scuro">
-                                    <StackPanel Spacing="6">
-                                        <Border Classes="Preview" Width="88" Height="56" CornerRadius="7" ClipToBounds="True" Background="#232325">
+                                    <StackPanel Spacing="3">
+                                        <Border Classes="Ring" Width="88" Height="56" CornerRadius="7" Margin="3">
+                                            <Border Classes="Preview" CornerRadius="7" ClipToBounds="True" Background="#232325">
                                             <DockPanel>
                                                 <Border DockPanel.Dock="Left" Width="26" Background="#3A3A3D" />
                                                 <StackPanel Margin="7,8" Spacing="4">
@@ -104,7 +109,7 @@
                                                     <Border Height="4" CornerRadius="2" Background="#4A4A4E" />
                                                 </StackPanel>
                                             </DockPanel>
-                                        </Border>
+                                        </Border></Border>
                                         <TextBlock Classes="OptionLabel" Text="Scuro" FontSize="12" HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </RadioButton>
@@ -151,7 +156,7 @@
                             </DockPanel>
                         </Border>
                     </Border>
-                    <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap" Text="Cartelle di progetto in cui cercare bin e obj." />
+                    <TextBlock Classes="Caption" FontSize="11.5" Margin="4,0" TextWrapping="Wrap" Text="Cartelle di progetto in cui cercare bin e obj." />
                 </StackPanel>
 
                 <!-- File grandi -->
@@ -201,7 +206,7 @@
                             </Grid>
                         </StackPanel>
                     </Border>
-                    <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap" Text="Vengono proposti solo i file più grandi della soglia." />
+                    <TextBlock Classes="Caption" FontSize="11.5" Margin="4,0" TextWrapping="Wrap" Text="Vengono proposti solo i file più grandi della soglia." />
                 </StackPanel>
 
                 <!-- Età minima -->
@@ -228,9 +233,9 @@
                             </Grid>
                         </StackPanel>
                     </Border>
-                    <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap"
+                    <TextBlock Classes="Caption" FontSize="11.5" Margin="4,0" TextWrapping="Wrap"
                                Text="I file più recenti restano esclusi dall'analisi." />
-                    <TextBlock Classes="Caption" Margin="4,0" TextWrapping="Wrap"
+                    <TextBlock Classes="Caption" FontSize="11.5" Margin="4,0" TextWrapping="Wrap"
                                Text="L'età dei pacchetti NuGet si basa sull'ultimo accesso registrato dal filesystem: è un'euristica, non una certezza." />
                 </StackPanel>
             </StackPanel>

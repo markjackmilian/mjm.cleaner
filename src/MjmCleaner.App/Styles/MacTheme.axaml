@@ -213,8 +213,12 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="NumericUpDown.Compact /template/ TextBox#PART_TextBox"><Setter Property="MinHeight" Value="0" /><Setter Property="FontSize" Value="13" /><Setter Property="FontFeatures" Value="+tnum" /></Style>
-    <!-- Da attivo il TextBox Fluent dipinge sfondo e bordo propri (nero in scuro): qui li disegna il campo, con l'anello di fuoco. -->
+    <!-- Il TextBox Fluent dipinge sfondo e bordo propri in ogni stato (pointer-over, focus, disabilitato): nel campo compatto li disegna il PART_Field, con l'anello di fuoco. -->
+    <Style Selector="NumericUpDown.Compact /template/ TextBox#PART_TextBox /template/ Border#PART_BorderElement"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+    <Style Selector="NumericUpDown.Compact /template/ TextBox#PART_TextBox:pointerover /template/ Border#PART_BorderElement"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
     <Style Selector="NumericUpDown.Compact /template/ TextBox#PART_TextBox:focus /template/ Border#PART_BorderElement"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+    <Style Selector="NumericUpDown.Compact /template/ TextBox#PART_TextBox:focus:pointerover /template/ Border#PART_BorderElement"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+    <Style Selector="NumericUpDown.Compact /template/ TextBox#PART_TextBox:disabled /template/ Border#PART_BorderElement"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
     <Style Selector="NumericUpDown.Compact /template/ ButtonSpinner#PART_Spinner">
         <Setter Property="Template">
             <ControlTemplate>

@@ -58,6 +58,23 @@ public sealed class HistoryViewTests
     }
 
     [AvaloniaFact]
+    public async Task AmountIsVisibleWhenThereAreSessions()
+    {
+        var (window, vm) = await CreateAsync();
+
+        vm.TotalText = "1,2 GB";
+        vm.CountText = "in 3 pulizie";
+        vm.HasSessions = true;
+        window.UpdateLayout();
+
+        TextBlock total = Assert.Single(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "1,2 GB");
+        Assert.True(total.IsVisible);
+        Assert.True(total.IsEffectivelyVisible);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task SortChevronIsNinePixelsWithAThinStroke()
     {
         var (window, _) = await CreateAsync();

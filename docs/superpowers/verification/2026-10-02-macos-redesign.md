@@ -1,6 +1,6 @@
 # Verifica finale — redesign macOS di mjm.cleaner
 
-Data: 2026-10-02 · Branch `feat/macos-redesign` · HEAD di partenza `2fd1917`
+Data: 2026-10-02 · Branch `feat/macos-redesign` · HEAD di partenza `2fd1917`, aggiornato dopo la fix wave finale (`7c9a1f0`, `2f640ab`)
 Riferimenti: [spec](../specs/2026-10-02-macos-redesign-design.md), handoff UI (§7 criteri di accettazione), canvas «mjm.cleaner — macOS» (board `Main`, `Docker`, `Storico`, `Impostazioni`).
 
 ## Ambito
@@ -10,7 +10,7 @@ Verifica dei criteri di accettazione del §7 dell'handoff dopo le modifiche di T
 ## Come è stata prodotta l'evidenza
 
 - **Build e test**: comandi eseguiti alla radice del repository (sezione seguente).
-- **Screenshot dell'app reale** (non headless): catturati dal controller con `screencapture -x -o -l <windowid>`, quindi **solo la finestra di mjm.cleaner** (nessun desktop, nessuna altra app). PNG Retina 2x: finestra principale 1120×700 pt (2240×1400 px), finestra Impostazioni 700×820 pt (1400×1640 px). Ogni immagine è stata riesaminata prima di essere copiata: tutte mostrano esclusivamente la finestra dell'app.
+- **Screenshot dell'app reale** (non headless): catturati dal controller con `screencapture -x -o -l <windowid>`, quindi **solo la finestra di mjm.cleaner** (nessun desktop, nessuna altra app). PNG Retina 2x: finestra principale 1120×700 pt (2240×1400 px), finestra Impostazioni 700×680 pt (1400×1360 px; il contenuto scorre, la barra azioni resta visibile). Ogni immagine è stata riesaminata prima di essere copiata: tutte mostrano esclusivamente la finestra dell'app.
 - **Screenshot headless (Step 3 del brief)**: non necessari, perché la cattura delle finestre reali è stata possibile; nessun progetto di cattura headless è stato usato.
 - **Isolamento dei dati**: l'app è stata avviata con `HOME` puntato a una home finta in scratch (due copie, con `Appearance` = `Light` e `Dark` in `settings.json`), così le impostazioni reali dell'utente non sono mai state toccate; confronto con il backup dopo ogni esecuzione sulla home reale: identico. Il database dello Storico è una copia di quello reale (1 sessione reale).
 - **Flusso reale su dati fittizi**: nella home finta un progetto demo (`demo-projects/Demo.Api/Demo.Api.csproj` con `bin`/`obj` fittizi); selezionata solo «Cartelle bin e obj nei progetti». Eseguito Scegli → Analizza → Conferma → Elimina → Fatto: la cancellazione è rimasta confinata alla scratch (verificato che le cartelle siano sparite). Per questo lo Storico mostra anche la nuova sessione «2 ott 2026, 16:30 · 4,3 MB · Cartelle bin e obj nei progetti · 2» sopra quella reale «26 set 2026, 01:19 · 9,5 GB · Cache utente e di sistema · 2.117» (intestazione «9,5 GB in 2 pulizie»).
@@ -23,13 +23,13 @@ Verifica dei criteri di accettazione del §7 dell'handoff dopo le modifiche di T
 | Comando | Esito |
 |---|---|
 | `export PATH="/usr/local/share/dotnet:$PATH"; dotnet build` e `dotnet build --no-incremental` (radice del repo) | exit 0 — `Build succeeded. 0 Warning(s), 0 Error(s).` — 0 avvisi nuovi |
-| `dotnet test` (radice del repo) | exit 0 — `MjmCleaner.Core.Tests`: 502 superati, 0 falliti, 0 saltati · `MjmCleaner.App.Tests`: 93 superati, 0 falliti, 0 saltati · **totale 595 superati** |
+| `dotnet test` (radice del repo) | exit 0 — `MjmCleaner.Core.Tests`: 518 superati, 0 falliti, 0 saltati · `MjmCleaner.App.Tests`: 108 superati, 0 falliti, 0 saltati · **totale 626 superati** |
 
-(L'ultimo riferimento registrato, `2026-10-02-xcode-cleanup.md`, era 499 Core + 19 App; i totali odierni includono anche i test del redesign e delle modifiche al catalogo successive.)
+(Totali rieseguiti dopo la fix wave finale (`7c9a1f0`, `2f640ab`) con `dotnet build --no-incremental` e `dotnet test`. L'ultimo riferimento registrato, `2026-10-02-xcode-cleanup.md`, era 499 Core + 19 App; i totali odierni includono anche i test del redesign e delle modifiche al catalogo successive.)
 
 ## Screenshot
 
-Tutti in `2026-10-02-macos-redesign/`. Nota: le sessioni dello Storico nei due temi provengono da due esecuzioni distinte (orario 16:30 in chiaro, 16:31 in scuro); in `06-xcode-light` la finestra non era in primo piano (semafori grigi), il contenuto è invariato.
+Tutti in `2026-10-02-macos-redesign/`. Gli screenshot 08 e 09 (4 file) sono stati ricatturati alla dimensione finale 700×680 dopo la fix wave, con stessi tema e contenuto: la finestra ora scorre (08 mostra la parte alta, 09 la parte bassa scorsa fino in fondo); ciascuno è stato riesaminato e mostra solo la finestra «Impostazioni» di mjm.cleaner. Nota: le sessioni dello Storico nei due temi provengono da due esecuzioni distinte (orario 16:30 in chiaro, 16:31 in scuro); in `06-xcode-light` la finestra non era in primo piano (semafori grigi), il contenuto è invariato.
 
 | Schermata | Chiaro | Scuro |
 |---|---|---|
@@ -73,7 +73,7 @@ Differenza: il canvas mostra una sola sessione («in 1 pulizia»); l'app ne most
 
 ### Impostazioni
 
-Corrispondono: finestra modale propria 700×820 con titolo «Impostazioni»; sezioni **Aspetto** (tre riquadri-anteprima Automatico/Chiaro/Scuro con anello sul selezionato e didascalia sotto la card) · **Progetti .NET** · **File grandi** · **Età minima**; didascalie sotto le card; liste cartelle con barra + / − e stato vuoto «Nessuna cartella. Premi + per aggiungerne una.»; stepper compatti con unità («MB», «giorni»); «Annulla» e «Salva» in basso a destra.
+Corrispondono: finestra modale propria 700×680 (il contenuto scorre; l'altezza è limitata all'area utile dello schermo, margine 40 pt, minimo 400 pt) con titolo «Impostazioni»; sezioni **Aspetto** (tre riquadri-anteprima Automatico/Chiaro/Scuro con anello sul selezionato e didascalia sotto la card) · **Progetti .NET** · **File grandi** · **Età minima**; didascalie sotto le card; liste cartelle con barra + / − e stato vuoto «Nessuna cartella. Premi + per aggiungerne una.»; stepper compatti con unità («MB», «giorni»); «Annulla» e «Salva» in basso a destra.
 
 Differenza documentata: **Età minima ha tre righe** (Download · Log · Pacchetti NuGet), non quelle del board (decisione della spec: l'età dei pacchetti NuGet è un'impostazione esistente, con nota sull'euristica).
 
@@ -107,10 +107,11 @@ Differenze, tutte volute dalla spec:
 
 - Test: `MainWindowLayoutTests.ShellHasSidebarAndNoCloseButtons`, `ToolPagesLayoutTests.XcodePageHasToolbarAndNoCloseButton`, `ToolPagesLayoutTests.DockerViewsHaveNoCloseButton`, `HistoryViewTests.HasToolbarAndNoCloseButton`, `MainWindowLayoutTests.WizardViewsHaveToolbarAndActionBar`, `SidebarSectionTests` (`WizardPagesBelongToCleanup`, `ReportsBelongToTheirTool`, `IsWizardPageOnlyForTheFourSteps`).
 - Screenshot: sidebar con Pulizia · Docker · Xcode · Storico in tutte le schermate 01–07.
+- Accessibilità (fix wave): i pulsanti della sidebar e dei passi hanno nomi accessibili, verificati da `AccessibilityTests` (`MainWindowButtonsHaveAccessibleNames`, `ChooseStepButtonsHaveAccessibleNames`, `SettingsWindowButtonsHaveAccessibleNames`).
 
 ### 3. Impostazioni in finestra propria, ⌘, funzionante — soddisfatto
 
-- Test: `SettingsOpeningTests` (`ShowSettingsCommandOpensTheModalSettingsWindow`, `WhileTheWindowIsOpenTheCommandIsDisabled`, `ClickingTheSidebarSettingsButtonOpensTheWindow`, `CommandCommaOpensTheWindow`, `TheApplicationMenuHasTheSettingsItemFromStartup`); `SettingsWindowTests.ShowsTheFourSectionsAndTheEmptyFolderState`.
+- Test: `SettingsOpeningTests` (`ShowSettingsCommandOpensTheModalSettingsWindow`, `WhileTheWindowIsOpenTheCommandIsDisabled`, `ClickingTheSidebarSettingsButtonOpensTheWindow`, `CommandCommaOpensTheWindow`, `TheApplicationMenuHasTheSettingsItemFromStartup`); `SettingsWindowTests.ShowsTheFourSectionsAndTheEmptyFolderState`, `SettingsWindowTests.DefaultHeightFitsA13InchDisplay`, `SettingsWindowTests.HeightIsCappedToTheWorkingAreaOfTheScreen`.
 - Prova manuale sull'app reale: ⌘, (keystroke reale) apre la finestra, Esc la chiude come Annulla; il menu applicazione contiene «Impostazioni…». Screenshot 08/09.
 
 ### 4. Token §2 applicati, chiaro e scuro — soddisfatto
@@ -120,7 +121,7 @@ Differenze, tutte volute dalla spec:
 
 ### 5. Aspetto Automatico/Chiaro/Scuro funzionante e persistente — soddisfatto in parte: verificato all'avvio e per comportamento del framework; cambio dal vivo da provare a mano
 
-- Funzionante e persistente — test: `ThemeTests.PreferenceMapsToThemeVariant`, `ThemeTests.ApplySetsApplicationVariant`; `SettingsViewModelTests` (`PickingAnAppearancePreviewsItImmediately`, `CancelRestoresTheLoadedAppearanceAndCloses`, `ClosingFromTheTitleBarBehavesLikeCancel`, `SavePersistsAppearanceAndFoldersThenReturnsToStart`); `SettingsWindowTests.ClosingTheWindowRestoresTheAppearance`; Core: `SettingsStoreTests` (`AppearanceDefaultsToAuto`, `LegacyFileWithoutAppearanceLoadsAsAuto`, `AppearanceRoundTripsAsReadableString`). L'app reale avviata con `Appearance` = `Light`/`Dark` nel `settings.json` ha reso il tema corretto all'avvio (screenshot 01–09: ogni coppia chiaro/scuro).
+- Funzionante e persistente — test: `ThemeTests.PreferenceMapsToThemeVariant`, `ThemeTests.ApplySetsApplicationVariant`; `SettingsViewModelTests` (`PickingAnAppearancePreviewsItImmediately`, `CancelRestoresTheLoadedAppearanceAndCloses`, `ClosingFromTheTitleBarBehavesLikeCancel`, `SavePersistsAppearanceAndFoldersThenReturnsToStart`); `SettingsWindowTests.ClosingTheWindowRestoresTheAppearance`; Core: `SettingsStoreTests` (`AppearanceDefaultsToAuto`, `LegacyFileWithoutAppearanceLoadsAsAuto`, `AppearanceRoundTripsAsReadableString`, `UnknownAppearanceValueFallsBackToAutoAndKeepsTheOtherSettings`, `AppearanceIsReadCaseInsensitively`, `AppearanceRoundTripsForEveryValue`). Dopo la fix wave la lettura di `Appearance` è **tollerante**: un valore sconosciuto o non stringa (numero intero, booleano, oggetto, array, stringa vuota) ricade su Automatico, senza perdere le altre impostazioni e senza far fallire il caricamento. L'app reale avviata con `Appearance` = `Light`/`Dark` nel `settings.json` ha reso il tema corretto all'avvio (screenshot 01–09: ogni coppia chiaro/scuro).
 - **Automatico segue il sistema**: verificato **all'avvio** (esecuzione sulla home reale in Automatico con macOS in Scuro: app scura) e per **comportamento del framework** (`Auto` imposta `RequestedThemeVariant = Default`, che in Avalonia segue l'impostazione di piattaforma). **Il cambio dal vivo dell'Aspetto di sistema con l'app aperta non è stato eseguito**, perché avrebbe richiesto di modificare l'impostazione di sistema dell'utente: resta da provare a mano (`osascript -e 'tell application "System Events" to tell appearance preferences to set dark mode to not dark mode'`, poi ripristino).
 - Verifica manuale per l'utente (cambio dal vivo): con l'app aperta in Automatico, aprire Impostazioni di Sistema → Aspetto e passare da Chiaro a Scuro e viceversa; la finestra dell'app deve cambiare tema senza riavvio.
 
@@ -131,9 +132,22 @@ Differenze, tutte volute dalla spec:
 
 ### 7. Screenshot di ogni schermata in chiaro e scuro confrontati col canvas — soddisfatto, con i limiti indicati sotto (Docker con dati)
 
-- 18 screenshot dell'app reale (9 schermate × 2 temi) nella tabella sopra; confronto con i board nella sezione precedente; differenze solo per decisioni della spec.
+- 18 screenshot dell'app reale (9 schermate × 2 temi) nella tabella sopra (08 e 09 ricatturati a 700×680 dopo la fix wave); confronto con i board nella sezione precedente; differenze solo per decisioni della spec.
 - Limiti: lo stato **Docker con dati** (gruppi immagini/volumi) non è coperto né da screenshot né da un test di layout con dati (Docker Desktop non era in esecuzione; `DockerViewsHaveNoCloseButton` non renderizza dati). Le sezioni **Xcode** con voci selezionate/anteprima/conferma non sono state fotografate (la pulizia Xcode reale non va eseguita) ma sono coperte da `XcodeViewLayoutTests` (stati popolati e di conferma, anche con 100 dispositivi), `XcodeReportViewModelTests` e `XcodeViewModelTests`.
+
+## Correzioni dopo la review finale
+
+Dopo la scrittura di questo documento è stata applicata una fix wave finale (commit `7c9a1f0` e `2f640ab`). Elenco con i test che la coprono:
+
+- **Nomi accessibili sulla sidebar** (e sui pulsanti di Scegli e Impostazioni): `AccessibilityTests.MainWindowButtonsHaveAccessibleNames`, `AccessibilityTests.ChooseStepButtonsHaveAccessibleNames`, `AccessibilityTests.SettingsWindowButtonsHaveAccessibleNames`.
+- **Altezza della finestra Impostazioni 820 → 680**, limitata all'area utile dello schermo (margine 40 pt, minimo 400 pt); il contenuto scorre e la barra Annulla/Salva resta visibile: `SettingsWindowTests.DefaultHeightFitsA13InchDisplay`, `SettingsWindowTests.HeightIsCappedToTheWorkingAreaOfTheScreen`. Screenshot 08/09 ricatturati a 700×680.
+- **«Analizza» disabilitato con 0 selezioni** e aggiornato al variare dei toggle: `ChooseStepTests.AnalyzeIsDisabledWithoutSelectionAndFollowsTheToggles`.
+- **Blocco della navigazione durante l'eliminazione Xcode** e comando «Pulizia» (`ShowCleanup`): `NavigationLockTests.SidebarCommandsAreDisabledWhileXcodeDeletesAndReenabledAfterwards`, `NavigationLockTests.ShowCleanupLeavesAWizardPageUntouched`, `NavigationLockTests.ShowCleanupFromHistoryReturnsToStepOne`.
+- **Lettura tollerante di `Appearance` in `settings.json`**: valori sconosciuti o interi → Automatico, le altre impostazioni restano: `SettingsStoreTests.UnknownAppearanceValueFallsBackToAutoAndKeepsTheOtherSettings` (più `AppearanceIsReadCaseInsensitively`, `AppearanceRoundTripsForEveryValue`).
+- **Pulizia del tema**: stili morti rimossi, ombre condivise (`BoxShadows`) definite una sola volta, intestazioni di colonna dello Storico con uno stile unico, anello di focus condiviso: `ThemeTests.SharedShadowsAreDefinedOnce`, `ThemeTests.FocusedButtonUsesTheSharedFocusRing`, `HistoryViewTests.ColumnHeadersShareOneStyle`.
+
+Totali verificati dopo la fix wave: `dotnet build --no-incremental` 0 avvisi, 0 errori; `dotnet test` Core 518 superati, App 108 superati, 0 falliti (626 in tutto).
 
 ## Esito
 
-Tutte le voci del §7 sono soddisfatte tranne il cambio dal vivo della voce 5 (da provare a mano). Altre riserve esplicite: Docker con dati non è coperto né da screenshot né da un test di layout con dati; gli stati Xcode in anteprima/conferma non sono fotografati ma sono coperti da `XcodeViewLayoutTests`.
+Tutte le voci del §7 sono soddisfatte (con la tolleranza ai valori errati di `Appearance` e i nomi accessibili aggiunti dalla fix wave) tranne il cambio dal vivo dell'Aspetto di sistema della voce 5, da provare a mano. Altre riserve esplicite: Docker con dati non è coperto né da screenshot né da un test di layout con dati; gli stati Xcode in anteprima/conferma non sono fotografati ma sono coperti da `XcodeViewLayoutTests`.

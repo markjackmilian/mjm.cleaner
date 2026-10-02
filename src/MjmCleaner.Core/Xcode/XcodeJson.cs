@@ -26,6 +26,8 @@ public static class XcodeJson
         }
         catch (JsonException ex)
         {
+            simctlDocument?.Dispose();
+            simctlDocument = null;
             deviceInventorySafe = false;
             logicalRuntimeInventorySafe = false;
             warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, $"Inventario simulatori non leggibile: {ex.Message}"));
@@ -95,6 +97,12 @@ public static class XcodeJson
                                 deviceInventorySafe = false;
                             }
 
+                            long? sizeBytes = OptionalInt64(device, "dataPathSize", out bool malformedSize);
+                            if (malformedSize && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Device || !w.Message.Contains("dimensione", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, "La dimensione di un dispositivo non è leggibile e resta sconosciuta."));
+                            }
+
                             devices.Add(new XcodeCandidate(
                                 Key: uuid,
                                 Kind: XcodeResourceKind.Device,
@@ -102,7 +110,7 @@ public static class XcodeJson
                                 CliId: uuid,
                                 RuntimeIdentifier: group.Name,
                                 State: state,
-                                SizeBytes: Int64(device, "dataPathSize"),
+                                SizeBytes: sizeBytes,
                                 BlockReason: blockReason));
                         }
                     }
@@ -142,12 +150,18 @@ public static class XcodeJson
                 string? build = String(image, "build");
                 string? version = String(image, "version");
                 bool hasUuid = IsUuid(id);
+                long? sizeBytes = OptionalInt64(image, "sizeBytes", out bool malformedSize);
+                if (malformedSize && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime || !w.Message.Contains("dimensione", StringComparison.OrdinalIgnoreCase)))
+                {
+                    warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "La dimensione di un'immagine runtime non è leggibile e resta sconosciuta."));
+                }
+
                 if (!hasUuid || runtimeIdentifier is null || build is null)
                 {
                     runtimeInventorySafe = false;
                 }
 
-                images.Add(new RuntimeImage(id, hasUuid ? id : null, runtimeIdentifier, build, version, String(image, "state"), Int64(image, "sizeBytes"), Bool(image, "deletable")));
+                images.Add(new RuntimeImage(id, hasUuid ? id : null, runtimeIdentifier, build, version, String(image, "state"), sizeBytes, Bool(image, "deletable")));
             }
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
@@ -241,10 +255,22 @@ public static class XcodeJson
             ? value.GetString()
             : null;
 
-    private static long? Int64(JsonElement element, string property)
-        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out JsonElement value) && value.TryGetInt64(out long number)
-            ? number
-            : null;
+    private static long? OptionalInt64(JsonElement element, string property, out bool malformed)
+    {
+        malformed = false;
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(property, out JsonElement value))
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out long number))
+        {
+            return number;
+        }
+
+        malformed = true;
+        return null;
+    }
 
     private static bool? Bool(JsonElement element, string property)
         => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out JsonElement value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False

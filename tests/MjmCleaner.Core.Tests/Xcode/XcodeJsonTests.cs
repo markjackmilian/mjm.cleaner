@@ -123,4 +123,33 @@ public class XcodeJsonTests
         Assert.False(device.CanSelect);
         Assert.False(runtime.CanSelect);
     }
+
+    [Fact]
+    public void NonObjectJsonRootReturnsWarningsWithoutThrowing()
+    {
+        XcodeSnapshot snapshot = XcodeJson.ParseInventory("[]", "{}", runtimeDeleteSupported: true);
+
+        Assert.Empty(snapshot.Candidates);
+        Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device);
+        Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Runtime);
+    }
+
+    [Fact]
+    public void NonnumericDeviceSizePreservesSiblingWithUnknownSizeAndWarning()
+    {
+        const string simctl = """
+            {"runtimes":[],"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Shutdown","dataPathSize":100},
+              {"udid":"22222222-2222-4222-8222-222222222222","name":"iPhone 16 Pro","state":"Shutdown","dataPathSize":[]}]}}
+            """;
+
+        XcodeSnapshot snapshot = XcodeJson.ParseInventory(simctl, "{}", runtimeDeleteSupported: true);
+
+        XcodeCandidate[] devices = snapshot.Candidates.Where(candidate => candidate.Kind == XcodeResourceKind.Device).ToArray();
+        Assert.Equal(2, devices.Length);
+        Assert.Equal(100, devices[0].SizeBytes);
+        Assert.Null(devices[1].SizeBytes);
+        Assert.All(devices, device => Assert.True(device.CanSelect));
+        Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device);
+    }
 }

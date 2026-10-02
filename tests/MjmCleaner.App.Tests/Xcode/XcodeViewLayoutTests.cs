@@ -98,4 +98,23 @@ public sealed class XcodeViewLayoutTests
         Assert.InRange(confirmBottom, 1, window.ClientSize.Height);
         Assert.InRange(backBottom, 1, window.ClientSize.Height);
     }
+
+    [AvaloniaFact]
+    public async Task ReportRowsRenderResourceIdentity()
+    {
+        const string uuid = "11111111-1111-4111-8111-111111111111";
+        XcodeCandidate candidate = new("device:" + uuid, XcodeResourceKind.Device, "iPhone 16", CliId: uuid);
+        XcodeCleanResult result = new(XcodeViewModelTests.EmptyReport(),
+            [new XcodeItemResult(candidate, XcodeItemOutcome.Deleted, "verified", 100)], 100, 120, []);
+        XcodeReportViewModel vm = new(new XcodeViewModelTests.FakeXcode(XcodeViewModelTests.Snapshot()),
+            new XcodeViewModelTests.FakeHistory(), new XcodeViewModelTests.FakeLog(), new XcodeViewModelTests.FakeNavigation(), result);
+        await vm.PersistenceTask;
+
+        Window window = new() { Width = 900, Height = 640, Content = new XcodeReportView { DataContext = vm } };
+        window.Show();
+        window.UpdateLayout();
+
+        string[] visible = window.GetVisualDescendants().OfType<TextBlock>().Select(text => text.Text ?? string.Empty).ToArray();
+        Assert.Contains(uuid, visible);
+    }
 }

@@ -296,6 +296,82 @@ public sealed class XcodeCleanExecutorTests
         Assert.Empty(cli.DeletedDevices);
     }
 
+    [Fact]
+    public async Task ParsedUnavailableDeviceCanBeDeletedThroughExecutor()
+    {
+        XcodeSnapshot unavailable = ParseUnavailableDevice();
+        XcodeConfirmedPlan plan = Confirm(unavailable, DeviceId);
+        FakeCli cli = new();
+        XcodeSnapshot after = XcodeJson.ParseInventory("""{"runtimes":[],"devices":{}}""", "{}", runtimeDeleteSupported: true);
+
+        XcodeCleanResult result = await Create(cli, new QueueCollector(unavailable, after)).ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(new[] { DeviceId }, cli.DeletedDevices);
+        Assert.Equal(XcodeItemOutcome.Deleted, Assert.Single(result.Items).Outcome);
+    }
+
+    [Fact]
+    public async Task ParsedUnavailableDependencyDoesNotBlockRuntimeDelete()
+    {
+        XcodeSnapshot unavailable = ParseUnavailableDevice(includeRuntime: true);
+        XcodeConfirmedPlan plan = Confirm(unavailable, "runtime:" + RuntimeId);
+        FakeCli cli = new();
+        XcodeSnapshot after = XcodeJson.ParseInventory("""{"runtimes":[],"devices":{}}""", "{}", runtimeDeleteSupported: true);
+
+        XcodeCleanResult result = await Create(cli, new QueueCollector(unavailable, after)).ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(new[] { "runtime" }, cli.OperationOrder);
+        Assert.Equal(XcodeItemOutcome.Deleted, Assert.Single(result.Items).Outcome);
+    }
+
+    [Fact]
+    public async Task ParsedUnknownDeviceStateRemainsBlockedAtExecutor()
+    {
+        const string simctl = """
+            {"runtimes":[],"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"MysteryState"}]}}
+            """;
+        XcodeSnapshot unknown = XcodeJson.ParseInventory(simctl, "{}", runtimeDeleteSupported: true);
+        FakeCli cli = new();
+
+        Assert.Throws<ArgumentException>(() => Confirm(unknown, DeviceId));
+        Assert.Empty(cli.DeletedDevices);
+    }
+
+    [Fact]
+    public async Task FileHistoryUsesFreshAllocatedSizeInsteadOfLogicalBytesFreed()
+    {
+        const string path = "/Users/test/Library/Developer/Xcode/DerivedData/App-abc";
+        const string key = "derived-data:/Users/test/Library/Developer/Xcode/DerivedData/App-abc";
+        const long allocatedBytes = 1_048_576;
+        const long logicalBytes = 10L * 1024 * 1024 * 1024;
+        XcodeSnapshot preview = FileSnapshot(path, key, allocatedBytes: 4_194_304);
+        XcodeSnapshot fresh = FileSnapshot(path, key, allocatedBytes);
+        XcodeConfirmedPlan plan = Confirm(preview, key);
+        FakeCleanEngine clean = new() { BytesFreed = logicalBytes, ItemsDeleted = 1 };
+
+        XcodeCleanResult result = await Create(new FakeCli(), new QueueCollector(fresh), clean).ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(allocatedBytes, Assert.Single(result.Items).VerifiedEstimatedBytes);
+        Assert.Equal(allocatedBytes, result.HistoryReport.BytesFreed);
+    }
+
+    [Fact]
+    public async Task FileHistoryLeavesSizeUnknownWhenFreshAllocatedMeasureIsUnavailable()
+    {
+        const string path = "/Users/test/Library/Developer/Xcode/DerivedData/App-abc";
+        const string key = "derived-data:/Users/test/Library/Developer/Xcode/DerivedData/App-abc";
+        XcodeSnapshot preview = FileSnapshot(path, key, allocatedBytes: 4_194_304);
+        XcodeSnapshot fresh = FileSnapshot(path, key, allocatedBytes: null);
+        XcodeConfirmedPlan plan = Confirm(preview, key);
+        FakeCleanEngine clean = new() { BytesFreed = 10L * 1024 * 1024 * 1024, ItemsDeleted = 1 };
+
+        XcodeCleanResult result = await Create(new FakeCli(), new QueueCollector(fresh), clean).ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Null(Assert.Single(result.Items).VerifiedEstimatedBytes);
+        Assert.Equal(0, result.HistoryReport.BytesFreed);
+    }
+
     private static XcodeCleanExecutor Create(FakeCli cli, IXcodeInventoryCollector collector, FakeCleanEngine? clean = null)
         => new(cli, collector, clean ?? new FakeCleanEngine(), new FakeSizeProbe(), new QueueRunningProbe(XcodeRunningState.NotRunning), TimeProvider.System);
 
@@ -313,6 +389,29 @@ public sealed class XcodeCleanExecutorTests
 
     private static XcodeConfirmedPlan Confirm(XcodeSnapshot source, params string[] selected)
         => XcodeSelection.Confirm(XcodeSelection.Preview(source, selected.ToHashSet(StringComparer.Ordinal)), acknowledgeDependencies: true);
+
+    private static XcodeSnapshot ParseUnavailableDevice(bool includeRuntime = false)
+    {
+        const string simctl = """
+            {"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Unavailable"}]},
+             "runtimes":[{"identifier":"com.apple.CoreSimulator.SimRuntime.iOS-18-0","name":"iOS 18","version":"18.0","buildversion":"22A3351","platform":"iOS"}]}
+            """;
+        const string images = """
+            {"22222222-2222-4222-8222-222222222222":{"identifier":"22222222-2222-4222-8222-222222222222","runtimeIdentifier":"com.apple.CoreSimulator.SimRuntime.iOS-18-0","version":"18.0","build":"22A3351","deletable":true}}
+            """;
+        return XcodeJson.ParseInventory(simctl, includeRuntime ? images : "{}", runtimeDeleteSupported: true);
+    }
+
+    private static XcodeSnapshot FileSnapshot(string path, string key, long? allocatedBytes)
+    {
+        ScanItem scan = new(path, 10L * 1024 * 1024 * 1024, true, "/Users/test/Library/Developer/Xcode/DerivedData");
+        XcodeFileIdentity identity = new(path, true, DateTime.UnixEpoch.AddDays(1), DateTime.UnixEpoch.AddDays(2), scan.SizeBytes);
+        return new XcodeSnapshot([new XcodeCandidate(key, XcodeResourceKind.DerivedData, "App-abc", path, SizeBytes: allocatedBytes)], [])
+        {
+            FileInventory = new XcodeFileInventory([new KeyValuePair<string, XcodeFileEntry>(key, new XcodeFileEntry(scan, identity))]),
+        };
+    }
 
     private sealed class QueueCollector(params XcodeSnapshot[] snapshots) : IXcodeInventoryCollector
     {
@@ -351,10 +450,12 @@ public sealed class XcodeCleanExecutorTests
     private sealed class FakeCleanEngine : ICleanEngine
     {
         public int Calls { get; private set; }
+        public long BytesFreed { get; set; }
+        public int ItemsDeleted { get; set; }
         public Task<CleanReport> CleanAsync(IReadOnlyList<CategorySelection> selections, IProgress<CleanProgress>? progress, CancellationToken ct)
         {
             Calls++;
-            return Task.FromResult(new CleanReport(DateTimeOffset.UnixEpoch, TimeSpan.Zero, 0, 0, 0, [], [], []));
+            return Task.FromResult(new CleanReport(DateTimeOffset.UnixEpoch, TimeSpan.Zero, BytesFreed, ItemsDeleted, 0, [], [], []));
         }
     }
 

@@ -94,7 +94,7 @@ public static class XcodeJson
                             }
 
                             string? blockReason = DeviceBlockReason(state);
-                            if (state is null || (!IsRunning(state) && !IsShutdown(state)))
+                            if (state is null || (!IsRunning(state) && !IsShutdown(state) && !IsUnavailable(state)))
                             {
                                 deviceInventorySafe = false;
                             }
@@ -257,11 +257,13 @@ public static class XcodeJson
             XcodeCandidate[] dependentDevices = image.RuntimeIdentifier is null
                 ? []
                 : devices.Where(device => device.RuntimeIdentifier == image.RuntimeIdentifier).ToArray();
-            if (blockReason is null && dependentDevices.Any(device => !IsShutdown(device.State)))
+            if (blockReason is null && dependentDevices.Any(device => IsRunning(device.State)))
             {
-                blockReason = dependentDevices.Any(device => IsRunning(device.State))
-                    ? "Un dispositivo che usa questo runtime è avviato; arrestalo in Xcode prima di rimuoverlo."
-                    : "Lo stato di un dispositivo che usa questo runtime non è verificato.";
+                blockReason = "Un dispositivo che usa questo runtime è avviato; arrestalo in Xcode prima di rimuoverlo.";
+            }
+            else if (blockReason is null && dependentDevices.Any(device => !IsShutdown(device.State) && !IsUnavailable(device.State)))
+            {
+                blockReason = "Lo stato di un dispositivo che usa questo runtime non è verificato.";
             }
 
             string runtimeName = exactMatches.Count == 1
@@ -322,6 +324,7 @@ public static class XcodeJson
             || state.Equals("Starting", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsShutdown(string? state) => state?.Equals("Shutdown", StringComparison.OrdinalIgnoreCase) == true;
+    private static bool IsUnavailable(string? state) => state?.Equals("Unavailable", StringComparison.OrdinalIgnoreCase) == true;
 
     private static string? DeviceBlockReason(string? state)
     {

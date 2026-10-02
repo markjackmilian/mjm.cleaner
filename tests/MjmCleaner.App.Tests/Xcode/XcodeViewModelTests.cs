@@ -82,6 +82,15 @@ public sealed class XcodeViewModelTests
     }
 
     [Fact]
+    public void EmptyGroupSummaryShowsZeroEntriesWithoutSizeWarning()
+    {
+        XcodeGroupNode group = new(XcodeResourceKind.DeviceSupport, [], []);
+
+        Assert.Contains("0 voci", group.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dimensioni non disponibili", group.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void MixedGroupSummaryLabelsKnownEstimateAndUnknownCount()
     {
         XcodeGroupNode group = new(XcodeResourceKind.DerivedData,

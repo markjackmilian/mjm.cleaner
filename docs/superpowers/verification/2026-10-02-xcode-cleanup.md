@@ -1,5 +1,25 @@
 # Task 6 verification report
 
+## Final review fixes
+
+Follow-up pass based on the review findings, starting from `e44b475` on `feat/xcode-cleanup`.
+
+The regression tests first reproduced the failures: unavailable devices marked the inventory incomplete, file history credited a 10 GiB logical length instead of a 1 MiB allocated estimate (and credited bytes when the fresh estimate was unknown), an empty group displayed an unavailable-size warning, and report rows omitted their resource identity.
+
+Commands:
+
+```text
+/usr/local/share/dotnet/dotnet build
+/usr/local/share/dotnet/dotnet test
+./build/bundle.sh
+/usr/bin/codesign --verify --deep --strict artifacts/mjm.cleaner.app
+/usr/bin/open -n /private/tmp/mjm-cleaner-xcode/artifacts/mjm.cleaner.app
+```
+
+Build result: exit 0, 0 warnings, 0 errors. Full test result: Core 499 passed, App 19 passed; total 518 passed, 0 failed, 0 skipped. Bundle build recreated `artifacts/mjm.cleaner.app` and `artifacts/mjm.cleaner.zip`. Strict deep signature verification returned exit 0. Launch smoke returned exit 0; process PID 24385 ran the bundle executable. No cleanup action was performed. Live visual inspection remains unavailable.
+
+New regression coverage includes parser-to-executor deletion of a recognized unavailable device, runtime deletion with an unavailable dependent device, preserved blocking for unknown device states and independent identity conflicts, allocated-size and unavailable-measure file history behavior, report identity rendering, and the zero-row group summary.
+
 Worktree: `/private/tmp/mjm-cleaner-xcode`
 Branch: `feat/xcode-cleanup` at `a15a78d` before evidence-only edits.
 

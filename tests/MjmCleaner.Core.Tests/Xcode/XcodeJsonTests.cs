@@ -126,6 +126,42 @@ public class XcodeJsonTests
     }
 
     [Fact]
+    public void UnavailableDeviceIsKnownNonrunningAndDoesNotBlockRuntime()
+    {
+        const string simctl = """
+            {"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Unavailable"}]},
+             "runtimes":[{"identifier":"com.apple.CoreSimulator.SimRuntime.iOS-18-0","name":"iOS 18.0","version":"18.0","buildversion":"22A3351","platform":"iOS"}]}
+            """;
+
+        XcodeSnapshot snapshot = XcodeJson.ParseInventory(simctl, Fixture("runtime-list.json"), runtimeDeleteSupported: true);
+
+        XcodeSnapshot classified = XcodeClassifier.Classify(snapshot, xcodeRunning: false);
+        XcodeCandidate device = Assert.Single(classified.Candidates, candidate => candidate.Kind == XcodeResourceKind.Device);
+        XcodeCandidate runtime = Assert.Single(classified.Candidates, candidate => candidate.Kind == XcodeResourceKind.Runtime);
+        Assert.DoesNotContain(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device && warning.Kind == XcodeInventoryWarningKind.CompletenessFailure);
+        Assert.True(runtime.CanSelect);
+        Assert.Contains(device.Key, runtime.DependentDeviceKeys);
+    }
+
+    [Fact]
+    public void UnavailableDeviceRetainsIndependentIdentityBlock()
+    {
+        const string simctl = """
+            {"runtimes":[],"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Unavailable"},
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"Different device","state":"Unavailable"}]}}
+            """;
+
+        XcodeSnapshot classified = XcodeClassifier.Classify(
+            XcodeJson.ParseInventory(simctl, "{}", runtimeDeleteSupported: true), xcodeRunning: false);
+
+        XcodeCandidate device = Assert.Single(classified.Candidates, candidate => candidate.Kind == XcodeResourceKind.Device);
+        Assert.False(device.CanSelect);
+        Assert.Contains("conflitto", device.BlockReason!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void NonObjectJsonRootReturnsWarningsWithoutThrowing()
     {
         XcodeSnapshot snapshot = XcodeJson.ParseInventory("[]", "{}", runtimeDeleteSupported: true);

@@ -84,7 +84,7 @@ public sealed class XcodeCleanExecutor(
 
                 if (IsFile(approved.Kind))
                 {
-                    await ExecuteFileAsync(plan, approved, progress, ct, results, warnings);
+                    await ExecuteFileAsync(plan, approved, current.SizeBytes, progress, ct, results, warnings);
                     continue;
                 }
 
@@ -111,7 +111,7 @@ public sealed class XcodeCleanExecutor(
         return new XcodeCleanResult(report, Array.AsReadOnly(results.ToArray()), freeBefore, freeAfter, Array.AsReadOnly(warnings.Distinct(StringComparer.Ordinal).ToArray()));
     }
 
-    private async Task ExecuteFileAsync(XcodeConfirmedPlan plan, XcodeCandidate candidate, IProgress<CleanProgress>? progress, CancellationToken ct, List<XcodeItemResult> results, List<string> warnings)
+    private async Task ExecuteFileAsync(XcodeConfirmedPlan plan, XcodeCandidate candidate, long? freshAllocatedBytes, IProgress<CleanProgress>? progress, CancellationToken ct, List<XcodeItemResult> results, List<string> warnings)
     {
         if (!plan.FileInventory.TryGetValue(candidate.Key, out XcodeFileEntry? approvedEntry) || approvedEntry.Identity.LogicalSizeBytes is null)
         {
@@ -123,7 +123,7 @@ public sealed class XcodeCleanExecutor(
             [new CategorySelection(Category(candidate.Kind), [approvedEntry.Item])], progress, ct);
         if (report.ItemsDeleted == 1)
         {
-            results.Add(Result(candidate, XcodeItemOutcome.Deleted, "Cartella rimossa e verificata dal motore di pulizia.", report.BytesFreed));
+            results.Add(Result(candidate, XcodeItemOutcome.Deleted, "Cartella rimossa e verificata dal motore di pulizia.", freshAllocatedBytes));
         }
         else if (report.Errors.Count > 0)
         {

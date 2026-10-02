@@ -63,7 +63,7 @@ public sealed partial class XcodeGroupNode : ObservableObject
                 string unknownLabel = unknownCount == 1 ? "1 dimensione non disponibile" : $"{unknownCount} dimensioni non disponibili";
                 size += $" · {unknownLabel}";
             }
-            return $"{Rows.Count:N0} voci · {size}";
+            return Rows.Count == 0 ? "0 voci" : $"{Rows.Count:N0} voci · {size}";
         }
     }
     partial void OnIsSelectedChanged(bool value)

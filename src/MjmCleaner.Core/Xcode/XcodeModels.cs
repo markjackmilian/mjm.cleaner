@@ -51,6 +51,21 @@ public sealed record XcodeFileIdentity(
 
 public sealed record XcodeFileEntry(ScanItem Item, XcodeFileIdentity Identity);
 
+public enum XcodeItemOutcome { Deleted, Skipped, Failed, Uncertain }
+
+public sealed record XcodeItemResult(
+    XcodeCandidate Candidate,
+    XcodeItemOutcome Outcome,
+    string Reason,
+    long? VerifiedEstimatedBytes);
+
+public sealed record XcodeCleanResult(
+    MjmCleaner.Core.Cleaning.CleanReport HistoryReport,
+    IReadOnlyList<XcodeItemResult> Items,
+    long? FreeBytesBefore,
+    long? FreeBytesAfter,
+    IReadOnlyList<string> Warnings);
+
 /// <summary>Immutable candidate-key mapping; copied on construction so callers cannot mutate a scan.</summary>
 public sealed class XcodeFileInventory : IReadOnlyDictionary<string, XcodeFileEntry>
 {

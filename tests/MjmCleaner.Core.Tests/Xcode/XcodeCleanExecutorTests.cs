@@ -1,0 +1,252 @@
+using MjmCleaner.Core.Cleaning;
+using MjmCleaner.Core.Diagnostics;
+using MjmCleaner.Core.Docker;
+using MjmCleaner.Core.Scanning;
+using MjmCleaner.Core.Xcode;
+
+namespace MjmCleaner.Core.Tests.Xcode;
+
+public sealed class XcodeCleanExecutorTests
+{
+    private const string DeviceId = "11111111-1111-4111-8111-111111111111";
+    private const string OtherDeviceId = "33333333-3333-4333-8333-333333333333";
+    private const string RuntimeId = "22222222-2222-4222-8222-222222222222";
+
+    [Fact]
+    public async Task RevalidationNeverAddsItems()
+    {
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device(), Runtime([DeviceId])), DeviceId);
+        FakeCli cli = new();
+        XcodeCleanExecutor executor = Create(cli, new QueueCollector(Snapshot(Device(), Device(OtherDeviceId)), Snapshot(Device(OtherDeviceId))));
+
+        XcodeCleanResult result = await executor.ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Single(cli.DeletedDevices);
+        Assert.Equal(DeviceId, cli.DeletedDevices[0]);
+        Assert.Single(result.Items);
+        Assert.Equal(XcodeItemOutcome.Deleted, result.Items[0].Outcome);
+    }
+
+    [Fact]
+    public async Task ChangedIdentityIsSkipped()
+    {
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device()), DeviceId);
+        FakeCli cli = new();
+        XcodeCleanExecutor executor = Create(cli, new QueueCollector(Snapshot(Device() with { Build = "new-build" })));
+
+        XcodeCleanResult result = await executor.ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Empty(cli.DeletedDevices);
+        Assert.Equal(XcodeItemOutcome.Skipped, Assert.Single(result.Items).Outcome);
+    }
+
+    [Fact]
+    public async Task DeviceBootedAfterConfirmationIsSkipped()
+    {
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device()), DeviceId);
+        FakeCli cli = new();
+        XcodeCleanExecutor executor = Create(cli, new QueueCollector(Snapshot(Device() with { State = "Booted" })));
+
+        XcodeCleanResult result = await executor.ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Empty(cli.DeletedDevices);
+        Assert.Equal(XcodeItemOutcome.Skipped, Assert.Single(result.Items).Outcome);
+    }
+
+    [Fact]
+    public async Task DevicesRunBeforeRuntimes()
+    {
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device(), Runtime([DeviceId])), DeviceId, "runtime:" + RuntimeId);
+        FakeCli cli = new();
+        XcodeCleanExecutor executor = Create(cli, new QueueCollector(
+            Snapshot(Device(), Runtime([DeviceId])),
+            Snapshot(Runtime([])),
+            Snapshot(Runtime([])),
+            Snapshot([])));
+
+        XcodeCleanResult result = await executor.ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(new[] { "device", "runtime" }, cli.OperationOrder);
+        Assert.All(result.Items, item => Assert.Equal(XcodeItemOutcome.Deleted, item.Outcome));
+    }
+
+    [Fact]
+    public async Task DeviceFailureSkipsDependentRuntime()
+    {
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device(), Runtime([DeviceId])), DeviceId, "runtime:" + RuntimeId);
+        FakeCli cli = new() { DeviceResult = new ProcessResult(1, "", "in use", false) };
+        XcodeCleanExecutor executor = Create(cli, new QueueCollector(Snapshot(Device(), Runtime([DeviceId]))));
+
+        XcodeCleanResult result = await executor.ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(new[] { "device" }, cli.OperationOrder);
+        Assert.Equal(XcodeItemOutcome.Failed, result.Items[0].Outcome);
+        Assert.Equal(XcodeItemOutcome.Skipped, result.Items[1].Outcome);
+    }
+
+    [Fact]
+    public async Task NewRuntimeDependencyAfterConfirmationSkipsRuntime()
+    {
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device(), Runtime([DeviceId])), "runtime:" + RuntimeId);
+        FakeCli cli = new();
+        XcodeCleanExecutor executor = Create(cli, new QueueCollector(Snapshot(Device(), Device(OtherDeviceId), Runtime([DeviceId, OtherDeviceId]))));
+
+        XcodeCleanResult result = await executor.ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Empty(cli.OperationOrder);
+        Assert.Equal(XcodeItemOutcome.Skipped, Assert.Single(result.Items).Outcome);
+    }
+
+    [Fact]
+    public async Task TimeoutWithUnreadableInventoryIsUncertain()
+    {
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device()), DeviceId);
+        FakeCli cli = new() { DeviceResult = new ProcessResult(-1, "", "", true) };
+        QueueCollector collector = new(Snapshot(Device()), Snapshot([], new XcodeInventoryWarning(XcodeResourceKind.Device, "unavailable")));
+
+        XcodeCleanResult result = await Create(cli, collector).ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(XcodeItemOutcome.Uncertain, Assert.Single(result.Items).Outcome);
+        Assert.Single(cli.DeletedDevices);
+    }
+
+    [Fact]
+    public async Task CancellationRetainsCompletedResults()
+    {
+        using CancellationTokenSource cts = new();
+        FakeCli cli = new() { OnDeviceDelete = _ => cts.Cancel() };
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device(), Device(OtherDeviceId)), DeviceId, OtherDeviceId);
+        QueueCollector collector = new(Snapshot(Device(), Device(OtherDeviceId)), Snapshot(Device(OtherDeviceId)));
+
+        XcodeCleanResult result = await Create(cli, collector).ExecuteAsync(plan, null, cts.Token);
+
+        Assert.Equal(2, result.Items.Count);
+        Assert.Equal(XcodeItemOutcome.Deleted, result.Items[0].Outcome);
+        Assert.Equal(XcodeItemOutcome.Skipped, result.Items[1].Outcome);
+        Assert.Single(cli.DeletedDevices);
+    }
+
+    [Fact]
+    public async Task FailedAndUnknownSizesDoNotIncreaseHistoryBytes()
+    {
+        XcodeCandidate unknown = Device(OtherDeviceId) with { SizeBytes = null };
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device(size: 500), unknown), DeviceId, OtherDeviceId);
+        FakeCli cli = new() { DeviceResult = new ProcessResult(1, "", "failure", false) };
+        XcodeCleanResult result = await Create(cli, new QueueCollector(Snapshot(Device(size: 500), unknown), Snapshot(Device(size: 500), unknown), Snapshot(Device(size: 500), unknown), Snapshot(unknown)))
+            .ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(0, result.HistoryReport.BytesFreed);
+        Assert.Null(result.Items[0].VerifiedEstimatedBytes);
+    }
+
+    [Fact]
+    public async Task IndependentFailureDoesNotStopOtherItems()
+    {
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device(), Device(OtherDeviceId)), DeviceId, OtherDeviceId);
+        FakeCli cli = new() { DeviceResult = new ProcessResult(1, "", "failure", false), DeviceResultForSecond = new ProcessResult(0, "", "", false) };
+        XcodeCleanExecutor executor = Create(cli, new QueueCollector(
+            Snapshot(Device(), Device(OtherDeviceId)), Snapshot(Device(), Device(OtherDeviceId)),
+            Snapshot(Device(), Device(OtherDeviceId)), Snapshot(Device())));
+
+        XcodeCleanResult result = await executor.ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(new[] { DeviceId, OtherDeviceId }, cli.DeletedDevices);
+        Assert.Equal(new[] { XcodeItemOutcome.Failed, XcodeItemOutcome.Deleted }, result.Items.Select(item => item.Outcome));
+    }
+
+    [Fact]
+    public async Task XcodeStartedAfterConfirmationBlocksFilesWithoutCallingCleanEngine()
+    {
+        string path = "/Users/test/Library/Developer/Xcode/DerivedData/App-abc";
+        ScanItem scan = new(path, 50, true, "/Users/test/Library/Developer/Xcode/DerivedData");
+        XcodeFileIdentity identity = new(path, true, DateTime.UnixEpoch.AddDays(1), DateTime.UnixEpoch.AddDays(2), 50);
+        const string key = "derived-data:/Users/test/Library/Developer/Xcode/DerivedData/App-abc";
+        XcodeSnapshot source = new([new XcodeCandidate(key, XcodeResourceKind.DerivedData, "App-abc", path, SizeBytes: 10)], [])
+        {
+            FileInventory = new XcodeFileInventory([new KeyValuePair<string, XcodeFileEntry>(key, new XcodeFileEntry(scan, identity))]),
+        };
+        XcodeConfirmedPlan plan = Confirm(source, key);
+        FakeCli cli = new();
+        FakeCleanEngine clean = new();
+        XcodeCleanExecutor executor = new(cli, new QueueCollector(source), clean, new FakeSizeProbe(), new QueueRunningProbe(XcodeRunningState.Running), TimeProvider.System);
+
+        XcodeCleanResult result = await executor.ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.Equal(0, clean.Calls);
+        Assert.Equal(XcodeItemOutcome.Skipped, Assert.Single(result.Items).Outcome);
+        Assert.Empty(cli.DeletedDevices);
+    }
+
+    private static XcodeCleanExecutor Create(FakeCli cli, IXcodeInventoryCollector collector)
+        => new(cli, collector, new FakeCleanEngine(), new FakeSizeProbe(), new QueueRunningProbe(XcodeRunningState.NotRunning), TimeProvider.System);
+
+    private static XcodeSnapshot Snapshot(params XcodeCandidate[] candidates)
+        => new(candidates, []);
+
+    private static XcodeSnapshot Snapshot(XcodeCandidate[] candidates, params XcodeInventoryWarning[] warnings)
+        => new(candidates, warnings);
+
+    private static XcodeCandidate Device(string id = DeviceId, long? size = 100)
+        => new(id, XcodeResourceKind.Device, "iPhone", CliId: id, Build: "build-1", State: "Shutdown", SizeBytes: size);
+
+    private static XcodeCandidate Runtime(IReadOnlyList<string> dependencies)
+        => new("runtime:" + RuntimeId, XcodeResourceKind.Runtime, "iOS 18", CliId: RuntimeId, RuntimeIdentifier: "com.apple.CoreSimulator.SimRuntime.iOS-18-0", Build: "runtime-build", SizeBytes: 200, Dependencies: dependencies);
+
+    private static XcodeConfirmedPlan Confirm(XcodeSnapshot source, params string[] selected)
+        => XcodeSelection.Confirm(XcodeSelection.Preview(source, selected.ToHashSet(StringComparer.Ordinal)), acknowledgeDependencies: true);
+
+    private sealed class QueueCollector(params XcodeSnapshot[] snapshots) : IXcodeInventoryCollector
+    {
+        private int _index;
+        public Task<XcodeSnapshot> CollectAsync(CancellationToken ct)
+        {
+            int index = Math.Min(_index++, snapshots.Length - 1);
+            return Task.FromResult(snapshots[index]);
+        }
+    }
+
+    private sealed class FakeCli : IXcodeCli
+    {
+        public List<string> DeletedDevices { get; } = [];
+        public List<string> OperationOrder { get; } = [];
+        public ProcessResult DeviceResult { get; set; } = new(0, "", "", false);
+        public ProcessResult DeviceResultForSecond { get; set; } = new(0, "", "", false);
+        public Action<string>? OnDeviceDelete { get; set; }
+        public Task<XcodeSnapshot> ReadInventoryAsync(CancellationToken ct) => Task.FromResult(XcodeSnapshot.Empty);
+        public Task<ProcessResult> DeleteDeviceAsync(string uuid, CancellationToken ct)
+        {
+            DeletedDevices.Add(uuid);
+            OperationOrder.Add("device");
+            OnDeviceDelete?.Invoke(uuid);
+            return Task.FromResult(DeletedDevices.Count == 1 ? DeviceResult : DeviceResultForSecond);
+        }
+        public Task<ProcessResult> DeleteRuntimeAsync(string uuid, CancellationToken ct)
+        {
+            OperationOrder.Add("runtime");
+            return Task.FromResult(new ProcessResult(0, "", "", false));
+        }
+    }
+
+    private sealed class FakeCleanEngine : ICleanEngine
+    {
+        public int Calls { get; private set; }
+        public Task<CleanReport> CleanAsync(IReadOnlyList<CategorySelection> selections, IProgress<CleanProgress>? progress, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(new CleanReport(DateTimeOffset.UnixEpoch, TimeSpan.Zero, 0, 0, 0, [], [], []));
+        }
+    }
+
+    private sealed class FakeSizeProbe : IXcodeSizeProbe
+    {
+        public Task<long?> MeasureAsync(string path, CancellationToken ct) => Task.FromResult<long?>(null);
+        public Task<long?> GetFreeBytesAsync(CancellationToken ct) => Task.FromResult<long?>(1000);
+    }
+
+    private sealed class QueueRunningProbe(params XcodeRunningState[] states) : IXcodeRunningProbe
+    {
+        private int _index;
+        public Task<XcodeRunningState> GetStateAsync(CancellationToken ct)
+            => Task.FromResult(states[Math.Min(_index++, states.Length - 1)]);
+    }
+}

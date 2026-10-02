@@ -1,41 +1,84 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MjmCleaner.App.ViewModels"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
              x:Class="MjmCleaner.App.Views.HistoryView"
              x:DataType="vm:HistoryViewModel">
 
-    <DockPanel LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top" Spacing="5" Margin="0,0,0,18">
-            <TextBlock Text="Storico delle pulizie" Classes="PageTitle" />
-            <TextBlock Text="Le pulizie completate e lo spazio effettivamente recuperato." Classes="PageSubtitle" />
-        </StackPanel>
-        <Button DockPanel.Dock="Bottom" Classes="Secondary" Content="Chiudi" Command="{Binding CloseCommand}"
-                HorizontalAlignment="Right" Margin="0,14,0,0" />
+    <UserControl.Resources>
+        <!-- Riempimento a strisce sotto l'ultima riga: periodo 64 (riga 0 = GroupBrush, riga 1 = StripeBrush), allineato in alto. -->
+        <DrawingBrush x:Key="HistoryStripes" TileMode="Tile" Stretch="None" AlignmentX="Left" AlignmentY="Top" DestinationRect="0,0,8,64" SourceRect="0,0,8,64">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="{DynamicResource GroupBrush}" Geometry="M0,0 H8 V32 H0 Z" />
+                    <GeometryDrawing Brush="{DynamicResource StripeBrush}" Geometry="M0,32 H8 V64 H0 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+    </UserControl.Resources>
 
-        <Border Classes="SurfaceCard">
+    <DockPanel LastChildFill="True">
+        <Border DockPanel.Dock="Top" Classes="Toolbar" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="1">
+                    <TextBlock Text="Storico delle pulizie" Classes="ToolbarTitle" />
+                    <TextBlock Text="Le pulizie completate e lo spazio effettivamente recuperato." Classes="ToolbarSubtitle" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TotalText}" FontSize="13" FontWeight="SemiBold" Classes="Numeric" />
+                    <TextBlock Text="{Binding CountText}" FontSize="12" Classes="Muted" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Classes="SurfaceCard" Margin="24,20,24,24">
             <DockPanel>
-                <Grid DockPanel.Dock="Top" ColumnDefinitions="130,100,*,110" Margin="14,10" ColumnSpacing="10">
-                    <TextBlock Grid.Column="0" Text="DATA" Classes="Eyebrow" />
-                    <TextBlock Grid.Column="1" Text="SPAZIO" Classes="Eyebrow" />
-                    <TextBlock Grid.Column="2" Text="CATEGORIE" Classes="Eyebrow" />
-                    <TextBlock Grid.Column="3" Text="ELEMENTI" Classes="Eyebrow" />
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="210,110,*,120" Height="30" Margin="16,0">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                        <Path Data="M6 9 L12 15 L18 9" Width="9" Height="9" Stretch="Uniform" StrokeThickness="3"
+                              Stroke="{DynamicResource PrimaryTextBrush}" StrokeLineCap="Round" StrokeJoin="Round" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="Spazio" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}"
+                               HorizontalAlignment="Right" Margin="0,0,24,0" VerticalAlignment="Center" />
+                    <Border Grid.Column="2" BorderThickness="0.5,0,0,0" BorderBrush="{DynamicResource SeparatorBrush}" Padding="12,0,0,0">
+                        <TextBlock Text="Categorie" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Grid.Column="3" Text="Elementi" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}"
+                               HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
-                <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Rows}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:HistoryRow">
-                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,10">
-                                    <Grid ColumnDefinitions="130,100,*,110" ColumnSpacing="10">
-                                        <TextBlock Grid.Column="0" Text="{Binding When}" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Freed}" FontWeight="SemiBold" />
-                                        <TextBlock Grid.Column="2" Text="{Binding Categories}" Classes="Muted" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Grid.Column="3" Text="{Binding Items}" Classes="Muted" HorizontalAlignment="Right" />
+                <Border DockPanel.Dock="Top" Classes="Separator" />
+
+                <Panel>
+                    <Border Background="{StaticResource HistoryStripes}" />
+                    <ScrollViewer VerticalAlignment="Top">
+                        <ItemsControl Classes="Striped" ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:HistoryRow">
+                                    <Grid ColumnDefinitions="210,110,*,120" Height="32" Margin="16,0">
+                                        <TextBlock Grid.Column="0" Text="{Binding When}" Classes="Numeric" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Freed}" FontWeight="SemiBold" Classes="Numeric"
+                                                   HorizontalAlignment="Right" Margin="0,0,24,0" VerticalAlignment="Center" />
+                                        <ItemsControl Grid.Column="2" ItemsSource="{Binding CategoryNames}" Margin="12,0,0,0" VerticalAlignment="Center" ClipToBounds="True">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <Border CornerRadius="5" Padding="8,2" Background="{DynamicResource WellBrush}">
+                                                        <TextBlock Text="{Binding}" FontSize="11" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Grid.Column="3" Text="{Binding Items}" Classes="Muted Numeric"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center" />
                                     </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Panel>
             </DockPanel>
         </Border>
     </DockPanel>

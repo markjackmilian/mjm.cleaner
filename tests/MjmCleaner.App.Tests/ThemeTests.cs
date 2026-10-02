@@ -29,27 +29,6 @@ public sealed class ThemeTests
         Assert.Equal(expected, ((ISolidColorBrush)value!).Color.ToString().ToUpperInvariant());
     }
 
-    // Gli alias temporanei usati dalle view non ancora migrate devono seguire il tema.
-    [AvaloniaTheory]
-    [InlineData("Light", "CardBrush", "#FFFFFFFF")]
-    [InlineData("Dark", "CardBrush", "#FF2B2B2E")]
-    [InlineData("Light", "CanvasBrush", "#FFF7F7F9")]
-    [InlineData("Dark", "CanvasBrush", "#FF1E1E20")]
-    [InlineData("Light", "ToolbarBrush", "#FFFFFFFF")]
-    [InlineData("Dark", "ToolbarBrush", "#FF232325")]
-    [InlineData("Light", "BorderBrush", "#14000000")]
-    [InlineData("Dark", "BorderBrush", "#14FFFFFF")]
-    [InlineData("Light", "SubtleSurfaceBrush", "#0E000000")]
-    [InlineData("Dark", "SubtleSurfaceBrush", "#14FFFFFF")]
-    public void LegacyAliasesFollowVariant(string variant, string key, string expected)
-    {
-        ThemeVariant theme = variant == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
-        Assert.True(Application.Current!.TryGetResource(key, theme, out object? value));
-        Color color = ((ISolidColorBrush)value!).Color;
-        // Color.ToString() usa il nome per i colori noti ("White"): si confronta l'ARGB esplicito.
-        Assert.Equal(expected, $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}");
-    }
-
     [AvaloniaFact]
     public void ApplySetsApplicationVariant()
     {

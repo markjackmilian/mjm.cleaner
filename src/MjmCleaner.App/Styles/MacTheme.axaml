@@ -33,13 +33,6 @@
                     <SolidColorBrush x:Key="RiskMediumSurfaceBrush" Color="#FFF0DE" />
                     <SolidColorBrush x:Key="RiskHighTextBrush" Color="#B42318" />
                     <SolidColorBrush x:Key="RiskHighSurfaceBrush" Color="#FDECEA" />
-                    <!-- Alias temporanei per le view non ancora migrate (rimossi nel Task 7): StaticResource verso
-                         ThemeDictionaries non è risolvibile, quindi i colori sono duplicati. -->
-                    <SolidColorBrush x:Key="CanvasBrush" Color="#F7F7F9" />
-                    <SolidColorBrush x:Key="ToolbarBrush" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="BorderBrush" Color="#14000000" />
-                    <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#0E000000" />
                     <SolidColorBrush x:Key="GroupHoverBrush" Color="#F8F8F8" />
                     <SolidColorBrush x:Key="GroupPressedBrush" Color="#EDEDED" />
                     <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme). -->
@@ -100,12 +93,6 @@
                     <SolidColorBrush x:Key="RiskMediumSurfaceBrush" Color="#29FF9F0A" />
                     <SolidColorBrush x:Key="RiskHighTextBrush" Color="#FF8A80" />
                     <SolidColorBrush x:Key="RiskHighSurfaceBrush" Color="#2BFF453A" />
-                    <!-- Alias temporanei (vedi tema chiaro). -->
-                    <SolidColorBrush x:Key="CanvasBrush" Color="#1E1E20" />
-                    <SolidColorBrush x:Key="ToolbarBrush" Color="#232325" />
-                    <SolidColorBrush x:Key="CardBrush" Color="#2B2B2E" />
-                    <SolidColorBrush x:Key="BorderBrush" Color="#14FFFFFF" />
-                    <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#14FFFFFF" />
                     <SolidColorBrush x:Key="GroupHoverBrush" Color="#323235" />
                     <SolidColorBrush x:Key="GroupPressedBrush" Color="#3A3A3D" />
                     <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme). -->

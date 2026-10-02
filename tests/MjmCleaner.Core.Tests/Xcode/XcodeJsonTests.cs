@@ -158,6 +158,23 @@ public class XcodeJsonTests
     }
 
     [Fact]
+    public void DeviceSizeAdvisoryDoesNotMaskIncompleteDeviceInventory()
+    {
+        const string simctl = """
+            {"runtimes":[],"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"33333333-3333-4333-8333-333333333333","name":"iPhone 16","state":"Shutdown","dataPathSize":[]},
+              {"name":"missing UUID","state":"Shutdown"}]}}
+            """;
+
+        XcodeSnapshot snapshot = XcodeJson.ParseInventory(simctl, "{}", runtimeDeleteSupported: true);
+
+        Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device
+            && warning.Kind == XcodeInventoryWarningKind.Advisory);
+        Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device
+            && warning.Kind == XcodeInventoryWarningKind.CompletenessFailure);
+    }
+
+    [Fact]
     public void RuntimeCandidateKeepsBackingPathAndLeavesAllocatedSizeUnknownUntilProbed()
     {
         const string path = "/System/Library/AssetsV2/runtime.asset/AssetData";

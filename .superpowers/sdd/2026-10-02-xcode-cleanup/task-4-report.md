@@ -33,3 +33,10 @@ The workspace already had unrelated changes in `src/MjmCleaner.Core/Categories/C
 - Added regressions for failed, timed-out, cancelled, and exception-throwing CLI operations with absent resources; advisory runtime size warnings still permit deletion and verification; completeness warnings block it. Malformed device inventory remains blocked, malformed device sizes remain advisory and preserve selectable candidates, and CLI paths assert that the file engine was not called.
 - RED: temporarily restoring the old absent-first branch made `FailedCommandAndAbsentResourceIsNotCredited` fail (`Expected Failed, got Deleted`). Temporarily restoring “any same-group warning blocks” made `AdvisoryRuntimeSizeWarningDoesNotBlockDeleteOrVerification` fail (expected a runtime CLI call, got none).
 - GREEN: the focused executor/JSON/CLI tests passed 36/36 before the final two command exception/cancellation cases; those four focused outcome cases then passed 4/4. After all changes, the complete Xcode test group passed 72/72 using `/usr/local/share/dotnet/dotnet test tests/MjmCleaner.Core.Tests/MjmCleaner.Core.Tests.csproj --filter FullyQualifiedName~Xcode --no-restore`.
+
+## Review round 2
+
+- The device-warning summary now adds an inventory completeness warning unless one already exists for the device group. Advisory size warnings no longer suppress that safety warning; the same typed de-duplication rule is used for runtime completeness warnings.
+- Added a parser regression with a malformed device size and a sibling missing its UUID. It requires both an advisory warning and a completeness warning. Added an executor regression using that combined post-command inventory while the approved device is absent; the item is `Uncertain`, with zero history bytes.
+- RED: both new tests failed before the fix. The parser returned only the advisory, and the executor marked the omitted device `Deleted`.
+- GREEN: focused executor and JSON tests passed 31/31 using `/usr/local/share/dotnet/dotnet test tests/MjmCleaner.Core.Tests/MjmCleaner.Core.Tests.csproj --filter 'FullyQualifiedName~XcodeCleanExecutorTests|FullyQualifiedName~XcodeJsonTests' --no-restore`.

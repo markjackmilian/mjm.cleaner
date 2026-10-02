@@ -60,7 +60,7 @@ public static class XcodeJson
                         logicalRuntimes.Add(new LogicalRuntime(identifier, build, String(runtime, "name") ?? identifier, String(runtime, "version"), String(runtime, "platform")));
                     }
 
-                    if (!logicalRuntimeInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime))
+                    if (!logicalRuntimeInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime || w.Kind != XcodeInventoryWarningKind.CompletenessFailure))
                     {
                         warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, "Metadati dei runtime logici incompleti."));
                     }
@@ -120,7 +120,7 @@ public static class XcodeJson
             }
         }
 
-        if (!deviceInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Device))
+        if (!deviceInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Device || w.Kind != XcodeInventoryWarningKind.CompletenessFailure))
         {
             warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Device, "Inventario simulatori incompleto; la rimozione dei simulatori e dei runtime è disabilitata."));
         }
@@ -200,7 +200,7 @@ public static class XcodeJson
             warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, $"Inventario immagini runtime non leggibile: {ex.Message}"));
         }
 
-        if (!runtimeInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime))
+        if (!runtimeInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime || w.Kind != XcodeInventoryWarningKind.CompletenessFailure))
         {
             warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, "Alcune immagini runtime non hanno identificatori verificabili."));
         }
@@ -248,7 +248,7 @@ public static class XcodeJson
                 || logicalRuntimes.Count(other => other.Identifier == image.RuntimeIdentifier && other.Version == image.Version) > 1)
             {
                 blockReason = "Associazione runtime ambigua: più immagini hanno la stessa versione e le dipendenze dei simulatori non sono distinguibili con certezza.";
-                if (warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime))
+                if (warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime || w.Kind != XcodeInventoryWarningKind.CompletenessFailure))
                 {
                     warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, "Associazione runtime/build ambigua: immagini con la stessa versione hanno build diverse."));
                 }

@@ -115,6 +115,29 @@ public sealed class XcodeCleanExecutorTests
     }
 
     [Fact]
+    public async Task IncompletePostCommandInventoryCannotVerifyAbsence()
+    {
+        const string malformedSimctl = """
+            {"runtimes":[],"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"33333333-3333-4333-8333-333333333333","name":"iPhone 16","state":"Shutdown","dataPathSize":[]},
+              {"name":"missing UUID","state":"Shutdown"}]}}
+            """;
+        XcodeSnapshot incomplete = XcodeJson.ParseInventory(malformedSimctl, "{}", runtimeDeleteSupported: true);
+        XcodeConfirmedPlan plan = Confirm(Snapshot(Device(size: 500)), DeviceId);
+        FakeCli cli = new();
+        FakeCleanEngine clean = new();
+
+        XcodeCleanResult result = await Create(cli, new QueueCollector(Snapshot(Device(size: 500)), incomplete), clean)
+            .ExecuteAsync(plan, null, CancellationToken.None);
+
+        Assert.DoesNotContain(incomplete.Candidates, candidate => candidate.Key == DeviceId);
+        Assert.Equal(XcodeItemOutcome.Uncertain, Assert.Single(result.Items).Outcome);
+        Assert.Equal(0, result.HistoryReport.BytesFreed);
+        Assert.Single(cli.DeletedDevices);
+        Assert.Equal(0, clean.Calls);
+    }
+
+    [Fact]
     public async Task FailedCommandAndAbsentResourceIsNotCredited()
     {
         XcodeConfirmedPlan plan = Confirm(Snapshot(Device(size: 500)), DeviceId);

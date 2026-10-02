@@ -29,7 +29,7 @@
         </Style>
         <Style Selector="ToggleButton.ChoiceRow:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
             <!-- Anello interno: non incide sul layout (un bordo spingerebbe in basso le righe seguenti) e la card ritaglia l'esterno. -->
-            <Setter Property="BoxShadow" Value="inset 0 0 0 2 #800A66D8" />
+            <Setter Property="BoxShadow" Value="{StaticResource FocusRingInsetShadow}" />
         </Style>
         <Style Selector="ToggleButton.ChoiceRow:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverBrush}" />

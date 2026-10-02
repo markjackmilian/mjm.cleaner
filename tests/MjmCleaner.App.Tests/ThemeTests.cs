@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Avalonia.Styling;
 using MjmCleaner.App.Services;
 using MjmCleaner.App.Views;
@@ -74,6 +76,40 @@ public sealed class ThemeTests
             Assert.DoesNotContain("current", indicator.FindControl<Control>("Step3")!.Classes);
             Assert.Contains("current", indicator.FindControl<Control>("Step2")!.Classes);
             Assert.DoesNotContain("current", indicator.FindControl<Control>("Label3")!.Classes);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData("FocusRingShadow", 3, 0x80)]
+    [InlineData("FocusRingInsetShadow", 2, 0x80)]
+    [InlineData("PreviewHairlineShadow", 0.5, 0x73)]
+    [InlineData("PreviewSelectedShadow", 2, 0xFF)]
+    public void SharedShadowsAreDefinedOnce(string key, double spread, int alpha)
+    {
+        Assert.True(Application.Current!.TryGetResource(key, ThemeVariant.Light, out object? value), key);
+        BoxShadow shadow = ((BoxShadows)value!)[0];
+        Assert.Equal(spread, shadow.Spread);
+        Assert.Equal(alpha, shadow.Color.A);
+    }
+
+    [AvaloniaFact]
+    public void FocusedButtonUsesTheSharedFocusRing()
+    {
+        Button button = new() { Content = "Prova" };
+        Window window = new() { Content = button };
+        try
+        {
+            window.Show();
+            ((IPseudoClasses)button.Classes).Set(":focus-visible", true);
+            window.UpdateLayout();
+
+            ContentPresenter presenter = button.GetVisualDescendants().OfType<ContentPresenter>().Single(p => p.Name == "PART_ContentPresenter");
+            Assert.Equal(3, presenter.BoxShadow[0].Spread);
+            Assert.Equal(0x80, presenter.BoxShadow[0].Color.A);
         }
         finally
         {

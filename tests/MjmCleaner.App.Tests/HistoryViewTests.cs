@@ -90,4 +90,20 @@ public sealed class HistoryViewTests
 
         window.Close();
     }
+
+    [AvaloniaFact]
+    public async Task ColumnHeadersShareOneStyle()
+    {
+        var (window, _) = await CreateAsync();
+
+        foreach (string title in new[] { "Data", "Spazio", "Categorie", "Elementi" })
+        {
+            TextBlock header = window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == title);
+            Assert.Contains("ColumnHeader", header.Classes);
+            Assert.Equal(11, header.FontSize);
+            Assert.Equal(Avalonia.Media.FontWeight.SemiBold, header.FontWeight);
+        }
+
+        window.Close();
+    }
 }

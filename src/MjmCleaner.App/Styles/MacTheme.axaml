@@ -11,7 +11,6 @@
                     <SolidColorBrush x:Key="GroupBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="PrimaryTextBrush" Color="#1D1D1F" />
                     <SolidColorBrush x:Key="SecondaryTextBrush" Color="#68686D" />
-                    <SolidColorBrush x:Key="TertiaryTextBrush" Color="#B4B4B8" />
                     <SolidColorBrush x:Key="SeparatorBrush" Color="#17000000" />
                     <SolidColorBrush x:Key="CardBorderBrush" Color="#14000000" />
                     <SolidColorBrush x:Key="ControlBorderBrush" Color="#29000000" />
@@ -36,10 +35,10 @@
                     <SolidColorBrush x:Key="RiskHighSurfaceBrush" Color="#FDECEA" />
                     <SolidColorBrush x:Key="GroupHoverBrush" Color="#F8F8F8" />
                     <SolidColorBrush x:Key="GroupPressedBrush" Color="#EDEDED" />
-                    <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme). -->
+                    <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme); hover e pressed riusano i token GroupHoverBrush e GroupPressedBrush. -->
                     <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#F8F8F8" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#EDEDED" />
+                    <StaticResource x:Key="ExpanderHeaderBackgroundPointerOver" ResourceKey="GroupHoverBrush" />
+                    <StaticResource x:Key="ExpanderHeaderBackgroundPressed" ResourceKey="GroupPressedBrush" />
                     <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#14000000" />
                     <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="#14000000" />
@@ -70,7 +69,6 @@
                     <SolidColorBrush x:Key="GroupBrush" Color="#2B2B2E" />
                     <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F5F5F7" />
                     <SolidColorBrush x:Key="SecondaryTextBrush" Color="#A1A1A6" />
-                    <SolidColorBrush x:Key="TertiaryTextBrush" Color="#5E5E62" />
                     <SolidColorBrush x:Key="SeparatorBrush" Color="#17FFFFFF" />
                     <SolidColorBrush x:Key="CardBorderBrush" Color="#14FFFFFF" />
                     <SolidColorBrush x:Key="ControlBorderBrush" Color="#24FFFFFF" />
@@ -96,10 +94,10 @@
                     <SolidColorBrush x:Key="RiskHighSurfaceBrush" Color="#2BFF453A" />
                     <SolidColorBrush x:Key="GroupHoverBrush" Color="#323235" />
                     <SolidColorBrush x:Key="GroupPressedBrush" Color="#3A3A3D" />
-                    <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme). -->
+                    <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme); hover e pressed riusano i token GroupHoverBrush e GroupPressedBrush. -->
                     <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#2B2B2E" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#323235" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#3A3A3D" />
+                    <StaticResource x:Key="ExpanderHeaderBackgroundPointerOver" ResourceKey="GroupHoverBrush" />
+                    <StaticResource x:Key="ExpanderHeaderBackgroundPressed" ResourceKey="GroupPressedBrush" />
                     <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="#2B2B2E" />
                     <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#14FFFFFF" />
                     <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="#14FFFFFF" />
@@ -127,6 +125,14 @@
             <!-- Expander: bordo da 0,5 continuo tra intestazione e contenuto (default Fluent: 1). -->
             <Thickness x:Key="ExpanderHeaderBorderThickness">0.5</Thickness>
             <Thickness x:Key="ExpanderContentDownBorderThickness">0.5,0,0.5,0.5</Thickness>
+            <!--
+              Ombre riusate (BoxShadows non accetta un colore da risorsa): anello di fuoco = accento al 50%, filetto
+              dell'anteprima Aspetto = grigio al 45%, anello di selezione = accento pieno.
+            -->
+            <BoxShadows x:Key="FocusRingShadow">0 0 0 3 #800A66D8</BoxShadows>
+            <BoxShadows x:Key="FocusRingInsetShadow">inset 0 0 0 2 #800A66D8</BoxShadows>
+            <BoxShadows x:Key="PreviewHairlineShadow">0 0 0 0.5 #73808080</BoxShadows>
+            <BoxShadows x:Key="PreviewSelectedShadow">0 0 0 2 #0A66D8</BoxShadows>
             <SolidColorBrush x:Key="AccentBrush" Color="#0A66D8" />
             <SolidColorBrush x:Key="AccentHoverBrush" Color="#1A72E0" />
             <SolidColorBrush x:Key="AccentPressedBrush" Color="#0957BA" />
@@ -149,7 +155,6 @@
     <Style Selector="TextBlock.SectionTitle"><Setter Property="FontSize" Value="13" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Margin" Value="4,0,0,2" /></Style>
     <Style Selector="TextBlock.SidebarHeading"><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" /><Setter Property="Margin" Value="10,0,10,6" /></Style>
     <Style Selector="TextBlock.Eyebrow"><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" /></Style>
-    <Style Selector="TextBlock.FieldLabel"><Setter Property="FontSize" Value="13" /></Style>
     <Style Selector="TextBlock.Muted"><Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" /></Style>
     <Style Selector="TextBlock.Numeric"><Setter Property="FontFeatures" Value="+tnum" /></Style>
 
@@ -194,7 +199,7 @@
     <Style Selector="Button.Mini:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
     <!-- Da disabilitato Mini si attenua con l'opacità 0.4 generica di Button:disabled, icona compresa. -->
     <!-- Anello esterno (accento al 50%): resta visibile anche su Primary, dove il riempimento è già AccentBrush. -->
-    <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
+    <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="{StaticResource FocusRingShadow}" /></Style>
 
     <Style Selector="CheckBox"><Setter Property="MinHeight" Value="0" /></Style>
     <Style Selector="TextBox"><Setter Property="Background" Value="{DynamicResource FieldBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" /><Setter Property="BorderThickness" Value="0.5" /><Setter Property="CornerRadius" Value="5" /></Style>
@@ -271,7 +276,7 @@
     <Style Selector="RepeatButton.Step:pressed /template/ Border#PART_StepBackground"><Setter Property="Background" Value="{DynamicResource SelectedBrush}" /></Style>
     <Style Selector="RepeatButton.Step:disabled"><Setter Property="Opacity" Value="0.4" /></Style>
     <!-- Anello di fuoco sul campo, come per i pulsanti; il TextBox interno è trasparente e non ne disegna uno proprio. -->
-    <Style Selector="NumericUpDown.Compact:focus-within /template/ ButtonSpinner#PART_Spinner /template/ Border#PART_Field"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
+    <Style Selector="NumericUpDown.Compact:focus-within /template/ ButtonSpinner#PART_Spinner /template/ Border#PART_Field"><Setter Property="BoxShadow" Value="{StaticResource FocusRingShadow}" /></Style>
     <Style Selector="ProgressBar"><Setter Property="Background" Value="{DynamicResource WellBrush}" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /><Setter Property="CornerRadius" Value="3" /><Setter Property="MinHeight" Value="6" /></Style>
     <Style Selector="Expander"><Setter Property="Background" Value="{DynamicResource GroupBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" /><Setter Property="BorderThickness" Value="0.5" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="12" /><Setter Property="HorizontalAlignment" Value="Stretch" /></Style>
     <Style Selector="ListBox"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>

@@ -15,7 +15,7 @@ public sealed record CleanerSettings
     public IReadOnlyList<string> SelectedCategoryIds { get; init; } =
         ["system-caches", "dev-caches", "project-build-output", "logs"];
 
-    /// <summary>Salvato come testo («Auto», «Light», «Dark») perché il file resti leggibile.</summary>
-    [JsonConverter(typeof(JsonStringEnumConverter<AppearancePreference>))]
+    /// <summary>Salvato come testo («Auto», «Light», «Dark») perché il file resti leggibile; un valore sconosciuto vale Auto.</summary>
+    [JsonConverter(typeof(AppearancePreferenceJsonConverter))]
     public AppearancePreference Appearance { get; init; } = AppearancePreference.Auto;
 }

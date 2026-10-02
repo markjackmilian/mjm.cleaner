@@ -17,8 +17,8 @@
                 <TextBlock Text="{Binding ProgressText}" IsVisible="{Binding IsDeleting}" Classes="Muted" FontSize="12"
                            VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                    <Button Classes="Secondary" Content="Interrompi" Command="{Binding CancelDeleteCommand}" IsVisible="{Binding IsDeleting}" />
-                    <Button Classes="Secondary" Content="Riprova analisi" Command="{Binding RetryCommand}" IsEnabled="{Binding !IsDeleting}" />
+                    <Button Content="Interrompi" Command="{Binding CancelDeleteCommand}" IsVisible="{Binding IsDeleting}" />
+                    <Button Content="Riprova analisi" Command="{Binding RetryCommand}" IsEnabled="{Binding !IsDeleting}" />
                     <Button Classes="Primary" Content="Anteprima selezione" Command="{Binding PreviewCommand}" IsEnabled="{Binding !IsDeleting}" IsVisible="{Binding !HasConfirmation}" />
                 </StackPanel>
             </Grid>
@@ -66,7 +66,7 @@
                         </StackPanel>
                     </ScrollViewer>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-                        <Button Classes="Secondary" Content="Torna alla selezione" Command="{Binding BackToSelectionCommand}" IsEnabled="{Binding !IsDeleting}" />
+                        <Button Content="Torna alla selezione" Command="{Binding BackToSelectionCommand}" IsEnabled="{Binding !IsDeleting}" />
                         <Button Classes="Destructive" Content="Conferma ed elimina" Command="{Binding ConfirmDeleteCommand}" IsEnabled="{Binding !IsDeleting}" />
                     </StackPanel>
                 </Grid>

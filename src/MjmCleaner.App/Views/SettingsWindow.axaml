@@ -22,10 +22,10 @@
             </Setter>
         </Style>
         <!-- L'anello sta su un Border esterno senza ritaglio: il ClipToBounds dell'anteprima ritaglierebbe la propria ombra. -->
-        <Style Selector="RadioButton.AppearanceOption Border.Ring"><Setter Property="BoxShadow" Value="0 0 0 0.5 #73808080" /></Style>
-        <Style Selector="RadioButton.AppearanceOption:checked Border.Ring"><Setter Property="BoxShadow" Value="0 0 0 2 #0A66D8" /></Style>
+        <Style Selector="RadioButton.AppearanceOption Border.Ring"><Setter Property="BoxShadow" Value="{StaticResource PreviewHairlineShadow}" /></Style>
+        <Style Selector="RadioButton.AppearanceOption:checked Border.Ring"><Setter Property="BoxShadow" Value="{StaticResource PreviewSelectedShadow}" /></Style>
         <Style Selector="RadioButton.AppearanceOption:checked TextBlock.OptionLabel"><Setter Property="FontWeight" Value="SemiBold" /></Style>
-        <Style Selector="RadioButton.AppearanceOption:focus-visible Border.Ring"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
+        <Style Selector="RadioButton.AppearanceOption:focus-visible Border.Ring"><Setter Property="BoxShadow" Value="{StaticResource FocusRingShadow}" /></Style>
     </Window.Styles>
 
     <DockPanel LastChildFill="True">

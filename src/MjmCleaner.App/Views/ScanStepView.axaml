@@ -26,8 +26,8 @@
 
         <Border DockPanel.Dock="Bottom" Classes="ActionBar">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                <Button Classes="Secondary" Content="Annulla" Command="{Binding CancelCommand}" IsVisible="{Binding !HasError}" />
-                <Button Classes="Secondary" Content="Torna al passo 1" Command="{Binding BackToStartCommand}" IsVisible="{Binding HasError}" />
+                <Button Content="Annulla" Command="{Binding CancelCommand}" IsVisible="{Binding !HasError}" />
+                <Button Content="Torna al passo 1" Command="{Binding BackToStartCommand}" IsVisible="{Binding HasError}" />
             </StackPanel>
         </Border>
 

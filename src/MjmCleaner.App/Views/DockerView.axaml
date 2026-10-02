@@ -39,7 +39,7 @@
                            IsVisible="{Binding IsDeleting}"
                            Classes="Muted" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                    <Button Classes="Secondary" Content="Interrompi"
+                    <Button Content="Interrompi"
                             Command="{Binding CancelDeleteCommand}"
                             IsVisible="{Binding IsDeleting}" />
                     <Button Classes="Destructive" Content="{Binding TotalText, StringFormat='Elimina {0}'}"

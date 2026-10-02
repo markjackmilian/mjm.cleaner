@@ -5,6 +5,15 @@
              x:Class="MjmCleaner.App.Views.HistoryView"
              x:DataType="vm:HistoryViewModel">
 
+    <UserControl.Styles>
+        <!-- Intestazioni di colonna: una sola definizione per le quattro celle. -->
+        <Style Selector="TextBlock.ColumnHeader">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+        </Style>
+    </UserControl.Styles>
+
     <UserControl.Resources>
         <!-- Riempimento a strisce sotto l'ultima riga: periodo 64 (riga 0 = GroupBrush, riga 1 = StripeBrush), allineato in alto. -->
         <DrawingBrush x:Key="HistoryStripes" TileMode="Tile" Stretch="None" AlignmentX="Left" AlignmentY="Top" DestinationRect="0,0,8,64" SourceRect="0,0,8,64">
@@ -35,18 +44,19 @@
             <DockPanel>
                 <Grid DockPanel.Dock="Top" ColumnDefinitions="210,110,*,120" Height="30" Margin="16,0">
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                        <TextBlock Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                        <!-- Colonna ordinata: titolo nel colore primario. -->
+                        <TextBlock Text="Data" Classes="ColumnHeader" Foreground="{DynamicResource PrimaryTextBrush}" />
                         <!-- 9x9 come nella bozza: il Viewbox scala anche il tratto (3 su viewBox 24). -->
                         <Viewbox Width="9" Height="9" VerticalAlignment="Center">
                             <Path Classes="Icon" Data="{StaticResource IconChevronDown}" StrokeThickness="3" Stroke="{DynamicResource PrimaryTextBrush}" />
                         </Viewbox>
                     </StackPanel>
-                    <TextBlock Grid.Column="1" Text="Spazio" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}"
+                    <TextBlock Grid.Column="1" Text="Spazio" Classes="ColumnHeader"
                                HorizontalAlignment="Right" Margin="0,0,24,0" VerticalAlignment="Center" />
                     <Border Grid.Column="2" BorderThickness="0.5,0,0,0" BorderBrush="{DynamicResource SeparatorBrush}" Padding="12,0,0,0">
-                        <TextBlock Text="Categorie" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Categorie" Classes="ColumnHeader" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Grid.Column="3" Text="Elementi" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}"
+                    <TextBlock Grid.Column="3" Text="Elementi" Classes="ColumnHeader"
                                HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
                 <Border DockPanel.Dock="Top" Classes="Separator" />

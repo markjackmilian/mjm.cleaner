@@ -87,6 +87,61 @@ public class SettingsStoreTests
         Assert.Equal(AppearancePreference.Dark, store.Load().Appearance);
     }
 
+    [Theory]
+    [InlineData("\"Darkk\"")]
+    [InlineData("7")]
+    [InlineData("-1")]
+    [InlineData("null")]
+    [InlineData("true")]
+    [InlineData("\"\"")]
+    [InlineData("\"1\"")]
+    [InlineData("{ \"x\": 1 }")]
+    [InlineData("[ \"Dark\" ]")]
+    public void UnknownAppearanceValueFallsBackToAutoAndKeepsTheOtherSettings(string appearanceJson)
+    {
+        MockFileSystem fs = new();
+        AppPaths paths = new(Home);
+        fs.AddFile(paths.SettingsFile, new MockFileData("{ \"DownloadsMinAgeDays\": 12, \"Appearance\": " + appearanceJson + ", \"LogsMinAgeDays\": 5 }"));
+
+        CleanerSettings settings = new SettingsStore(fs, paths).Load();
+
+        Assert.Equal(AppearancePreference.Auto, settings.Appearance);
+        Assert.Equal(12, settings.DownloadsMinAgeDays);
+        Assert.Equal(5, settings.LogsMinAgeDays);
+    }
+
+    [Theory]
+    [InlineData("dark", AppearancePreference.Dark)]
+    [InlineData("DARK", AppearancePreference.Dark)]
+    [InlineData("Light", AppearancePreference.Light)]
+    [InlineData("auto", AppearancePreference.Auto)]
+    public void AppearanceIsReadCaseInsensitively(string text, AppearancePreference expected)
+    {
+        MockFileSystem fs = new();
+        AppPaths paths = new(Home);
+        fs.AddFile(paths.SettingsFile, new MockFileData("{ \"Appearance\": \"" + text + "\" }"));
+
+        Assert.Equal(expected, new SettingsStore(fs, paths).Load().Appearance);
+    }
+
+    [Theory]
+    [InlineData(AppearancePreference.Auto)]
+    [InlineData(AppearancePreference.Light)]
+    [InlineData(AppearancePreference.Dark)]
+    public void AppearanceRoundTripsForEveryValue(AppearancePreference preference)
+    {
+        MockFileSystem fs = new();
+        AppPaths paths = new(Home);
+        SettingsStore store = new(fs, paths);
+
+        store.Save(new CleanerSettings { Appearance = preference, DownloadsMinAgeDays = 7 });
+
+        Assert.Contains($"\"Appearance\": \"{preference}\"", fs.File.ReadAllText(paths.SettingsFile));
+        CleanerSettings loaded = store.Load();
+        Assert.Equal(preference, loaded.Appearance);
+        Assert.Equal(7, loaded.DownloadsMinAgeDays);
+    }
+
     [Fact]
     public void AppPathsLiveUnderApplicationSupport()
     {

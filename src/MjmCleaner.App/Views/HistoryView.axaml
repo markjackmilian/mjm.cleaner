@@ -25,7 +25,7 @@
                     <TextBlock Text="Le pulizie completate e lo spazio effettivamente recuperato." Classes="ToolbarSubtitle" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding TotalText}" FontSize="13" FontWeight="SemiBold" Classes="Numeric" />
+                    <TextBlock Text="{Binding TotalText}" FontSize="13" FontWeight="SemiBold" Classes="Numeric" IsVisible="{Binding HasSessions}" />
                     <TextBlock Text="{Binding CountText}" FontSize="12" Classes="Muted" />
                 </StackPanel>
             </Grid>
@@ -36,8 +36,10 @@
                 <Grid DockPanel.Dock="Top" ColumnDefinitions="210,110,*,120" Height="30" Margin="16,0">
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <TextBlock Text="Data" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                        <Path Data="M6 9 L12 15 L18 9" Width="9" Height="9" Stretch="Uniform" StrokeThickness="3"
-                              Stroke="{DynamicResource PrimaryTextBrush}" StrokeLineCap="Round" StrokeJoin="Round" VerticalAlignment="Center" />
+                        <!-- 9x9 come nella bozza: il Viewbox scala anche il tratto (3 su viewBox 24). -->
+                        <Viewbox Width="9" Height="9" VerticalAlignment="Center">
+                            <Path Classes="Icon" Data="{StaticResource IconChevronDown}" StrokeThickness="3" Stroke="{DynamicResource PrimaryTextBrush}" />
+                        </Viewbox>
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="Spazio" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}"
                                HorizontalAlignment="Right" Margin="0,0,24,0" VerticalAlignment="Center" />

@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:MjmCleaner.App.Views">
     <Styles.Resources>
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
@@ -198,6 +199,75 @@
     <Style Selector="CheckBox"><Setter Property="MinHeight" Value="0" /></Style>
     <Style Selector="TextBox"><Setter Property="Background" Value="{DynamicResource FieldBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" /><Setter Property="BorderThickness" Value="0.5" /><Setter Property="CornerRadius" Value="5" /></Style>
     <Style Selector="NumericUpDown"><Setter Property="Background" Value="{DynamicResource FieldBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" /><Setter Property="BorderThickness" Value="0.5" /><Setter Property="CornerRadius" Value="5" /><Setter Property="MinHeight" Value="24" /><Setter Property="Width" Value="110" /><Setter Property="FormatString" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Right" /></Style>
+    <!--
+      NumericUpDown.Compact: campo 64x22, unità di misura (letta da Tag) e stepper verticale 15x11 per pulsante,
+      come nella bozza. Si sostituisce solo il template del ButtonSpinner: le parti PART_IncreaseButton e
+      PART_DecreaseButton mantengono i nomi attesi, quindi tastiera, rotella, limiti e bind restano quelli di Fluent.
+    -->
+    <Style Selector="NumericUpDown.Compact">
+        <Setter Property="Width" Value="NaN" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="NumericUpDown.Compact /template/ TextBox#PART_TextBox"><Setter Property="MinHeight" Value="0" /><Setter Property="FontSize" Value="13" /><Setter Property="FontFeatures" Value="+tnum" /></Style>
+    <!-- Da attivo il TextBox Fluent dipinge sfondo e bordo propri (nero in scuro): qui li disegna il campo, con l'anello di fuoco. -->
+    <Style Selector="NumericUpDown.Compact /template/ TextBox#PART_TextBox:focus /template/ Border#PART_BorderElement"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderBrush" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>
+    <Style Selector="NumericUpDown.Compact /template/ ButtonSpinner#PART_Spinner">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Grid ColumnDefinitions="Auto,Auto,Auto" VerticalAlignment="Center">
+                    <Border Name="PART_Field" Grid.Column="0" Width="64" Height="22"
+                            Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <!-- Il TextBox del template Fluent ha margine -1: il margine 1 lo riporta a filo del bordo. -->
+                        <ContentPresenter Name="PART_ContentPresenter" Margin="1" Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    </Border>
+                    <TextBlock Grid.Column="1" Width="38" Margin="8,0" FontSize="13" VerticalAlignment="Center"
+                               Foreground="{DynamicResource SecondaryTextBrush}"
+                               Text="{ReflectionBinding $parent[NumericUpDown].Tag}" />
+                    <Border Name="PART_Stepper" Grid.Column="2" VerticalAlignment="Center"
+                            Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" BoxShadow="0 0.5 1 0 #1A000000"
+                            IsVisible="{TemplateBinding ShowButtonSpinner}">
+                        <!-- Nel template niente classe Icon: gli stili vincono sui valori impostati nel template e riporterebbero tratto e colore dell'icona. -->
+                        <Border CornerRadius="4.5" ClipToBounds="True">
+                        <StackPanel Name="PART_SpinnerPanel" Orientation="Vertical">
+                            <RepeatButton Name="PART_IncreaseButton" Classes="Step" IsTabStop="False"
+                                          AutomationProperties.Name="{ReflectionBinding $parent[NumericUpDown].(AutomationProperties.Name), Converter={x:Static views:StepperNames.Increase}}">
+                                <Viewbox Width="7" Height="7"><Path Width="24" Height="24" Data="{StaticResource IconChevronUp}" StrokeThickness="4" StrokeLineCap="Round" StrokeJoin="Round" Stroke="{DynamicResource PrimaryTextBrush}" /></Viewbox>
+                            </RepeatButton>
+                            <RepeatButton Name="PART_DecreaseButton" Classes="Step" IsTabStop="False"
+                                          AutomationProperties.Name="{ReflectionBinding $parent[NumericUpDown].(AutomationProperties.Name), Converter={x:Static views:StepperNames.Decrease}}">
+                                <Viewbox Width="7" Height="7"><Path Width="24" Height="24" Data="{StaticResource IconChevronDown}" StrokeThickness="4" StrokeLineCap="Round" StrokeJoin="Round" Stroke="{DynamicResource PrimaryTextBrush}" /></Viewbox>
+                            </RepeatButton>
+                        </StackPanel>
+                        </Border>
+                    </Border>
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="RepeatButton.Step">
+        <Setter Property="Width" Value="15" /><Setter Property="Height" Value="11" />
+        <Setter Property="MinWidth" Value="0" /><Setter Property="MinHeight" Value="0" /><Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" /><Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_StepBackground" Background="{TemplateBinding Background}">
+                    <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="RepeatButton.Step:pointerover /template/ Border#PART_StepBackground"><Setter Property="Background" Value="{DynamicResource HoverBrush}" /></Style>
+    <Style Selector="RepeatButton.Step:pressed /template/ Border#PART_StepBackground"><Setter Property="Background" Value="{DynamicResource SelectedBrush}" /></Style>
+    <Style Selector="RepeatButton.Step:disabled"><Setter Property="Opacity" Value="0.4" /></Style>
+    <!-- Anello di fuoco sul campo, come per i pulsanti; il TextBox interno è trasparente e non ne disegna uno proprio. -->
+    <Style Selector="NumericUpDown.Compact:focus-within /template/ ButtonSpinner#PART_Spinner /template/ Border#PART_Field"><Setter Property="BoxShadow" Value="0 0 0 3 #800A66D8" /></Style>
     <Style Selector="ProgressBar"><Setter Property="Background" Value="{DynamicResource WellBrush}" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /><Setter Property="CornerRadius" Value="3" /><Setter Property="MinHeight" Value="6" /></Style>
     <Style Selector="Expander"><Setter Property="Background" Value="{DynamicResource GroupBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" /><Setter Property="BorderThickness" Value="0.5" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="12" /><Setter Property="HorizontalAlignment" Value="Stretch" /></Style>
     <Style Selector="ListBox"><Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /></Style>

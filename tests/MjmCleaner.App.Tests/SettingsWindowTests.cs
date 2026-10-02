@@ -1,5 +1,8 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using MjmCleaner.App.Services;
 using MjmCleaner.App.ViewModels;
@@ -63,5 +66,72 @@ public sealed class SettingsWindowTests
         window.Close();
 
         Assert.Equal(AppearancePreference.Auto, appearance.Applied[^1]);
+    }
+
+    [AvaloniaFact]
+    public void AppearanceCaptionSitsBelowTheCard()
+    {
+        var (window, _) = Create();
+
+        TextBlock caption = Assert.Single(window.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Text == "Automatico segue l'aspetto scelto in Impostazioni di Sistema.");
+        // La didascalia segue la card come in tutte le altre sezioni: non ne è un discendente.
+        Assert.DoesNotContain(caption.GetVisualAncestors().OfType<Border>(), b => b.Classes.Contains("SurfaceCard"));
+        Assert.Contains("Caption", caption.Classes);
+        Assert.Equal(11.5, caption.FontSize);
+        Assert.Equal(new Avalonia.Thickness(4, 0), caption.Margin);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void NumericFieldsUseTheCompactStepperWithNamedButtons()
+    {
+        var (window, _) = Create();
+
+        NumericUpDown[] fields = [.. window.GetVisualDescendants().OfType<NumericUpDown>()];
+        Assert.Equal(4, fields.Length);
+        foreach (NumericUpDown field in fields)
+        {
+            Assert.Contains("Compact", field.Classes);
+            string fieldName = AutomationProperties.GetName(field) ?? string.Empty;
+            Assert.False(string.IsNullOrWhiteSpace(fieldName));
+
+            RepeatButton up = Assert.Single(field.GetVisualDescendants().OfType<RepeatButton>(), b => b.Name == "PART_IncreaseButton");
+            RepeatButton down = Assert.Single(field.GetVisualDescendants().OfType<RepeatButton>(), b => b.Name == "PART_DecreaseButton");
+            Assert.StartsWith("Aumenta ", AutomationProperties.GetName(up));
+            Assert.StartsWith("Diminuisci ", AutomationProperties.GetName(down));
+            Assert.EndsWith(fieldName[1..], AutomationProperties.GetName(up));
+            Assert.EndsWith(fieldName[1..], AutomationProperties.GetName(down));
+
+            // Stepper compatto: i due pulsanti stanno uno sopra l'altro e sono piccoli.
+            Assert.True(down.Bounds.Top >= up.Bounds.Bottom - 0.5 && Equals(up.GetVisualParent(), down.GetVisualParent()));
+            Assert.True(up.Bounds.Width <= 16 && up.Bounds.Height <= 12);
+            Assert.Equal(64, field.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "PART_Field").Bounds.Width, 1);
+        }
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void SteppingStillChangesTheBoundValueAndClamps()
+    {
+        var (window, _) = Create();
+        SettingsViewModel vm = (SettingsViewModel)window.DataContext!;
+        NumericUpDown field = window.GetVisualDescendants().OfType<NumericUpDown>().First();
+        RepeatButton up = field.GetVisualDescendants().OfType<RepeatButton>().Single(b => b.Name == "PART_IncreaseButton");
+        RepeatButton down = field.GetVisualDescendants().OfType<RepeatButton>().Single(b => b.Name == "PART_DecreaseButton");
+
+        long before = vm.LargeFileThresholdMegabytes;
+        up.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(before + 1, vm.LargeFileThresholdMegabytes);
+        down.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(before, vm.LargeFileThresholdMegabytes);
+
+        field.Value = 1;
+        down.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(1, vm.LargeFileThresholdMegabytes);
+
+        window.Close();
     }
 }

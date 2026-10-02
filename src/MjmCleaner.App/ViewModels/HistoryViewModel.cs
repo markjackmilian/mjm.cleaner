@@ -29,6 +29,9 @@ public sealed partial class HistoryViewModel : ViewModelBase
     [ObservableProperty] private string _totalText = "—";
     [ObservableProperty] private string _countText = string.Empty;
 
+    /// <summary>Senza sessioni la barra mostra solo «nessuna pulizia»: «0 B» davanti sarebbe rumore.</summary>
+    [ObservableProperty] private bool _hasSessions;
+
     public HistoryViewModel(AppServices services, MainWindowViewModel main)
     {
         _main = main;
@@ -57,6 +60,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
 
         TotalText = FormatBytes(Rows.Sum(r => r.BytesFreed));
         CountText = Summarize(Rows.Count);
+        HasSessions = Rows.Count > 0;
     }
 
     [RelayCommand]

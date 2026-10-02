@@ -48,7 +48,7 @@
                 <!-- Aspetto -->
                 <StackPanel Spacing="6">
                     <TextBlock Classes="SectionTitle" Text="Aspetto" />
-                    <Border Classes="SurfaceCard" Padding="16,14,16,12">
+                    <Border Classes="SurfaceCard" Padding="16,14">
                         <StackPanel Spacing="12">
                             <StackPanel Orientation="Horizontal" Spacing="20">
                                 <RadioButton Classes="AppearanceOption" GroupName="Appearance"
@@ -109,10 +109,10 @@
                                     </StackPanel>
                                 </RadioButton>
                             </StackPanel>
-                            <TextBlock Classes="Caption" FontSize="11.5" Margin="4,0" TextWrapping="Wrap"
-                                       Text="Automatico segue l'aspetto scelto in Impostazioni di Sistema." />
                         </StackPanel>
                     </Border>
+                    <TextBlock Classes="Caption" FontSize="11.5" Margin="4,0" TextWrapping="Wrap"
+                               Text="Automatico segue l'aspetto scelto in Impostazioni di Sistema." />
                 </StackPanel>
 
                 <!-- Progetti .NET -->
@@ -194,11 +194,10 @@
                                 </Border>
                             </StackPanel>
                             <Border Classes="Separator" Margin="12,0" />
-                            <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
+                            <Grid ColumnDefinitions="*,Auto" Margin="12,10">
                                 <TextBlock Grid.Column="0" Text="Soglia file grandi" VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Column="1" Value="{Binding LargeFileThresholdMegabytes}" Minimum="1" Maximum="100000"
+                                <NumericUpDown Grid.Column="1" Classes="Compact" Tag="MB" Value="{Binding LargeFileThresholdMegabytes}" Minimum="1" Maximum="100000"
                                                AutomationProperties.Name="Soglia file grandi" />
-                                <TextBlock Grid.Column="2" Text="MB" Classes="Muted" Margin="8,0,0,0" VerticalAlignment="Center" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -210,25 +209,22 @@
                     <TextBlock Classes="SectionTitle" Text="Età minima" />
                     <Border Classes="SurfaceCard">
                         <StackPanel>
-                            <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
+                            <Grid ColumnDefinitions="*,Auto" Margin="12,10">
                                 <TextBlock Grid.Column="0" Text="Download" VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Column="1" Value="{Binding DownloadsMinAgeDays}" Minimum="0" Maximum="3650"
+                                <NumericUpDown Grid.Column="1" Classes="Compact" Tag="giorni" Value="{Binding DownloadsMinAgeDays}" Minimum="0" Maximum="3650"
                                                AutomationProperties.Name="Età minima dei download" />
-                                <TextBlock Grid.Column="2" Text="giorni" Classes="Muted" Margin="8,0,0,0" VerticalAlignment="Center" />
                             </Grid>
                             <Border Classes="Separator" Margin="12,0" />
-                            <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
+                            <Grid ColumnDefinitions="*,Auto" Margin="12,10">
                                 <TextBlock Grid.Column="0" Text="Log" VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Column="1" Value="{Binding LogsMinAgeDays}" Minimum="0" Maximum="3650"
+                                <NumericUpDown Grid.Column="1" Classes="Compact" Tag="giorni" Value="{Binding LogsMinAgeDays}" Minimum="0" Maximum="3650"
                                                AutomationProperties.Name="Età minima dei log" />
-                                <TextBlock Grid.Column="2" Text="giorni" Classes="Muted" Margin="8,0,0,0" VerticalAlignment="Center" />
                             </Grid>
                             <Border Classes="Separator" Margin="12,0" />
-                            <Grid ColumnDefinitions="*,Auto,38" Margin="12,10">
+                            <Grid ColumnDefinitions="*,Auto" Margin="12,10">
                                 <TextBlock Grid.Column="0" Text="Pacchetti NuGet" VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Column="1" Value="{Binding NuGetMinAgeDays}" Minimum="0" Maximum="3650"
+                                <NumericUpDown Grid.Column="1" Classes="Compact" Tag="giorni" Value="{Binding NuGetMinAgeDays}" Minimum="0" Maximum="3650"
                                                AutomationProperties.Name="Età minima dei pacchetti NuGet" />
-                                <TextBlock Grid.Column="2" Text="giorni" Classes="Muted" Margin="8,0,0,0" VerticalAlignment="Center" />
                             </Grid>
                         </StackPanel>
                     </Border>

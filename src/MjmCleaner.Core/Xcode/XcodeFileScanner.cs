@@ -48,11 +48,11 @@ public sealed class XcodeFileScanner(
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    warnings.Add(new XcodeInventoryWarning(kind, $"Root Xcode non accessibile: {root}"));
+                    warnings.Add(XcodeInventoryWarning.CompletenessFailure(kind, $"Root Xcode non accessibile: {root}"));
                 }
                 catch (IOException)
                 {
-                    warnings.Add(new XcodeInventoryWarning(kind, $"Impossibile verificare la root Xcode: {root}"));
+                    warnings.Add(XcodeInventoryWarning.CompletenessFailure(kind, $"Impossibile verificare la root Xcode: {root}"));
                 }
 
                 return;
@@ -60,7 +60,7 @@ public sealed class XcodeFileScanner(
 
             if (links.IsSymbolicLink(root))
             {
-                warnings.Add(new XcodeInventoryWarning(kind, $"La root Xcode è un collegamento simbolico e non viene scansionata: {root}"));
+                warnings.Add(XcodeInventoryWarning.CompletenessFailure(kind, $"La root Xcode è un collegamento simbolico e non viene scansionata: {root}"));
                 return;
             }
 
@@ -68,7 +68,7 @@ public sealed class XcodeFileScanner(
             RuleScanOutcome outcome = ruleScanner.Scan(rule, ct);
             if (outcome.Errors.Count > 0 || outcome.Exclusions.Count > 0)
             {
-                warnings.Add(new XcodeInventoryWarning(kind, "Inventario incompleto: alcune cartelle non sono leggibili o non superano i controlli di percorso."));
+                warnings.Add(XcodeInventoryWarning.CompletenessFailure(kind, "Inventario incompleto: alcune cartelle non sono leggibili o non superano i controlli di percorso."));
             }
 
             foreach (ScanItem item in outcome.Items)
@@ -79,7 +79,7 @@ public sealed class XcodeFileScanner(
                 GuardVerdict verdict = guard.Validate(item.Path, root);
                 if (!verdict.IsAllowed || links.IsSymbolicLink(item.Path) || !fileSystem.Directory.Exists(item.Path))
                 {
-                    warnings.Add(new XcodeInventoryWarning(kind, $"Una cartella Xcode è stata saltata perché è cambiata o non è sicura: {fileSystem.Path.GetFileName(item.Path)}"));
+                    warnings.Add(XcodeInventoryWarning.CompletenessFailure(kind, $"Una cartella Xcode è stata saltata perché è cambiata o non è sicura: {fileSystem.Path.GetFileName(item.Path)}"));
                     continue;
                 }
 
@@ -101,7 +101,7 @@ public sealed class XcodeFileScanner(
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    warnings.Add(new XcodeInventoryWarning(kind, $"Una cartella Xcode è stata saltata perché i metadati non sono leggibili: {fileSystem.Path.GetFileName(item.Path)}"));
+                    warnings.Add(XcodeInventoryWarning.CompletenessFailure(kind, $"Una cartella Xcode è stata saltata perché i metadati non sono leggibili: {fileSystem.Path.GetFileName(item.Path)}"));
                     continue;
                 }
 
@@ -142,7 +142,7 @@ public sealed class XcodeFileScanner(
             if (string.IsNullOrWhiteSpace(candidate.Path) || !fileSystem.Path.IsPathRooted(candidate.Path))
             {
                 candidates[index] = candidate with { SizeBytes = null };
-                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, $"Dimensione sconosciuta per {candidate.Name}: percorso dell'immagine runtime non disponibile."));
+                warnings.Add(XcodeInventoryWarning.Advisory(XcodeResourceKind.Runtime, $"Dimensione sconosciuta per {candidate.Name}: percorso dell'immagine runtime non disponibile."));
                 continue;
             }
 
@@ -150,7 +150,7 @@ public sealed class XcodeFileScanner(
             if (root is null)
             {
                 candidates[index] = candidate with { SizeBytes = null };
-                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, $"Dimensione sconosciuta per {candidate.Name}: percorso dell'immagine runtime non valido."));
+                warnings.Add(XcodeInventoryWarning.Advisory(XcodeResourceKind.Runtime, $"Dimensione sconosciuta per {candidate.Name}: percorso dell'immagine runtime non valido."));
                 continue;
             }
 
@@ -159,7 +159,7 @@ public sealed class XcodeFileScanner(
             if (!verdict.IsAllowed || links.IsSymbolicLink(candidate.Path))
             {
                 candidates[index] = candidate with { SizeBytes = null };
-                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, $"Dimensione sconosciuta per {candidate.Name}: il percorso dell'immagine non supera i controlli di sicurezza."));
+                warnings.Add(XcodeInventoryWarning.Advisory(XcodeResourceKind.Runtime, $"Dimensione sconosciuta per {candidate.Name}: il percorso dell'immagine non supera i controlli di sicurezza."));
                 continue;
             }
 
@@ -167,7 +167,7 @@ public sealed class XcodeFileScanner(
             if (!seenPaths.Add(canonical))
             {
                 candidates[index] = candidate with { Path = canonical, SizeBytes = null };
-                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, $"Immagine runtime condivisa con {firstPath}: la dimensione viene conteggiata una sola volta."));
+                warnings.Add(XcodeInventoryWarning.Advisory(XcodeResourceKind.Runtime, $"Immagine runtime condivisa con {firstPath}: la dimensione viene conteggiata una sola volta."));
                 continue;
             }
 

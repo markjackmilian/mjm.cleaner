@@ -30,7 +30,19 @@ public sealed record XcodeCandidate(
     public IReadOnlyList<string> DependentDeviceKeys => Dependencies ?? Array.Empty<string>();
 }
 
-public sealed record XcodeInventoryWarning(XcodeResourceKind ResourceGroup, string Message);
+public enum XcodeInventoryWarningKind { CompletenessFailure, Advisory }
+
+public sealed record XcodeInventoryWarning(XcodeResourceKind ResourceGroup, string Message)
+{
+    /// <summary>Conservative for callers that have not yet classified their warning.</summary>
+    public XcodeInventoryWarningKind Kind { get; init; } = XcodeInventoryWarningKind.CompletenessFailure;
+
+    public static XcodeInventoryWarning CompletenessFailure(XcodeResourceKind group, string message)
+        => new(group, message) { Kind = XcodeInventoryWarningKind.CompletenessFailure };
+
+    public static XcodeInventoryWarning Advisory(XcodeResourceKind group, string message)
+        => new(group, message) { Kind = XcodeInventoryWarningKind.Advisory };
+}
 
 public sealed record XcodeSnapshot(
     IReadOnlyList<XcodeCandidate> Candidates,

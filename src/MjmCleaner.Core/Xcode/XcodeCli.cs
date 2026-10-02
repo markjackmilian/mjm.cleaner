@@ -23,7 +23,7 @@ public sealed partial class XcodeCli(IProcessRunner runner, string? binaryPath) 
             ProcessResult simctl = await RunAsync(["simctl", "list", "--json"], InventoryTimeout, ct);
             if (simctl.TimedOut || simctl.ExitCode != 0)
             {
-                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, $"Inventario simulatori non disponibile: {Describe(simctl)}"));
+                warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Device, $"Inventario simulatori non disponibile: {Describe(simctl)}"));
             }
             else
             {
@@ -32,7 +32,7 @@ public sealed partial class XcodeCli(IProcessRunner runner, string? binaryPath) 
         }
         catch (XcodeUnavailableException ex)
         {
-            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, ex.Message));
+            warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Device, ex.Message));
         }
 
         try
@@ -43,7 +43,7 @@ public sealed partial class XcodeCli(IProcessRunner runner, string? binaryPath) 
         }
         catch (XcodeUnavailableException ex)
         {
-            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, ex.Message));
+            warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, ex.Message));
         }
 
         try
@@ -51,7 +51,7 @@ public sealed partial class XcodeCli(IProcessRunner runner, string? binaryPath) 
             ProcessResult runtime = await RunAsync(["simctl", "runtime", "list", "--json"], InventoryTimeout, ct);
             if (runtime.TimedOut || runtime.ExitCode != 0)
             {
-                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, $"Inventario immagini runtime non disponibile: {Describe(runtime)}"));
+                warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, $"Inventario immagini runtime non disponibile: {Describe(runtime)}"));
             }
             else
             {
@@ -60,12 +60,12 @@ public sealed partial class XcodeCli(IProcessRunner runner, string? binaryPath) 
 
             if (!runtimeDeleteSupported)
             {
-                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Questa versione di Xcode non supporta la rimozione dei runtime dalla CLI; gestiscili in Xcode Settings."));
+                warnings.Add(XcodeInventoryWarning.Advisory(XcodeResourceKind.Runtime, "Questa versione di Xcode non supporta la rimozione dei runtime dalla CLI; gestiscili in Xcode Settings."));
             }
         }
         catch (XcodeUnavailableException ex)
         {
-            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, ex.Message));
+            warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, ex.Message));
         }
 
         XcodeSnapshot parsed = XcodeJson.ParseInventory(simctlJson, runtimeJson, runtimeDeleteSupported);

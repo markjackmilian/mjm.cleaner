@@ -12,7 +12,8 @@ public class XcodeJsonTests
     {
         XcodeSnapshot snapshot = XcodeJson.ParseInventory(Fixture("malformed-devices.json"), Fixture("runtime-list.json"), runtimeDeleteSupported: true);
 
-        Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device && warning.Message.Length > 0);
+        Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device
+            && warning.Kind == XcodeInventoryWarningKind.CompletenessFailure && warning.Message.Length > 0);
         XcodeCandidate runtime = Assert.Single(snapshot.Candidates, candidate => candidate.Kind == XcodeResourceKind.Runtime);
         Assert.False(runtime.CanSelect);
         Assert.Contains("simulatori", runtime.BlockReason!, StringComparison.OrdinalIgnoreCase);
@@ -149,6 +150,9 @@ public class XcodeJsonTests
         Assert.Equal(2, devices.Length);
         Assert.Equal(100, devices[0].SizeBytes);
         Assert.Null(devices[1].SizeBytes);
+        Assert.All(devices, device => Assert.True(device.CanSelect));
+        Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device
+            && warning.Kind == XcodeInventoryWarningKind.Advisory);
         Assert.All(devices, device => Assert.True(device.CanSelect));
         Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device);
     }

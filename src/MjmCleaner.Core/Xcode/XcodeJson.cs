@@ -31,8 +31,8 @@ public static class XcodeJson
             simctlDocument = null;
             deviceInventorySafe = false;
             logicalRuntimeInventorySafe = false;
-            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, $"Inventario simulatori non leggibile: {ex.Message}"));
-            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Inventario dei runtime logici non leggibile."));
+            warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Device, $"Inventario simulatori non leggibile: {ex.Message}"));
+            warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, "Inventario dei runtime logici non leggibile."));
         }
 
         if (simctlDocument is not null)
@@ -43,7 +43,7 @@ public static class XcodeJson
                 if (!root.TryGetProperty("runtimes", out JsonElement runtimeArray) || runtimeArray.ValueKind != JsonValueKind.Array)
                 {
                     logicalRuntimeInventorySafe = false;
-                    warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Metadati dei runtime logici mancanti o non validi."));
+                    warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, "Metadati dei runtime logici mancanti o non validi."));
                 }
                 else
                 {
@@ -62,14 +62,14 @@ public static class XcodeJson
 
                     if (!logicalRuntimeInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime))
                     {
-                        warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Metadati dei runtime logici incompleti."));
+                        warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, "Metadati dei runtime logici incompleti."));
                     }
                 }
 
                 if (!root.TryGetProperty("devices", out JsonElement deviceGroups) || deviceGroups.ValueKind != JsonValueKind.Object)
                 {
                     deviceInventorySafe = false;
-                    warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, "Elenco dispositivi mancante o non valido."));
+                    warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Device, "Elenco dispositivi mancante o non valido."));
                 }
                 else
                 {
@@ -100,9 +100,9 @@ public static class XcodeJson
                             }
 
                             long? sizeBytes = OptionalInt64(device, "dataPathSize", out bool malformedSize);
-                            if (malformedSize && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Device || !w.Message.Contains("dimensione", StringComparison.OrdinalIgnoreCase)))
+                            if (malformedSize && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Device || w.Kind != XcodeInventoryWarningKind.Advisory))
                             {
-                                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, "La dimensione di un dispositivo non è leggibile e resta sconosciuta."));
+                                warnings.Add(XcodeInventoryWarning.Advisory(XcodeResourceKind.Device, "La dimensione di un dispositivo non è leggibile e resta sconosciuta."));
                             }
 
                             devices.Add(new XcodeCandidate(
@@ -122,7 +122,7 @@ public static class XcodeJson
 
         if (!deviceInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Device))
         {
-            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, "Inventario simulatori incompleto; la rimozione dei simulatori e dei runtime è disabilitata."));
+            warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Device, "Inventario simulatori incompleto; la rimozione dei simulatori e dei runtime è disabilitata."));
         }
 
         List<XcodeCandidate> uniqueDevices = [];
@@ -148,7 +148,7 @@ public static class XcodeJson
                     SizeBytes = null,
                     BlockReason = "UUID dispositivo ripetuto con metadati in conflitto; ripeti l'analisi prima di rimuoverlo.",
                 };
-                warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, $"UUID dispositivo ripetuto con metadati in conflitto: {first.Key}."));
+                warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Device, $"UUID dispositivo ripetuto con metadati in conflitto: {first.Key}."));
             }
 
             uniqueDevices.Add(first);
@@ -197,12 +197,12 @@ public static class XcodeJson
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
             runtimeInventorySafe = false;
-            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, $"Inventario immagini runtime non leggibile: {ex.Message}"));
+            warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, $"Inventario immagini runtime non leggibile: {ex.Message}"));
         }
 
         if (!runtimeInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime))
         {
-            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Alcune immagini runtime non hanno identificatori verificabili."));
+            warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, "Alcune immagini runtime non hanno identificatori verificabili."));
         }
 
         foreach (RuntimeImage image in images)
@@ -250,7 +250,7 @@ public static class XcodeJson
                 blockReason = "Associazione runtime ambigua: più immagini hanno la stessa versione e le dipendenze dei simulatori non sono distinguibili con certezza.";
                 if (warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime))
                 {
-                    warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Associazione runtime/build ambigua: immagini con la stessa versione hanno build diverse."));
+                    warnings.Add(XcodeInventoryWarning.CompletenessFailure(XcodeResourceKind.Runtime, "Associazione runtime/build ambigua: immagini con la stessa versione hanno build diverse."));
                 }
             }
 

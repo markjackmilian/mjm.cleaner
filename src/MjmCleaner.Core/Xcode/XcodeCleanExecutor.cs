@@ -165,14 +165,19 @@ public sealed class XcodeCleanExecutor(
         {
             results.Add(Result(candidate, XcodeItemOutcome.Uncertain, "Il comando è terminato senza poter verificare l'inventario successivo.", null));
         }
+        else if (commandError is OperationCanceledException || command?.TimedOut == true || ct.IsCancellationRequested)
+        {
+            results.Add(Result(candidate, XcodeItemOutcome.Uncertain, "Il comando è stato interrotto; l'assenza successiva non viene attribuita a questa pulizia.", null));
+        }
+        else if (commandError is not null || command is null || command.ExitCode != 0)
+        {
+            string reason = commandError?.Message ?? command?.StdErr.Trim() ?? string.Empty;
+            results.Add(Result(candidate, XcodeItemOutcome.Failed, string.IsNullOrWhiteSpace(reason) ? "Il comando di rimozione non è riuscito." : reason, null));
+        }
         else if (!verified.Candidates.Any(c => SameKey(c.Key, candidate.Key)))
         {
             long? estimate = candidate.SizeBytes;
             results.Add(Result(candidate, XcodeItemOutcome.Deleted, estimate is null ? "Risorsa assente dopo il comando; dimensione stimata sconosciuta." : "Risorsa assente dopo il comando.", estimate));
-        }
-        else if (commandError is OperationCanceledException || command?.TimedOut == true)
-        {
-            results.Add(Result(candidate, XcodeItemOutcome.Uncertain, "Il comando è stato interrotto e la risorsa risulta ancora presente.", null));
         }
         else
         {
@@ -204,7 +209,7 @@ public sealed class XcodeCleanExecutor(
     }
 
     private static bool IsInventoryReadable(XcodeSnapshot snapshot, XcodeResourceKind kind)
-        => !snapshot.Warnings.Any(w => w.ResourceGroup == kind);
+        => !snapshot.Warnings.Any(w => w.ResourceGroup == kind && w.Kind == XcodeInventoryWarningKind.CompletenessFailure);
 
     private static string? CompareIdentity(XcodeConfirmedPlan plan, XcodeSnapshot fresh, XcodeCandidate approved, XcodeCandidate? current, IReadOnlySet<string> deletedDevices)
     {

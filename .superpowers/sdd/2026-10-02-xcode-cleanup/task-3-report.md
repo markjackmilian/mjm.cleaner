@@ -26,3 +26,23 @@ Result: Passed 45, Failed 0, Skipped 0. `git diff --check` passed.
 - Preview admits only explicit keys, normalizes UUID key spelling, collapses equivalent selections, rejects unknown or blocked keys, and leaves dependent devices out of the selected candidates.
 - Confirmation requires acknowledgement for retained dependent devices and copies candidates, dependencies, and guarded inventory into read-only collections. Null sizes stay null and are counted separately from known estimated bytes.
 - The pre-existing local modifications to `CategoryCatalog.cs` and `CategoryCatalogTests.cs` were not touched or staged.
+
+## Round 1 review fixes
+
+RED command:
+
+```text
+/usr/local/share/dotnet/dotnet test tests/MjmCleaner.Core.Tests --filter FullyQualifiedName~Xcode --no-restore
+```
+
+New regression cases first failed for an unavailable device with an unrelated block and for selected file candidates with missing or incomplete guards (47 passed, 3 failed). After enforcing the fixes, the unknown-size file test also needed a valid guard while retaining nullable logical size.
+
+GREEN command:
+
+```text
+/usr/local/share/dotnet/dotnet test tests/MjmCleaner.Core.Tests --filter FullyQualifiedName~Xcode --no-restore
+```
+
+Result: Passed 50, Failed 0, Skipped 0. `git diff --check` passed.
+
+The classifier now clears only the known state-derived unavailable warning and preserves unrelated blocks. Preview and Confirm both require file candidates to retain a matching directory guard with canonical path, declared root, and timestamps. Regression tests also cover equivalent UUID spellings collapsing to one selected candidate and explicit selection of a blocked device being rejected.

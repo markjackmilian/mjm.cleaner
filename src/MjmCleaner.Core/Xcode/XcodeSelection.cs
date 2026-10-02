@@ -75,6 +75,11 @@ public static class XcodeSelection
             {
                 throw new ArgumentException($"Xcode candidate is blocked: {candidate.Name}: {candidate.BlockReason}", nameof(selectedKeys));
             }
+
+            if (IsFileCandidate(candidate) && !HasCompleteFileGuard(snapshot.FileInventory, candidate))
+            {
+                throw new ArgumentException($"Selected file candidate has no complete guarded inventory entry: {candidate.Name}", nameof(snapshot));
+            }
         }
 
         XcodeCandidate[] chosen = candidatesByKey.Where(pair => selected.Contains(pair.Key)).Select(pair => CopyCandidate(pair.Value)).ToArray();
@@ -112,13 +117,49 @@ public static class XcodeSelection
         Dictionary<string, XcodeFileEntry> inventory = new(StringComparer.Ordinal);
         foreach (XcodeCandidate candidate in copied)
         {
-            if (preview.SourceSnapshot.FileInventory.TryGetValue(candidate.Key, out XcodeFileEntry? entry))
+            if (IsFileCandidate(candidate))
             {
-                inventory[candidate.Key] = entry;
+                if (!HasCompleteFileGuard(preview.SourceSnapshot.FileInventory, candidate, out XcodeFileEntry? entry))
+                {
+                    throw new InvalidOperationException($"Selected file candidate lost its guarded inventory entry: {candidate.Name}");
+                }
+
+                inventory.Add(candidate.Key, entry!);
             }
         }
 
         return new XcodeConfirmedPlan(preview.SourceSnapshot, Array.AsReadOnly(copied), new XcodeFileInventory(inventory));
+    }
+
+    private static bool IsFileCandidate(XcodeCandidate candidate)
+        => candidate.Kind is XcodeResourceKind.DerivedData or XcodeResourceKind.DeviceSupport;
+
+    private static bool HasCompleteFileGuard(XcodeFileInventory inventory, XcodeCandidate candidate)
+        => HasCompleteFileGuard(inventory, candidate, out _);
+
+    private static bool HasCompleteFileGuard(XcodeFileInventory inventory, XcodeCandidate candidate, out XcodeFileEntry? entry)
+    {
+        entry = null;
+        if (candidate.Path is null || !inventory.TryGetValue(candidate.Key, out XcodeFileEntry? found))
+        {
+            return false;
+        }
+
+        XcodeFileIdentity identity = found.Identity;
+        bool complete = !string.IsNullOrWhiteSpace(identity.CanonicalPath)
+            && string.Equals(candidate.Path, identity.CanonicalPath, StringComparison.Ordinal)
+            && string.Equals(found.Item.Path, identity.CanonicalPath, StringComparison.Ordinal)
+            && found.Item.IsDirectory
+            && identity.IsDirectory
+            && !string.IsNullOrWhiteSpace(found.Item.DeclaredRoot)
+            && identity.CreationTimeUtc != default
+            && identity.LastWriteTimeUtc != default;
+        if (complete)
+        {
+            entry = found;
+        }
+
+        return complete;
     }
 
     private static XcodeSnapshot CopySnapshot(XcodeSnapshot source)

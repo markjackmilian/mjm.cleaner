@@ -16,6 +16,44 @@ public class XcodeSelectionTests
     }
 
     [Fact]
+    public void DuplicateNormalizedUuidSelectionsCollapse()
+    {
+        XcodeSnapshot snapshot = CreateSnapshot(Device());
+        XcodeConfirmation preview = XcodeSelection.Preview(snapshot, new HashSet<string>(StringComparer.Ordinal)
+        {
+            DeviceKey,
+            DeviceKey.ToUpperInvariant(),
+        });
+        Assert.Single(preview.SelectedCandidates);
+    }
+
+    [Fact]
+    public void DirectSelectionOfBlockedRowIsRejected()
+    {
+        XcodeCandidate blocked = Device() with { State = "Booted" };
+        XcodeSnapshot snapshot = new(new[] { blocked }, Array.Empty<XcodeInventoryWarning>());
+        Assert.Throws<ArgumentException>(() => XcodeSelection.Preview(snapshot, new HashSet<string> { DeviceKey }));
+    }
+
+    [Fact]
+    public void SelectedFileWithoutGuardedInventoryIsRejected()
+    {
+        XcodeCandidate file = new("derived-data:/one", XcodeResourceKind.DerivedData, "One", Path: "/one", SizeBytes: 3);
+        XcodeSnapshot snapshot = CreateSnapshot(file);
+        Assert.Throws<ArgumentException>(() => XcodeSelection.Preview(snapshot, new HashSet<string> { file.Key }));
+    }
+
+    [Fact]
+    public void SelectedFileWithIncompleteGuardedInventoryIsRejected()
+    {
+        XcodeCandidate file = new("derived-data:/one", XcodeResourceKind.DerivedData, "One", Path: "/one", SizeBytes: 3);
+        ScanItem item = new("/elsewhere", 3, true, "/");
+        XcodeFileEntry entry = new(item, new XcodeFileIdentity("/one", true, default, default, 3));
+        XcodeSnapshot snapshot = CreateSnapshot(file) with { FileInventory = new XcodeFileInventory([new KeyValuePair<string, XcodeFileEntry>(file.Key, entry)]) };
+        Assert.Throws<ArgumentException>(() => XcodeSelection.Preview(snapshot, new HashSet<string> { file.Key }));
+    }
+
+    [Fact]
     public void RetainedDependenciesRequireAcknowledgement()
     {
         XcodeConfirmation preview = XcodeSelection.Preview(CreateSnapshot(Device(), Runtime([DeviceKey])), new HashSet<string> { RuntimeKey });
@@ -36,8 +74,11 @@ public class XcodeSelectionTests
     [Fact]
     public void UnknownSizesRemainVisible()
     {
-        XcodeCandidate unknown = new("derived-data:/unknown", XcodeResourceKind.DerivedData, "Unknown", SizeBytes: null);
-        XcodeConfirmation preview = XcodeSelection.Preview(CreateSnapshot(unknown), new HashSet<string> { unknown.Key });
+        XcodeCandidate unknown = new("derived-data:/unknown", XcodeResourceKind.DerivedData, "Unknown", Path: "/unknown", SizeBytes: null);
+        ScanItem item = new("/unknown", 3, true, "/");
+        XcodeFileEntry entry = new(item, new XcodeFileIdentity("/unknown", true, DateTime.UnixEpoch, DateTime.UnixEpoch, null));
+        XcodeSnapshot snapshot = CreateSnapshot(unknown) with { FileInventory = new XcodeFileInventory([new KeyValuePair<string, XcodeFileEntry>(unknown.Key, entry)]) };
+        XcodeConfirmation preview = XcodeSelection.Preview(snapshot, new HashSet<string> { unknown.Key });
         Assert.Equal(1, preview.UnknownSizeCount);
         Assert.Equal(0, preview.EstimatedBytes);
         Assert.Null(preview.SelectedCandidates.Single().SizeBytes);

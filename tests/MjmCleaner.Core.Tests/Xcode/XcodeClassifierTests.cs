@@ -29,9 +29,23 @@ public class XcodeClassifierTests
     [Fact]
     public void UnavailableDeviceWithVerifiedUuidRemainsSelectable()
     {
-        XcodeCandidate unavailable = Device("11111111-1111-4111-8111-111111111111", state: "Unavailable");
+        XcodeCandidate unavailable = Device("11111111-1111-4111-8111-111111111111", state: "Unavailable") with
+        {
+            BlockReason = "Stato del dispositivo non verificato: Unavailable; ripeti l'analisi.",
+        };
         XcodeSnapshot classified = XcodeClassifier.Classify(Snapshot(unavailable), xcodeRunning: false);
         Assert.True(Assert.Single(classified.Candidates).CanSelect);
+    }
+
+    [Fact]
+    public void UnavailableDevicePreservesUnrelatedSafetyBlock()
+    {
+        XcodeCandidate unavailable = Device("11111111-1111-4111-8111-111111111111", state: "Unavailable") with
+        {
+            BlockReason = "UUID duplicato con metadati in conflitto.",
+        };
+        XcodeSnapshot classified = XcodeClassifier.Classify(Snapshot(unavailable), xcodeRunning: false);
+        Assert.Equal("UUID duplicato con metadati in conflitto.", Assert.Single(classified.Candidates).BlockReason);
     }
 
     [Fact]

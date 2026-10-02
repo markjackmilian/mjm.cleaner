@@ -46,8 +46,13 @@ public static class XcodeClassifier
             }
             else if (IsUnavailable(candidate.State))
             {
-                // simctl's unavailable state is still individually addressable by a verified UUID.
-                block = null;
+                // Allow only the parser's state-derived unavailable warning to be relaxed.
+                // Any independent inventory or identity warning remains a hard block.
+                string unavailableStateWarning = $"Stato del dispositivo non verificato: {candidate.State}; ripeti l'analisi.";
+                if (string.Equals(block, unavailableStateWarning, StringComparison.OrdinalIgnoreCase))
+                {
+                    block = null;
+                }
             }
             else if (!IsShutdown(candidate.State))
             {

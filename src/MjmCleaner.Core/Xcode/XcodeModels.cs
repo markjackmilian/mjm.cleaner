@@ -1,4 +1,6 @@
 using MjmCleaner.Core.Docker;
+using MjmCleaner.Core.Scanning;
+using System.Collections.ObjectModel;
 
 namespace MjmCleaner.Core.Xcode;
 
@@ -34,7 +36,40 @@ public sealed record XcodeSnapshot(
     IReadOnlyList<XcodeCandidate> Candidates,
     IReadOnlyList<XcodeInventoryWarning> Warnings)
 {
+    public XcodeFileInventory FileInventory { get; init; } = XcodeFileInventory.Empty;
+
     public static XcodeSnapshot Empty { get; } = new(Array.Empty<XcodeCandidate>(), Array.Empty<XcodeInventoryWarning>());
+}
+
+/// <summary>Portable metadata captured with a guarded file candidate for later revalidation.</summary>
+public sealed record XcodeFileIdentity(
+    string CanonicalPath,
+    bool IsDirectory,
+    DateTime CreationTimeUtc,
+    DateTime LastWriteTimeUtc,
+    long LogicalSizeBytes);
+
+public sealed record XcodeFileEntry(ScanItem Item, XcodeFileIdentity Identity);
+
+/// <summary>Immutable candidate-key mapping; copied on construction so callers cannot mutate a scan.</summary>
+public sealed class XcodeFileInventory : IReadOnlyDictionary<string, XcodeFileEntry>
+{
+    private readonly ReadOnlyDictionary<string, XcodeFileEntry> _items;
+
+    public XcodeFileInventory(IEnumerable<KeyValuePair<string, XcodeFileEntry>> items)
+    {
+        _items = new ReadOnlyDictionary<string, XcodeFileEntry>(items.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+    }
+
+    public static XcodeFileInventory Empty { get; } = new(Array.Empty<KeyValuePair<string, XcodeFileEntry>>());
+    public XcodeFileEntry this[string key] => _items[key];
+    public IEnumerable<string> Keys => _items.Keys;
+    public IEnumerable<XcodeFileEntry> Values => _items.Values;
+    public int Count => _items.Count;
+    public bool ContainsKey(string key) => _items.ContainsKey(key);
+    public bool TryGetValue(string key, out XcodeFileEntry value) => _items.TryGetValue(key, out value!);
+    public IEnumerator<KeyValuePair<string, XcodeFileEntry>> GetEnumerator() => _items.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 public interface IXcodeCli

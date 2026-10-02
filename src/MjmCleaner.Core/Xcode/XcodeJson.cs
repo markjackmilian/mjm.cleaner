@@ -149,19 +149,15 @@ public static class XcodeJson
                 string? runtimeIdentifier = String(image, "runtimeIdentifier");
                 string? build = String(image, "build");
                 string? version = String(image, "version");
+                string? backingPath = String(image, "path") ?? String(image, "diskImagePath");
                 bool hasUuid = IsUuid(id);
-                long? sizeBytes = OptionalInt64(image, "sizeBytes", out bool malformedSize);
-                if (malformedSize && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime || !w.Message.Contains("dimensione", StringComparison.OrdinalIgnoreCase)))
-                {
-                    warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "La dimensione di un'immagine runtime non è leggibile e resta sconosciuta."));
-                }
 
                 if (!hasUuid || runtimeIdentifier is null || build is null)
                 {
                     runtimeInventorySafe = false;
                 }
 
-                images.Add(new RuntimeImage(id, hasUuid ? id : null, runtimeIdentifier, build, version, String(image, "state"), sizeBytes, Bool(image, "deletable")));
+                images.Add(new RuntimeImage(id, hasUuid ? id : null, runtimeIdentifier, build, version, String(image, "state"), backingPath, Bool(image, "deletable")));
             }
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
@@ -237,12 +233,14 @@ public static class XcodeJson
                 Key: $"runtime:{image.CliId ?? image.Id}",
                 Kind: XcodeResourceKind.Runtime,
                 Name: runtimeName,
-                Path: null,
+                Path: image.BackingPath,
                 CliId: image.CliId,
                 RuntimeIdentifier: blockReason?.Contains("ambigua", StringComparison.OrdinalIgnoreCase) == true ? null : image.RuntimeIdentifier,
                 Build: image.Build,
                 State: image.State,
-                SizeBytes: image.SizeBytes,
+                // The CLI's sizeBytes is an image-level logical estimate. Allocated bytes are
+                // measured separately from the reported backing payload path.
+                SizeBytes: null,
                 BlockReason: blockReason,
                 Dependencies: dependentDevices.Select(device => device.Key).ToArray()));
         }
@@ -302,5 +300,5 @@ public static class XcodeJson
     }
 
     private sealed record LogicalRuntime(string Identifier, string Build, string Name, string? Version, string? Platform);
-    private sealed record RuntimeImage(string Id, string? CliId, string? RuntimeIdentifier, string? Build, string? Version, string? State, long? SizeBytes, bool? Deletable);
+    private sealed record RuntimeImage(string Id, string? CliId, string? RuntimeIdentifier, string? Build, string? Version, string? State, string? BackingPath, bool? Deletable);
 }

@@ -152,4 +152,20 @@ public class XcodeJsonTests
         Assert.All(devices, device => Assert.True(device.CanSelect));
         Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device);
     }
+
+    [Fact]
+    public void RuntimeCandidateKeepsBackingPathAndLeavesAllocatedSizeUnknownUntilProbed()
+    {
+        const string path = "/System/Library/AssetsV2/runtime.asset/AssetData";
+        const string simctl = """{"runtimes":[],"devices":{}}""";
+        const string images = """
+            {"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE":{"identifier":"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE","runtimeIdentifier":"com.apple.CoreSimulator.SimRuntime.iOS-18-0","version":"18.0","build":"22A4000","deletable":true,"path":"/System/Library/AssetsV2/runtime.asset/AssetData","mountPath":"/private/var/run/mounted-runtime","sizeBytes":999999}}
+            """;
+
+        XcodeSnapshot snapshot = XcodeJson.ParseInventory(simctl, images, runtimeDeleteSupported: true);
+
+        XcodeCandidate runtime = Assert.Single(snapshot.Candidates, candidate => candidate.Kind == XcodeResourceKind.Runtime);
+        Assert.Equal(path, runtime.Path);
+        Assert.Null(runtime.SizeBytes);
+    }
 }

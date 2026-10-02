@@ -39,7 +39,7 @@ public sealed partial class XcodeCli(IProcessRunner runner, string? binaryPath) 
         {
             ProcessResult help = await RunAsync(["simctl", "runtime"], InventoryTimeout, ct);
             string helpText = $"{help.StdOut}\n{help.StdErr}";
-            runtimeDeleteSupported = !help.TimedOut && help.ExitCode == 0 && Regex.IsMatch(helpText, @"(?m)^\s*delete\s+\(<identifier>", RegexOptions.CultureInvariant);
+            runtimeDeleteSupported = !help.TimedOut && Regex.IsMatch(helpText, @"(?m)^\s*delete\s+\(<identifier>", RegexOptions.CultureInvariant);
         }
         catch (XcodeUnavailableException ex)
         {

@@ -89,4 +89,21 @@ public class XcodeCliTests
         Assert.Contains(snapshot.Warnings, warning => warning.ResourceGroup == XcodeResourceKind.Device);
         Assert.Contains(runner.Calls, args => args.SequenceEqual(new[] { "simctl", "runtime", "list", "--json" }));
     }
+
+    [Fact]
+    public async Task RuntimeDeleteIsSupportedWhenHelpPrintsSyntaxWithUsageExitCode()
+    {
+        string simctlJson = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Xcode", "Fixtures", "simctl-list.json"));
+        string runtimeJson = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Xcode", "Fixtures", "runtime-list.json"));
+        FakeRunner runner = new(args => args.SequenceEqual(new[] { "simctl", "list", "--json" })
+            ? new ProcessResult(0, simctlJson, string.Empty, false)
+            : args.SequenceEqual(new[] { "simctl", "runtime" })
+                ? new ProcessResult(117, string.Empty, "delete (<identifier>|--unusable)", false)
+                : new ProcessResult(0, runtimeJson, string.Empty, false));
+
+        XcodeSnapshot snapshot = await new XcodeCli(runner, "/usr/bin/xcrun").ReadInventoryAsync(CancellationToken.None);
+
+        XcodeCandidate runtime = Assert.Single(snapshot.Candidates, candidate => candidate.Kind == XcodeResourceKind.Runtime);
+        Assert.True(runtime.CanSelect);
+    }
 }

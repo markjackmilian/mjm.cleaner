@@ -12,73 +12,102 @@ public static class XcodeJson
         List<LogicalRuntime> logicalRuntimes = [];
         List<XcodeCandidate> devices = [];
         bool deviceInventorySafe = true;
+        bool logicalRuntimeInventorySafe = true;
         bool runtimeInventorySafe = true;
 
+        JsonDocument? simctlDocument = null;
         try
         {
-            using JsonDocument document = JsonDocument.Parse(simctlJson ?? string.Empty);
-            JsonElement root = document.RootElement;
-            JsonElement runtimeArray = root.GetProperty("runtimes");
-            if (runtimeArray.ValueKind != JsonValueKind.Array)
+            simctlDocument = JsonDocument.Parse(simctlJson ?? string.Empty);
+            if (simctlDocument.RootElement.ValueKind != JsonValueKind.Object)
             {
-                throw new JsonException("The runtimes field is not an array.");
-            }
-
-            foreach (JsonElement runtime in runtimeArray.EnumerateArray())
-            {
-                string? identifier = String(runtime, "identifier");
-                string? build = String(runtime, "buildversion") ?? String(runtime, "buildVersion");
-                if (identifier is null || build is null)
-                {
-                    deviceInventorySafe = false;
-                    continue;
-                }
-
-                logicalRuntimes.Add(new LogicalRuntime(identifier, build, String(runtime, "name") ?? identifier, String(runtime, "version"), String(runtime, "platform")));
-            }
-
-            JsonElement deviceGroups = root.GetProperty("devices");
-            if (deviceGroups.ValueKind != JsonValueKind.Object)
-            {
-                throw new JsonException("The devices field is not an object.");
-            }
-
-            foreach (JsonProperty group in deviceGroups.EnumerateObject())
-            {
-                if (group.Value.ValueKind != JsonValueKind.Array)
-                {
-                    deviceInventorySafe = false;
-                    continue;
-                }
-
-                foreach (JsonElement device in group.Value.EnumerateArray())
-                {
-                    string? uuid = String(device, "udid");
-                    string? name = String(device, "name");
-                    string? state = String(device, "state");
-                    if (uuid is null || !IsUuid(uuid) || name is null || state is null)
-                    {
-                        deviceInventorySafe = false;
-                        continue;
-                    }
-
-                    string? blockReason = IsRunning(state) ? "Arresta il dispositivo in Xcode prima di rimuoverlo." : null;
-                    devices.Add(new XcodeCandidate(
-                        Key: uuid,
-                        Kind: XcodeResourceKind.Device,
-                        Name: name,
-                        CliId: uuid,
-                        RuntimeIdentifier: group.Name,
-                        State: state,
-                        SizeBytes: Int64(device, "dataPathSize"),
-                        BlockReason: blockReason));
-                }
+                throw new JsonException("L'inventario simulatori non è un oggetto JSON.");
             }
         }
-        catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException)
+        catch (JsonException ex)
         {
             deviceInventorySafe = false;
+            logicalRuntimeInventorySafe = false;
             warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, $"Inventario simulatori non leggibile: {ex.Message}"));
+            warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Inventario dei runtime logici non leggibile."));
+        }
+
+        if (simctlDocument is not null)
+        {
+            using (simctlDocument)
+            {
+                JsonElement root = simctlDocument.RootElement;
+                if (!root.TryGetProperty("runtimes", out JsonElement runtimeArray) || runtimeArray.ValueKind != JsonValueKind.Array)
+                {
+                    logicalRuntimeInventorySafe = false;
+                    warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Metadati dei runtime logici mancanti o non validi."));
+                }
+                else
+                {
+                    foreach (JsonElement runtime in runtimeArray.EnumerateArray())
+                    {
+                        string? identifier = String(runtime, "identifier");
+                        string? build = String(runtime, "buildversion") ?? String(runtime, "buildVersion");
+                        if (identifier is null || build is null)
+                        {
+                            logicalRuntimeInventorySafe = false;
+                            continue;
+                        }
+
+                        logicalRuntimes.Add(new LogicalRuntime(identifier, build, String(runtime, "name") ?? identifier, String(runtime, "version"), String(runtime, "platform")));
+                    }
+
+                    if (!logicalRuntimeInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Runtime))
+                    {
+                        warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Runtime, "Metadati dei runtime logici incompleti."));
+                    }
+                }
+
+                if (!root.TryGetProperty("devices", out JsonElement deviceGroups) || deviceGroups.ValueKind != JsonValueKind.Object)
+                {
+                    deviceInventorySafe = false;
+                    warnings.Add(new XcodeInventoryWarning(XcodeResourceKind.Device, "Elenco dispositivi mancante o non valido."));
+                }
+                else
+                {
+                    foreach (JsonProperty group in deviceGroups.EnumerateObject())
+                    {
+                        if (group.Value.ValueKind != JsonValueKind.Array)
+                        {
+                            deviceInventorySafe = false;
+                            continue;
+                        }
+
+                        foreach (JsonElement device in group.Value.EnumerateArray())
+                        {
+                            string? uuid = String(device, "udid");
+                            string? name = String(device, "name");
+                            string? state = String(device, "state");
+                            if (uuid is null || !IsUuid(uuid) || name is null)
+                            {
+                                deviceInventorySafe = false;
+                                continue;
+                            }
+
+                            string? blockReason = DeviceBlockReason(state);
+                            if (state is null || (!IsRunning(state) && !IsShutdown(state)))
+                            {
+                                deviceInventorySafe = false;
+                            }
+
+                            devices.Add(new XcodeCandidate(
+                                Key: uuid,
+                                Kind: XcodeResourceKind.Device,
+                                Name: name,
+                                CliId: uuid,
+                                RuntimeIdentifier: group.Name,
+                                State: state,
+                                SizeBytes: Int64(device, "dataPathSize"),
+                                BlockReason: blockReason));
+                        }
+                    }
+                }
+            }
         }
 
         if (!deviceInventorySafe && warnings.All(w => w.ResourceGroup != XcodeResourceKind.Device))
@@ -155,6 +184,10 @@ public static class XcodeJson
             {
                 blockReason = "Inventario simulatori incompleto; non è possibile verificare l'uso del runtime.";
             }
+            else if (!logicalRuntimeInventorySafe)
+            {
+                blockReason = "Metadati dei runtime logici incompleti; ripeti l'analisi.";
+            }
             else if (image.RuntimeIdentifier is null || image.Build is null || exactMatches.Count != 1)
             {
                 blockReason = "Associazione tra runtime e build ambigua o non verificabile.";
@@ -176,9 +209,11 @@ public static class XcodeJson
             XcodeCandidate[] dependentDevices = image.RuntimeIdentifier is null
                 ? []
                 : devices.Where(device => device.RuntimeIdentifier == image.RuntimeIdentifier).ToArray();
-            if (blockReason is null && dependentDevices.Any(device => IsRunning(device.State)))
+            if (blockReason is null && dependentDevices.Any(device => !IsShutdown(device.State)))
             {
-                blockReason = "Un dispositivo che usa questo runtime è avviato; arrestalo in Xcode prima di rimuoverlo.";
+                blockReason = dependentDevices.Any(device => IsRunning(device.State))
+                    ? "Un dispositivo che usa questo runtime è avviato; arrestalo in Xcode prima di rimuoverlo."
+                    : "Lo stato di un dispositivo che usa questo runtime non è verificato.";
             }
 
             string runtimeName = exactMatches.Count == 1
@@ -222,6 +257,23 @@ public static class XcodeJson
         => state is not null && (state.Equals("Booted", StringComparison.OrdinalIgnoreCase)
             || state.Equals("Booting", StringComparison.OrdinalIgnoreCase)
             || state.Equals("Starting", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsShutdown(string? state) => state?.Equals("Shutdown", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static string? DeviceBlockReason(string? state)
+    {
+        if (IsShutdown(state))
+        {
+            return null;
+        }
+
+        if (IsRunning(state))
+        {
+            return "Arresta il dispositivo in Xcode prima di rimuoverlo.";
+        }
+
+        return $"Stato del dispositivo non verificato{(state is null ? string.Empty : $": {state}")}; ripeti l'analisi.";
+    }
 
     private sealed record LogicalRuntime(string Identifier, string Build, string Name, string? Version, string? Platform);
     private sealed record RuntimeImage(string Id, string? CliId, string? RuntimeIdentifier, string? Build, string? Version, string? State, long? SizeBytes, bool? Deletable);

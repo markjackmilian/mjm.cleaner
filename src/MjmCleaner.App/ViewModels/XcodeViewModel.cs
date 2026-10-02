@@ -50,7 +50,22 @@ public sealed partial class XcodeGroupNode : ObservableObject
     };
     public bool IsExpanded => Kind is XcodeResourceKind.DerivedData or XcodeResourceKind.DeviceSupport;
     public bool ShowGroupCheckBox => Kind is XcodeResourceKind.DerivedData or XcodeResourceKind.DeviceSupport;
-    public string Summary => $"{Rows.Count:N0} voci · {ViewModelBase.FormatBytes(Rows.Sum(r => r.Candidate.SizeBytes ?? 0))}" + (Rows.Any(r => r.Candidate.SizeBytes is null) ? " · alcune dimensioni non disponibili" : "");
+    public string Summary
+    {
+        get
+        {
+            bool hasKnownSizes = Rows.Any(r => r.Candidate.SizeBytes.HasValue);
+            long knownBytes = Rows.Where(r => r.Candidate.SizeBytes.HasValue).Sum(r => r.Candidate.SizeBytes!.Value);
+            int unknownCount = Rows.Count(r => r.Candidate.SizeBytes is null);
+            string size = hasKnownSizes ? $"{ViewModelBase.FormatBytes(knownBytes)} stimati noti" : "dimensioni non disponibili";
+            if (hasKnownSizes && unknownCount > 0)
+            {
+                string unknownLabel = unknownCount == 1 ? "1 dimensione non disponibile" : $"{unknownCount} dimensioni non disponibili";
+                size += $" · {unknownLabel}";
+            }
+            return $"{Rows.Count:N0} voci · {size}";
+        }
+    }
     partial void OnIsSelectedChanged(bool value)
     {
         if (_sync || !ShowGroupCheckBox) return;
@@ -107,6 +122,11 @@ public sealed partial class XcodeViewModel : ViewModelBase
     private async Task LoadAsync()
     {
         IsLoading = true; ErrorText = string.Empty; WarningText = string.Empty; Confirmation = null; AcknowledgeDependencies = false; Groups.Clear(); _snapshot = null;
+        if (!IsDeleting)
+        {
+            _executionStarted = false;
+            ConfirmDeleteCommand.NotifyCanExecuteChanged();
+        }
         try
         {
             XcodeSnapshot snapshot = await _xcode.AnalyzeAsync(CancellationToken.None);
@@ -153,12 +173,14 @@ public sealed partial class XcodeViewModel : ViewModelBase
     {
         if (_executionStarted || Confirmation is null) return;
         _executionStarted = true; ConfirmDeleteCommand.NotifyCanExecuteChanged(); IsDeleting = true; ErrorText = string.Empty;
+        bool executionReturnedReport = false;
         try
         {
             XcodeConfirmedPlan plan = XcodeSelection.Confirm(Confirmation, AcknowledgeDependencies);
             _deleteCts = new CancellationTokenSource();
             IProgress<CleanProgress> progress = new Progress<CleanProgress>(p => ProgressText = $"{p.ItemsDone:N0} / {p.ItemsTotal:N0} · {p.CurrentPath}");
             XcodeCleanResult result = await _xcode.ExecuteAsync(plan, progress, _deleteCts.Token);
+            executionReturnedReport = true;
             CurrentReport = new XcodeReportViewModel(_xcode, _history, _log, _navigation, result);
             _navigation.GoTo(CurrentReport);
         }
@@ -167,7 +189,14 @@ public sealed partial class XcodeViewModel : ViewModelBase
             ErrorText = "Operazione interrotta prima di poter produrre il report.";
         }
         catch (Exception ex) { ErrorText = $"Pulizia Xcode non riuscita: {ex.Message}"; }
-        finally { _deleteCts?.Dispose(); _deleteCts = null; IsDeleting = false; }
+        finally
+        {
+            _deleteCts?.Dispose();
+            _deleteCts = null;
+            _executionStarted = executionReturnedReport;
+            IsDeleting = false;
+            ConfirmDeleteCommand.NotifyCanExecuteChanged();
+        }
     }
     [RelayCommand(CanExecute = nameof(IsDeleting))] private void CancelDelete() => _deleteCts?.Cancel();
     private bool CanNavigate() => !IsDeleting;

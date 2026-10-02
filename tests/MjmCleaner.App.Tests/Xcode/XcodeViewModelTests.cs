@@ -56,6 +56,7 @@ public sealed class XcodeViewModelTests
         service.Execution.SetResult(Result());
         await Task.WhenAll(first, second);
         Assert.Equal(1, service.ExecuteCount);
+        Assert.False(vm.ConfirmDeleteCommand.CanExecute(null));
     }
 
     [Fact]
@@ -68,6 +69,26 @@ public sealed class XcodeViewModelTests
         await vm.RetryCommand.ExecuteAsync(null);
         Assert.Equal("two", Assert.Single(vm.Groups.Single(g => g.Kind == XcodeResourceKind.Device).Rows).Candidate.Name);
         Assert.False(vm.Groups.Single(g => g.Kind == XcodeResourceKind.Device).Rows.Single().IsSelected);
+    }
+
+    [Fact]
+    public void UnknownOnlyGroupSummaryDoesNotDisplayZeroBytes()
+    {
+        XcodeGroupNode group = new(XcodeResourceKind.DeviceSupport,
+            [Candidate("unknown", XcodeResourceKind.DeviceSupport) with { SizeBytes = null }], []);
+
+        Assert.Contains("dimensioni non disponibili", group.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("0 B", group.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MixedGroupSummaryLabelsKnownEstimateAndUnknownCount()
+    {
+        XcodeGroupNode group = new(XcodeResourceKind.DerivedData,
+            [Candidate("known", XcodeResourceKind.DerivedData) with { SizeBytes = 2048 }, Candidate("unknown", XcodeResourceKind.DerivedData) with { SizeBytes = null }], []);
+
+        Assert.Contains("noti", group.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 dimensione non disponibile", group.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -116,6 +137,35 @@ public sealed class XcodeViewModelTests
         Assert.Equal("Saltata", vm.CurrentReport.Items[0].OutcomeText);
         Assert.Equal(1, history.Saves);
         Assert.Equal(1, log.Writes);
+    }
+
+    [Fact]
+    public async Task RetryAfterExecutionFailureCanConfirmAgain()
+    {
+        int attempts = 0;
+        FakeXcode service = new(Snapshot(Candidate("device", XcodeResourceKind.Device)))
+        {
+            ExecutionHandler = (_, _) => ++attempts == 1
+                ? Task.FromException<XcodeCleanResult>(new IOException("temporary executor failure"))
+                : Task.FromResult(Result()),
+        };
+        FakeNavigation navigation = new();
+        XcodeViewModel vm = new(service, new FakeHistory(), new FakeLog(), navigation);
+        await vm.InitialLoad;
+        vm.Groups.Single(g => g.Kind == XcodeResourceKind.Device).Rows.Single().IsSelected = true;
+        vm.PreviewCommand.Execute(null);
+        await vm.ConfirmDeleteCommand.ExecuteAsync(null);
+        Assert.Contains("temporary executor failure", vm.ErrorText, StringComparison.Ordinal);
+
+        await vm.RetryCommand.ExecuteAsync(null);
+        vm.Groups.Single(g => g.Kind == XcodeResourceKind.Device).Rows.Single().IsSelected = true;
+        vm.PreviewCommand.Execute(null);
+        Assert.True(vm.ConfirmDeleteCommand.CanExecute(null));
+        await vm.ConfirmDeleteCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, service.ExecuteCount);
+        Assert.Equal(1, navigation.NavigationCount);
+        Assert.NotNull(vm.CurrentReport);
     }
 
     internal static XcodeSnapshot Snapshot(params XcodeCandidate[] candidates) => new(candidates, []);

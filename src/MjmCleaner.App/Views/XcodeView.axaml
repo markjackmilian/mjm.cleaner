@@ -11,46 +11,50 @@
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
             <TextBlock Text="{Binding WarningText}" IsVisible="{Binding HasWarnings}" Classes="Muted" TextWrapping="Wrap" />
-            <Border IsVisible="{Binding HasConfirmation}" Padding="14" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}" BorderThickness="1" BorderBrush="#F0D69B">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Conferma finale" FontWeight="Bold" />
-                    <TextBlock Text="{Binding PreviewSummaryText}" />
-                    <TextBlock Text="{Binding PreviewEstimateText}" Classes="Muted" />
-                    <ItemsControl ItemsSource="{Binding Confirmation.SelectedCandidates}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding Path}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding CliId}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Text="Eliminare un dispositivo rimuove anche le sue app e i dati di test."
-                               IsVisible="{Binding HasSelectedDevices}" TextWrapping="Wrap" />
-                    <TextBlock Text="Rimuovere un runtime può rendere indisponibili i dispositivi che lo usano."
-                               IsVisible="{Binding HasSelectedRuntimes}" TextWrapping="Wrap" />
-                    <TextBlock Text="I dispositivi elencati resteranno sul disco, ma potrebbero non avviarsi se rimuovi il runtime."
-                               IsVisible="{Binding HasRetainedDependencies}" TextWrapping="Wrap" />
-                    <ItemsControl ItemsSource="{Binding Confirmation.RetainedDependentDevices}" IsVisible="{Binding HasRetainedDependencies}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding CliId}" Classes="Muted" FontSize="11" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <CheckBox Content="Ho capito che i dispositivi elencati potrebbero non essere più disponibili finché non reinstallo il runtime."
-                              IsVisible="{Binding HasRetainedDependencies}"
-                              IsChecked="{Binding AcknowledgeDependencies}" IsEnabled="{Binding !IsDeleting}" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Border IsVisible="{Binding HasConfirmation}" Padding="14" CornerRadius="10" Background="{DynamicResource WarningSurfaceBrush}" BorderThickness="1" BorderBrush="#F0D69B" MaxHeight="330">
+                <Grid RowDefinitions="*,Auto" RowSpacing="8">
+                    <ScrollViewer Grid.Row="0" MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Conferma finale" FontWeight="Bold" />
+                            <TextBlock Text="{Binding PreviewSummaryText}" />
+                            <TextBlock Text="{Binding PreviewEstimateText}" Classes="Muted" />
+                            <ItemsControl ItemsSource="{Binding Confirmation.SelectedCandidates}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Path}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding CliId}" Classes="Muted" FontSize="11" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="Eliminare un dispositivo rimuove anche le sue app e i dati di test."
+                                       IsVisible="{Binding HasSelectedDevices}" TextWrapping="Wrap" />
+                            <TextBlock Text="Rimuovere un runtime può rendere indisponibili i dispositivi che lo usano."
+                                       IsVisible="{Binding HasSelectedRuntimes}" TextWrapping="Wrap" />
+                            <TextBlock Text="I dispositivi elencati resteranno sul disco, ma potrebbero non avviarsi se rimuovi il runtime."
+                                       IsVisible="{Binding HasRetainedDependencies}" TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding Confirmation.RetainedDependentDevices}" IsVisible="{Binding HasRetainedDependencies}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding CliId}" Classes="Muted" FontSize="11" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <CheckBox Content="Ho capito che i dispositivi elencati potrebbero non essere più disponibili finché non reinstallo il runtime."
+                                      IsVisible="{Binding HasRetainedDependencies}"
+                                      IsChecked="{Binding AcknowledgeDependencies}" IsEnabled="{Binding !IsDeleting}" />
+                        </StackPanel>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                         <Button Classes="Secondary" Content="Torna alla selezione" Command="{Binding BackToSelectionCommand}" IsEnabled="{Binding !IsDeleting}" />
                         <Button Classes="Destructive" Content="Conferma ed elimina" Command="{Binding ConfirmDeleteCommand}" IsEnabled="{Binding !IsDeleting}" />
                     </StackPanel>
-                </StackPanel>
+                </Grid>
             </Border>
             <TextBlock Text="{Binding ProgressText}" IsVisible="{Binding IsDeleting}" Classes="Muted" HorizontalAlignment="Right" />
             <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />

@@ -1,4 +1,5 @@
 ﻿using Avalonia;
+using Avalonia.Media;
 using System;
 
 namespace MjmCleaner.App;
@@ -20,5 +21,7 @@ class Program
             .WithDeveloperTools()
 #endif
             .WithInterFont()
+            // Su macOS Skia risolve ".AppleSystemUIFont" (San Francisco); "-apple-system" ricadrebbe su Inter.
+            .With(new FontManagerOptions { DefaultFamilyName = OperatingSystem.IsMacOS() ? ".AppleSystemUIFont" : null })
             .LogToTrace();
 }

@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MjmCleaner.App.Views.StepIndicator">
+    <UserControl.Styles>
+        <Style Selector="Border.StepCircle"><Setter Property="Width" Value="18" /><Setter Property="Height" Value="18" /><Setter Property="CornerRadius" Value="9" /><Setter Property="BorderThickness" Value="1" /><Setter Property="BorderBrush" Value="{DynamicResource CheckBorderBrush}" /></Style>
+        <Style Selector="Border.StepCircle TextBlock"><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" /><Setter Property="HorizontalAlignment" Value="Center" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+        <Style Selector="Border.StepCircle.current"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="0" /></Style>
+        <Style Selector="Border.StepCircle.current TextBlock"><Setter Property="Foreground" Value="White" /></Style>
+        <Style Selector="TextBlock.StepLabel"><Setter Property="FontSize" Value="12" /><Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+        <Style Selector="TextBlock.StepLabel.current"><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" /></Style>
+        <Style Selector="Border.StepSeparator"><Setter Property="Width" Value="18" /><Setter Property="Height" Value="1" /><Setter Property="VerticalAlignment" Value="Center" /><Setter Property="Background" Value="{DynamicResource SeparatorBrush}" /></Style>
+    </UserControl.Styles>
+
+    <StackPanel Orientation="Horizontal" Spacing="8" AutomationProperties.Name="Avanzamento">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <Border x:Name="Step1" Classes="StepCircle"><TextBlock Text="1" /></Border>
+            <TextBlock x:Name="Label1" Classes="StepLabel" Text="Scegli" />
+        </StackPanel>
+        <Border Classes="StepSeparator" />
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <Border x:Name="Step2" Classes="StepCircle"><TextBlock Text="2" /></Border>
+            <TextBlock x:Name="Label2" Classes="StepLabel" Text="Analizza" />
+        </StackPanel>
+        <Border Classes="StepSeparator" />
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <Border x:Name="Step3" Classes="StepCircle"><TextBlock Text="3" /></Border>
+            <TextBlock x:Name="Label3" Classes="StepLabel" Text="Conferma" />
+        </StackPanel>
+        <Border Classes="StepSeparator" />
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <Border x:Name="Step4" Classes="StepCircle"><TextBlock Text="4" /></Border>
+            <TextBlock x:Name="Label4" Classes="StepLabel" Text="Fatto" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

@@ -51,6 +51,8 @@ public partial class App : Application
         try
         {
             AppServices services = await AppServices.CreateAsync();
+            // L'aspetto va applicato prima di creare la finestra, così non lampeggia il tema sbagliato.
+            new AppearanceController(Current!).Apply(services.Settings.Load().Appearance);
             return new MainWindow { DataContext = new MainWindowViewModel(services) };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SqliteException)

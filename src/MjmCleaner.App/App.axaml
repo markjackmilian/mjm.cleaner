@@ -4,10 +4,16 @@
              xmlns:views="clr-namespace:MjmCleaner.App.Views"
              x:Class="MjmCleaner.App.App"
              Name="mjm.cleaner"
-             RequestedThemeVariant="Light">
+             RequestedThemeVariant="Default">
 
     <Application.Styles>
-        <FluentTheme />
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Light" Accent="#0A66D8" RegionColor="#F7F7F9" />
+                <ColorPaletteResources x:Key="Dark" Accent="#0A66D8" RegionColor="#1E1E20" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+        <StyleInclude Source="avares://MjmCleaner.App/Styles/Icons.axaml" />
         <StyleInclude Source="avares://MjmCleaner.App/Styles/MacTheme.axaml" />
     </Application.Styles>
 

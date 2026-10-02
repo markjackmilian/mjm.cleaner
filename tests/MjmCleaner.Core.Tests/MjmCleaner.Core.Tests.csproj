@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <None Include="Docker\Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Xcode\Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

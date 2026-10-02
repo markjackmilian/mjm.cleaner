@@ -6,8 +6,8 @@
              x:DataType="vm:DockerViewModel">
 
     <UserControl.Styles>
-        <!-- Pallino di stato «motore non raggiungibile»: pulsa lentamente tra opacità piena e 0,35. -->
-        <Style Selector="Ellipse.StatusDot">
+        <!-- Pallino di stato «motore non raggiungibile»: pulsa lentamente tra opacità piena e 0,35, solo mentre la pill è visibile. -->
+        <Style Selector="Border.StatusPill[IsVisible=True] Ellipse.StatusDot">
             <Style.Animations>
                 <Animation Duration="0:0:1.6" IterationCount="INFINITE" PlaybackDirection="Alternate">
                     <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
@@ -33,7 +33,7 @@
             </Grid>
         </Border>
 
-        <Border DockPanel.Dock="Bottom" Classes="ActionBar">
+        <Border DockPanel.Dock="Bottom" Classes="ActionBar" IsVisible="{Binding IsReady}">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <TextBlock Text="{Binding DeleteProgressText}"
                            IsVisible="{Binding IsDeleting}"

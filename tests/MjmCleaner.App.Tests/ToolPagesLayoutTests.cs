@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using MjmCleaner.App.Tests.Xcode;
@@ -44,4 +45,28 @@ file static class LogicalExtensions
 {
     public static IEnumerable<T> GetLogicalDescendantsOfType<T>(this Avalonia.LogicalTree.ILogical root)
         => Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants(root).OfType<T>();
+}
+
+public sealed class ExpanderThemeTests
+{
+    // Regressione: l'intestazione dell'Expander usava lo sfondo nero di FluentTheme invece del colore della card.
+    [AvaloniaTheory]
+    [InlineData("Dark", "#FF2B2B2E")]
+    [InlineData("Light", "#FFFFFFFF")]
+    public void ExpanderHeaderUsesGroupColour(string variant, string expected)
+    {
+        Expander expander = new() { Header = "Gruppo", Content = new TextBlock { Text = "x" }, IsExpanded = true };
+        Window window = new()
+        {
+            Width = 400, Height = 300, Content = expander,
+            RequestedThemeVariant = variant == "Dark" ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light,
+        };
+        window.Show();
+        window.UpdateLayout();
+
+        ToggleButton header = window.GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "ExpanderHeader");
+        Avalonia.Media.Color color = Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(header.Background).Color;
+        Assert.Equal(expected, $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}");
+        window.Close();
+    }
 }

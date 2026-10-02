@@ -40,6 +40,30 @@
                     <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="BorderBrush" Color="#14000000" />
                     <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#0E000000" />
+                    <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme). -->
+                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#07000000" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#13000000" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushDisabled" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderForeground" Color="#1D1D1F" />
+                    <SolidColorBrush x:Key="ExpanderHeaderForegroundPointerOver" Color="#1D1D1F" />
+                    <SolidColorBrush x:Key="ExpanderHeaderForegroundPressed" Color="#1D1D1F" />
+                    <SolidColorBrush x:Key="ExpanderHeaderForegroundDisabled" Color="#B4B4B8" />
+                    <SolidColorBrush x:Key="ExpanderChevronForeground" Color="#68686D" />
+                    <SolidColorBrush x:Key="ExpanderChevronForegroundPointerOver" Color="#1D1D1F" />
+                    <SolidColorBrush x:Key="ExpanderChevronForegroundPressed" Color="#1D1D1F" />
+                    <SolidColorBrush x:Key="ExpanderChevronBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBackgroundPointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBackgroundPressed" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBorderBrush" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBorderBrushPointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBorderBrushPressed" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="Transparent" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="WindowBrush" Color="#232325" />
@@ -78,6 +102,30 @@
                     <SolidColorBrush x:Key="CardBrush" Color="#2B2B2E" />
                     <SolidColorBrush x:Key="BorderBrush" Color="#14FFFFFF" />
                     <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#14FFFFFF" />
+                    <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme). -->
+                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#2B2B2E" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#09FFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#1AFFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="#2B2B2E" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushDisabled" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderForeground" Color="#F5F5F7" />
+                    <SolidColorBrush x:Key="ExpanderHeaderForegroundPointerOver" Color="#F5F5F7" />
+                    <SolidColorBrush x:Key="ExpanderHeaderForegroundPressed" Color="#F5F5F7" />
+                    <SolidColorBrush x:Key="ExpanderHeaderForegroundDisabled" Color="#5E5E62" />
+                    <SolidColorBrush x:Key="ExpanderChevronForeground" Color="#A1A1A6" />
+                    <SolidColorBrush x:Key="ExpanderChevronForegroundPointerOver" Color="#F5F5F7" />
+                    <SolidColorBrush x:Key="ExpanderChevronForegroundPressed" Color="#F5F5F7" />
+                    <SolidColorBrush x:Key="ExpanderChevronBackground" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBackgroundPointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBackgroundPressed" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBorderBrush" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBorderBrushPointerOver" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBorderBrushPressed" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="#2B2B2E" />
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="Transparent" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
             <SolidColorBrush x:Key="AccentBrush" Color="#0A66D8" />
@@ -112,6 +160,8 @@
     <Style Selector="Border.Separator"><Setter Property="Height" Value="0.5" /><Setter Property="Background" Value="{DynamicResource SeparatorBrush}" /></Style>
     <Style Selector="Border.Banner"><Setter Property="Background" Value="{DynamicResource WarningSurfaceBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" /><Setter Property="BorderThickness" Value="0.5" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="12" /></Style>
     <Style Selector="Border.Banner TextBlock"><Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}" /></Style>
+    <!-- Nel banner le righe attenuate restano distinguibili; 0,9 mantiene il contrasto >= 4,5:1 in entrambi i temi. -->
+    <Style Selector="Border.Banner TextBlock.Muted"><Setter Property="Opacity" Value="0.9" /></Style>
     <Style Selector="Border.RiskPill"><Setter Property="CornerRadius" Value="999" /><Setter Property="Padding" Value="8,2" /></Style>
     <Style Selector="Border.RiskPill TextBlock"><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="Medium" /></Style>
     <Style Selector="Border.RiskPill.Low"><Setter Property="Background" Value="{DynamicResource RiskLowSurfaceBrush}" /></Style>

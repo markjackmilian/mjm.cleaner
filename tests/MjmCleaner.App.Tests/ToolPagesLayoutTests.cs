@@ -67,6 +67,34 @@ public sealed class ExpanderThemeTests
         ToggleButton header = window.GetVisualDescendants().OfType<ToggleButton>().Single(t => t.Name == "ExpanderHeader");
         Avalonia.Media.Color color = Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(header.Background).Color;
         Assert.Equal(expected, $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}");
+
+        // Intestazione e contenuto formano un'unica card: stesso bordo da 0,5 su entrambe le parti.
+        Border headerBorder = header.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ToggleButtonBackground");
+        Border contentBorder = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ExpanderContent");
+        Assert.Equal(new Avalonia.Thickness(0.5), headerBorder.BorderThickness);
+        Assert.Equal(new Avalonia.Thickness(0.5, 0, 0.5, 0.5), contentBorder.BorderThickness);
+        Assert.Equal(((Avalonia.Media.ISolidColorBrush)headerBorder.BorderBrush!).Color, ((Avalonia.Media.ISolidColorBrush)contentBorder.BorderBrush!).Color);
+        Assert.NotEqual(Avalonia.Media.Colors.Transparent, ((Avalonia.Media.ISolidColorBrush)headerBorder.BorderBrush!).Color);
         window.Close();
+    }
+
+    // Gli Expander poggiano sulla pagina, non su una card: hover e pressed devono essere opachi (pre-miscelati).
+    [AvaloniaTheory]
+    [InlineData("Dark", "ExpanderHeaderBackgroundPointerOver", "#FF323235")]
+    [InlineData("Dark", "ExpanderHeaderBackgroundPressed", "#FF3A3A3D")]
+    [InlineData("Dark", "GroupHoverBrush", "#FF323235")]
+    [InlineData("Dark", "GroupPressedBrush", "#FF3A3A3D")]
+    [InlineData("Light", "ExpanderHeaderBackgroundPointerOver", "#FFF8F8F8")]
+    [InlineData("Light", "ExpanderHeaderBackgroundPressed", "#FFEDEDED")]
+    [InlineData("Light", "GroupHoverBrush", "#FFF8F8F8")]
+    [InlineData("Light", "GroupPressedBrush", "#FFEDEDED")]
+    [InlineData("Dark", "ExpanderChevronBackgroundDisabled", "#00FFFFFF")]
+    [InlineData("Light", "ExpanderChevronBorderBrushDisabled", "#00FFFFFF")]
+    public void ExpanderStateBrushesAreOpaqueTokens(string variant, string key, string expected)
+    {
+        Avalonia.Styling.ThemeVariant theme = variant == "Dark" ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
+        Assert.True(Avalonia.Application.Current!.TryGetResource(key, theme, out object? value));
+        Avalonia.Media.Color color = ((Avalonia.Media.ISolidColorBrush)value!).Color;
+        Assert.Equal(expected, $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}");
     }
 }

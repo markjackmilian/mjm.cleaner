@@ -40,15 +40,17 @@
                     <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="BorderBrush" Color="#14000000" />
                     <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#0E000000" />
+                    <SolidColorBrush x:Key="GroupHoverBrush" Color="#F8F8F8" />
+                    <SolidColorBrush x:Key="GroupPressedBrush" Color="#EDEDED" />
                     <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme). -->
                     <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#07000000" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#13000000" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#F8F8F8" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#EDEDED" />
                     <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushDisabled" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#14000000" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="#14000000" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="#14000000" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushDisabled" Color="#14000000" />
                     <SolidColorBrush x:Key="ExpanderHeaderForeground" Color="#1D1D1F" />
                     <SolidColorBrush x:Key="ExpanderHeaderForegroundPointerOver" Color="#1D1D1F" />
                     <SolidColorBrush x:Key="ExpanderHeaderForegroundPressed" Color="#1D1D1F" />
@@ -62,8 +64,10 @@
                     <SolidColorBrush x:Key="ExpanderChevronBorderBrush" Color="Transparent" />
                     <SolidColorBrush x:Key="ExpanderChevronBorderBrushPointerOver" Color="Transparent" />
                     <SolidColorBrush x:Key="ExpanderChevronBorderBrushPressed" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBackgroundDisabled" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBorderBrushDisabled" Color="Transparent" />
                     <SolidColorBrush x:Key="ExpanderContentBackground" Color="#FFFFFF" />
-                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#14000000" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="WindowBrush" Color="#232325" />
@@ -102,15 +106,17 @@
                     <SolidColorBrush x:Key="CardBrush" Color="#2B2B2E" />
                     <SolidColorBrush x:Key="BorderBrush" Color="#14FFFFFF" />
                     <SolidColorBrush x:Key="SubtleSurfaceBrush" Color="#14FFFFFF" />
+                    <SolidColorBrush x:Key="GroupHoverBrush" Color="#323235" />
+                    <SolidColorBrush x:Key="GroupPressedBrush" Color="#3A3A3D" />
                     <!-- Expander: intestazione e contenuto sul colore della card (sovrascrive lo sfondo di FluentTheme). -->
                     <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#2B2B2E" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#09FFFFFF" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#1AFFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#323235" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#3A3A3D" />
                     <SolidColorBrush x:Key="ExpanderHeaderBackgroundDisabled" Color="#2B2B2E" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent" />
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushDisabled" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#14FFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="#14FFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="#14FFFFFF" />
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrushDisabled" Color="#14FFFFFF" />
                     <SolidColorBrush x:Key="ExpanderHeaderForeground" Color="#F5F5F7" />
                     <SolidColorBrush x:Key="ExpanderHeaderForegroundPointerOver" Color="#F5F5F7" />
                     <SolidColorBrush x:Key="ExpanderHeaderForegroundPressed" Color="#F5F5F7" />
@@ -124,10 +130,15 @@
                     <SolidColorBrush x:Key="ExpanderChevronBorderBrush" Color="Transparent" />
                     <SolidColorBrush x:Key="ExpanderChevronBorderBrushPointerOver" Color="Transparent" />
                     <SolidColorBrush x:Key="ExpanderChevronBorderBrushPressed" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBackgroundDisabled" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderChevronBorderBrushDisabled" Color="Transparent" />
                     <SolidColorBrush x:Key="ExpanderContentBackground" Color="#2B2B2E" />
-                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="Transparent" />
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#14FFFFFF" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+            <!-- Expander: bordo da 0,5 continuo tra intestazione e contenuto (default Fluent: 1). -->
+            <Thickness x:Key="ExpanderHeaderBorderThickness">0.5</Thickness>
+            <Thickness x:Key="ExpanderContentDownBorderThickness">0.5,0,0.5,0.5</Thickness>
             <SolidColorBrush x:Key="AccentBrush" Color="#0A66D8" />
             <SolidColorBrush x:Key="AccentHoverBrush" Color="#1A72E0" />
             <SolidColorBrush x:Key="AccentPressedBrush" Color="#0957BA" />

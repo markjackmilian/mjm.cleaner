@@ -5,15 +5,18 @@ namespace MjmCleaner.Core.Tests.Scanning;
 
 /// <summary>
 /// Decora un <see cref="IFileSystem"/> in modo che <c>Directory.EnumerateFileSystemEntries</c>
-/// su un percorso specifico lanci sempre <see cref="UnauthorizedAccessException"/>, simulando
+/// su un percorso specifico lanci sempre <see cref="UnauthorizedAccessException"/> (o l'eccezione prodotta da <c>exceptionFactory</c>), simulando
 /// una sottodirectory illeggibile (permessi negati) incontrata durante la somma ricorsiva delle
 /// dimensioni. A differenza di <see cref="VanishingChildFileSystem"/> (che scompare una tantum),
 /// qui <c>Directory.Exists</c> continua a restituire true per il percorso: la directory esiste
 /// ed è visibile, semplicemente non è elencabile.
 /// </summary>
-internal sealed class UnreadableDirectoryFileSystem(IFileSystem inner, string unreadablePath) : IFileSystem
+internal sealed class UnreadableDirectoryFileSystem(
+    IFileSystem inner,
+    string unreadablePath,
+    Func<string, Exception>? exceptionFactory = null) : IFileSystem
 {
-    public IDirectory Directory { get; } = UnreadableDirectoryProxy.Wrap(inner.Directory, unreadablePath);
+    public IDirectory Directory { get; } = UnreadableDirectoryProxy.Wrap(inner.Directory, unreadablePath, exceptionFactory);
 
     public IDirectoryInfoFactory DirectoryInfo => inner.DirectoryInfo;
 
@@ -43,6 +46,7 @@ internal class UnreadableDirectoryProxy : DispatchProxy
 {
     private IDirectory _inner = null!;
     private string _target = null!;
+    private Func<string, Exception> _exceptionFactory = null!;
 
     protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
     {
@@ -50,7 +54,7 @@ internal class UnreadableDirectoryProxy : DispatchProxy
             && args is { Length: > 0 } && args[0] is string path
             && path == _target)
         {
-            throw new UnauthorizedAccessException($"Accesso negato: {path}");
+            throw _exceptionFactory(path);
         }
 
         try
@@ -63,12 +67,13 @@ internal class UnreadableDirectoryProxy : DispatchProxy
         }
     }
 
-    public static IDirectory Wrap(IDirectory inner, string target)
+    public static IDirectory Wrap(IDirectory inner, string target, Func<string, Exception>? exceptionFactory)
     {
         object proxy = Create<IDirectory, UnreadableDirectoryProxy>()!;
         UnreadableDirectoryProxy typed = (UnreadableDirectoryProxy)proxy;
         typed._inner = inner;
         typed._target = target;
+        typed._exceptionFactory = exceptionFactory ?? (path => new UnauthorizedAccessException($"Accesso negato: {path}"));
         return (IDirectory)proxy;
     }
 }

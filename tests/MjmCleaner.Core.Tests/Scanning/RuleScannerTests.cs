@@ -406,4 +406,30 @@ public class RuleScannerTests
         Assert.Contains(outcome.Items, i => i.Path == $"{projects}/progetto/bin");
         Assert.Contains(outcome.Exclusions, e => e.Path == $"{projects}/progetto/.git");
     }
+
+    // Mount virtuali (es. ~/Library/Developer/CoreDevice/DeviceFS, il filesystem di un
+    // dispositivo collegato) rispondono "Invalid argument" all'enumerazione: un'eccezione fuori
+    // da IsExpected. Non deve fermare l'analisi né richiedere che l'utente escluda il percorso:
+    // il ramo si registra come errore e il resto della scansione continua.
+    [Fact]
+    public void UnexpectedEnumerationFailureIsRecordedAndScanContinues()
+    {
+        MockFileSystem mock = new();
+        string projects = $"{Home}/projects";
+        string broken = $"{Home}/Library/Developer/CoreDevice/DeviceFS/device-1/DiagnosticReports";
+        mock.AddFile($"{projects}/grosso.bin", File(200_000_000));
+        mock.AddFile($"{broken}/report.ips", File(10));
+
+        UnreadableDirectoryFileSystem fs = new(
+            mock, broken, path => new ArgumentException($"Invalid argument : '{path}'"));
+        FakeLinkInspector links = new();
+        RuleScanner scanner = new(fs, new PathGuard(new DenyList(Home), links, Home), links, new TestTimeProvider(Now));
+
+        RuleScanOutcome outcome = scanner.Scan(
+            new CleanupRule(Home, ScanMode.MatchingFiles, All, [], MinSizeBytes: 100_000_000, MaxDepth: 12),
+            CancellationToken.None);
+
+        Assert.Contains(outcome.Items, i => i.Path == $"{projects}/grosso.bin");
+        Assert.Contains(outcome.Errors, e => e.Path == broken);
+    }
 }

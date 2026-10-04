@@ -446,13 +446,22 @@ public sealed class RuleScanner(
         return false;
     }
 
+    /// <summary>
+    /// Elenca una directory senza mai far fallire l'intera scansione per un ramo illeggibile.
+    /// Il catch è volutamente più largo di <see cref="IsExpected"/>: mount virtuali come
+    /// "~/Library/Developer/CoreDevice/DeviceFS" (il filesystem di un dispositivo collegato)
+    /// rispondono "Invalid argument" con eccezioni di tipo imprevedibile, e l'utente non può
+    /// essere tenuto a escludere a mano ogni percorso problematico. L'errore si registra sul
+    /// ramo e si prosegue. L'elenco si materializza qui dentro perché l'enumerazione reale è
+    /// pigra: un errore durante l'iterazione, fuori dal try, risalirebbe fino all'interfaccia.
+    /// </summary>
     private IEnumerable<string> Enumerate(string directory, List<ScanError> errors)
     {
         try
         {
-            return fileSystem.Directory.EnumerateFileSystemEntries(directory);
+            return fileSystem.Directory.EnumerateFileSystemEntries(directory).ToList();
         }
-        catch (Exception ex) when (IsExpected(ex))
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             errors.Add(Describe(directory, ex));
             return [];

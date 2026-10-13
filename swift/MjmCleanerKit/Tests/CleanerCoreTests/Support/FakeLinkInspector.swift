@@ -1,4 +1,4 @@
-import CleanerCore
+@testable import CleanerCore
 
 /// Porting di `FakeLinkInspector.cs`. L'inizializzatore a elenco marca ogni percorso come
 /// collegamento con destinazione non specificata (`resolveLinkTarget` → `nil`); quello a mappa
@@ -32,6 +32,6 @@ struct FakeLinkInspector: LinkInspecting {
     }
 
     private static func key(_ path: String) -> String {
-        PathText.trimmingTrailingSlashes(path).lowercased()
+        PathText.folded(PathText.trimmingTrailingSlashes(path))
     }
 }

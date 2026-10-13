@@ -139,9 +139,11 @@ public struct PathGuard: PathGuarding {
 
         // 5. Collegamenti simbolici fra l'elemento e la root: la root e ciò che sta sopra sono già
         //    stati verificati da validateRoot, quindi qui si risale fino a lì, non oltre.
-        // Il limite è semantico (strettamente sotto la root), non una lunghezza: un ripiegamento delle maiuscole non può accorciarlo.
+        // Il limite è semantico (strettamente sotto la root), non una lunghezza: un ripiegamento
+        // delle maiuscole non può accorciarlo.
+        let rootPrefix = root + "/"
         var ancestor = PathText.parent(path)
-        while let current = ancestor, PathText.hasPrefixIgnoringCase(current, root + "/") {
+        while let current = ancestor, PathText.hasPrefixIgnoringCase(current, rootPrefix) {
             if links.isSymbolicLink(current) {
                 return .deny(String(localized: "antenato è un collegamento simbolico: \(current)", bundle: .module), path)
             }

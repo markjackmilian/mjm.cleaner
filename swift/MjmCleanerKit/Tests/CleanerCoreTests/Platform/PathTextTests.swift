@@ -56,6 +56,9 @@ struct PathTextTests {
         #expect(!PathText.equalsIgnoringCase("te\u{FB06}er", "TESTER"))
         #expect(PathText.equalsIgnoringCase("/Users/È", "/users/è"))
         #expect(!PathText.hasPrefixIgnoringCase("/Users/strasse/x", "/Users/straße/"))
+        #expect(!PathText.equalsIgnoringCase("Lıbrary", "LIBRARY"))
+        #expect(!PathText.equalsIgnoringCase("ſ", "S"))
+        #expect(PathText.equalsIgnoringCase("\u{1F80}", "\u{1F88}"))
     }
 
     @Test func helpersSplitOnTheSlashByteNotOnGraphemes() {

@@ -307,4 +307,18 @@ struct PathGuardTests {
         #expect(!verdict.isAllowed)
         #expect(verdict.canonicalPathValidated == "/Users/tester/Library/Preferences")
     }
+
+    @Test func dotlessIDoesNotSatisfyContainment() throws {
+        let verdict = try create("/Users/tester/Lıbrary/Caches")
+            .validate("/Users/tester/Lıbrary/Caches/tesi.docx", declaredRoot: "/Users/tester/Library/Caches")
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("contenimento"))
+    }
+
+    @Test func dotlessIDoesNotBypassTheOtherUsersRule() throws {
+        let home = "/Users/marco.milani"
+        let guardrail = try PathGuard(denyList: DenyList(homeDirectory: home), links: FakeLinkInspector(), homeDirectory: home)
+        #expect(!guardrail.validate("/Users/marco.mılanı/Library/Caches/x", declaredRoot: "\(home)/Library/Caches").isAllowed)
+        #expect(guardrail.pruneReason("/Users/marco.mılanı/Documents") != nil)
+    }
 }

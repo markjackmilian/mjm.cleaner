@@ -115,17 +115,30 @@ public enum PathText {
         return String(scalars)
     }
 
-    /// Mappatura semplice alla maiuscola, come `OrdinalIgnoreCase` di .NET: uno scalare diventa la
-    /// sua maiuscola solo se questa è un singolo scalare. "ß" resta "ß" (mai "SS") e le legature
-    /// restano tali: Foundation `.caseInsensitive` le espande, cambiando la lunghezza dei testi
-    /// confrontati, e i controlli del PathGuard basati su prefissi smetterebbero di essere affidabili.
+    /// Ripiegamento per i confronti senza maiuscole, con la semantica di `OrdinalIgnoreCase` di
+    /// .NET 10: mappatura semplice alla maiuscola, scalare per scalare, lunghezza invariata. Swift
+    /// espone solo le mappature complete, quindi si usa la maiuscola quando è un solo scalare,
+    /// altrimenti la titlecase quando è un solo scalare (recupera le lettere greche con
+    /// ypogegrammeni, che .NET equipara), altrimenti lo scalare resta com'è: "ß" resta "ß", le
+    /// legature restano tali. Restano invariati anche i casi che .NET distingue: "ı" (U+0131) e "ſ"
+    /// (U+017F), e il blocco U+16EA0–U+16EDF, assente dai dati Unicode di .NET 10. Principio: non
+    /// equiparare mai due scalari che .NET distingue, perché renderebbe più permissivo il
+    /// contenimento del PathGuard; perdere un'equivalenza di .NET fa solo negare di più.
     private static func fold(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
         if scalar.isASCII {
             let value = scalar.value
             return (97...122).contains(value) ? Unicode.Scalar(UInt8(value - 32)) : scalar
         }
-        let upper = scalar.properties.uppercaseMapping.unicodeScalars
-        return upper.count == 1 ? (upper.first ?? scalar) : scalar
+        let value = scalar.value
+        if value == 0x0131 || value == 0x017F || (0x16EA0...0x16EDF).contains(value) {
+            return scalar
+        }
+        let properties = scalar.properties
+        let upper = properties.uppercaseMapping.unicodeScalars
+        if upper.count == 1, let mapped = upper.first { return mapped }
+        let title = properties.titlecaseMapping.unicodeScalars
+        if title.count == 1, let mapped = title.first { return mapped }
+        return scalar
     }
 
     /// Vero se `path` coincide con `ancestor` o vi è contenuto, rispettando il confine di

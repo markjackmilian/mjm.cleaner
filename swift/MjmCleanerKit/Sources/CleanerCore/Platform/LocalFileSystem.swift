@@ -78,7 +78,7 @@ public struct LocalFileSystem: FileSystem {
         // contenuto. Il "/" finale si toglie prima; la radice "/" resta "/", una stringa vuota
         // resta vuota e fallisce con ENOENT come prima.
         let trimmed = PathText.trimmingTrailingSlashes(path)
-        let target = trimmed.isEmpty && path.hasPrefix("/") ? "/" : trimmed
+        let target = trimmed.isEmpty && path.utf8.first == UInt8(ascii: "/") ? "/" : trimmed
 
         var status = stat()
         guard lstat(target, &status) == 0 else { throw FileSystemError(code: errno, path: target) }

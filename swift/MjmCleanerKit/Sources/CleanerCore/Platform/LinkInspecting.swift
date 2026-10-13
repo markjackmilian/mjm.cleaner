@@ -32,7 +32,7 @@ public struct FileSystemLinkInspector: LinkInspecting {
             guard isSymbolicLink(current) else { return current }
             guard let destination = readLink(current) else { return nil }
             let base = PathText.parent(current) ?? "/"
-            current = PathText.normalize(destination.hasPrefix("/") ? destination : PathText.join(base, destination))
+            current = PathText.normalize(destination.utf8.first == UInt8(ascii: "/") ? destination : PathText.join(base, destination))
         }
         return nil
     }

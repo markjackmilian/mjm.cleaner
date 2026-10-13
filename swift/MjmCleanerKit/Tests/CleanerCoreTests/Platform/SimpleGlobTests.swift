@@ -22,6 +22,7 @@ struct SimpleGlobTests {
         ("*.csproj", "*foo.csproj", true),
         ("?", "😀", false),
         ("??", "😀", true),
+        ("STRASSE", "straße", false), ("straße", "STRAßE", true),
     ])
     func matchesLikeDotNetSimpleExpression(pattern: String, name: String, expected: Bool) {
         #expect(SimpleGlob.matches(pattern, name) == expected)

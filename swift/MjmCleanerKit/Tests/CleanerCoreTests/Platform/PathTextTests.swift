@@ -49,4 +49,19 @@ struct PathTextTests {
         #expect(PathText.isSameOrUnder("/Library/Caches/x", "/Library/Caches"))
         #expect(!PathText.isSameOrUnder("/Library/CachesExtra", "/Library/Caches"))
     }
+
+    @Test func ignoreCaseIsOrdinalAndNeverChangesLength() {
+        #expect(!PathText.equalsIgnoringCase("straße", "STRASSE"))
+        #expect(PathText.equalsIgnoringCase("straße", "STRAßE"))
+        #expect(!PathText.equalsIgnoringCase("te\u{FB06}er", "TESTER"))
+        #expect(PathText.equalsIgnoringCase("/Users/È", "/users/è"))
+        #expect(!PathText.hasPrefixIgnoringCase("/Users/strasse/x", "/Users/straße/"))
+    }
+
+    @Test func helpersSplitOnTheSlashByteNotOnGraphemes() {
+        #expect(PathText.trimmingTrailingSlashes("/a\u{600}/") == "/a\u{600}")
+        #expect(PathText.fileName("/a/\u{301}x") == "\u{301}x")
+        #expect(PathText.join("/a\u{600}/", "b") == "/a\u{600}/b")
+        #expect(PathText.normalize("/a/x\u{600}/../b") == "/a/b")
+    }
 }

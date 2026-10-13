@@ -13,7 +13,7 @@ public struct DenyList: Sendable {
     private let exceptions: [String]
 
     public init(homeDirectory: String?) throws {
-        guard let homeDirectory, homeDirectory.hasPrefix("/"), homeDirectory != "/" else {
+        guard let homeDirectory, homeDirectory.utf8.first == UInt8(ascii: "/"), homeDirectory != "/" else {
             throw InvalidConfiguration("La home directory deve essere un percorso assoluto diverso dalla radice.")
         }
 
@@ -52,8 +52,9 @@ public struct DenyList: Sendable {
             "\(home)/Library/CloudStorage",
             "\(home)/Library/Keychains",
             // Solo la sottocartella con le identità di firma e i profili di provisioning:
-            // "Library/Developer" resta pulibile (DerivedData si gestisce dalla pagina Xcode), quindi
-            // non va negato in blocco.
+            // "Library/Developer" resta pulibile (DerivedData è una categoria dell'app;
+            // Archives non lo è più — vedi CategoryCatalog — ma resta un percorso legittimo,
+            // non una cartella di sistema), quindi non va negato in blocco.
             "\(home)/Library/Developer/Xcode/UserData",
             "\(home)/.ssh",
             "\(home)/.gnupg",
@@ -106,11 +107,16 @@ public struct DenyList: Sendable {
         deniedReason(canonicalPath) != nil
     }
 
-    /// Come `deniedReason`, ma ignora le voci a uguaglianza esatta ("/", "/Users", la home): ha
-    /// senso negare l'ELEMENTO "/Users/tester" stesso (non lo si può cancellare), ma non la ROOT
-    /// di una scansione "/Users/tester", perché significherebbe vietare di guardare nell'intero
-    /// albero sottostante, dove vivono percorsi legittimamente pulibili come "~/Downloads". Usato
-    /// da `PathGuard.validateRoot`; `validate` continua a usare `deniedReason` per intero.
+    /// Come `deniedReason`, ma ignora le voci a uguaglianza esatta ("/", "/Users", la home
+    /// configurata): quelle proteggono solo se stesse, non un intero sottoalbero (vedi il
+    /// commento sopra `deniedExact`). Ha senso negare l'ELEMENTO "/Users/tester" stesso
+    /// (non lo si può cancellare), ma non ha senso negare la ROOT di una scansione "/Users/tester"
+    /// per lo stesso motivo: significherebbe vietare di guardare nell'intero albero sottostante,
+    /// dove vivono percorsi legittimamente pulibili come "~/Downloads" o "~/progetti". La regola
+    /// "/Users" resta invece una protezione ricorsiva mirata (le home degli ALTRI utenti, non la
+    /// propria) e si applica anche qui. Usato da `PathGuard.validateRoot`;
+    /// `PathGuard.validate` continua a usare `deniedReason` per intero, perché
+    /// lì il percorso candidato è l'elemento da cancellare, non la root da cui si parte.
     func recursiveDeniedReason(_ canonicalPath: String?) -> String? {
         guard let path = CanonicalPath.canonical(canonicalPath) else {
             return String(localized: "percorso non canonico", bundle: .module)

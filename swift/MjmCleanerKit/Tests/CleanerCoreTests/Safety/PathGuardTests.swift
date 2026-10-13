@@ -272,4 +272,39 @@ struct PathGuardTests {
         #expect(!verdict.isAllowed)
         #expect(verdict.reason.contains("profondità"))
     }
+
+    // Solo Swift: semantica Unicode delle stringhe (vedi registro di parità, differenze).
+    @Test(arguments: [
+        ("/Users/tester/Downloads/x\u{600}/..", "/Users/tester/Downloads"),
+        ("/Users/tester/x\u{600}/../Documents/f", "/Users/tester/x\u{600}/.."),
+        ("/Users/tester/Library/Caches/../\u{301}x", "/Users/tester/Library/Caches"),
+    ])
+    func deniesDotSegmentsHiddenByScalarsThatMergeWithTheSlash(path: String, root: String) throws {
+        #expect(try !create().validate(path, declaredRoot: root).isAllowed)
+    }
+
+    @Test(arguments: ["/Users/tester/x\u{600}/..", "/x\u{600}/.."])
+    func validateRootDeniesDotSegmentsHiddenByScalarsThatMergeWithTheSlash(root: String) throws {
+        #expect(try !create().validateRoot(root).isAllowed)
+    }
+
+    @Test func caseFoldingThatWouldChangeLengthNeverSatisfiesContainment() throws {
+        let home = "/Users/alessandro.rossi"
+        let guardrail = try PathGuard(
+            denyList: DenyList(homeDirectory: home),
+            links: FakeLinkInspector("/Users/aleßandro.roßi/Library/Caches/l"),
+            homeDirectory: home)
+
+        let verdict = guardrail.validate("/Users/aleßandro.roßi/Library/Caches/l/tesi.docx", declaredRoot: "\(home)/Library/Caches")
+
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("contenimento"))
+    }
+
+    @Test func resolvingALinkedAncestorKeepsTheSeparatorAfterAPrependScalar() throws {
+        let verdict = try create(targets: ["/Users/tester/a\u{600}": "/Users/tester/Library"])
+            .validateRoot("/Users/tester/a\u{600}/Preferences")
+        #expect(!verdict.isAllowed)
+        #expect(verdict.canonicalPathValidated == "/Users/tester/Library/Preferences")
+    }
 }

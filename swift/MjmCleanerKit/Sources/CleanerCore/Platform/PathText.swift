@@ -1,13 +1,17 @@
-import Foundation
-
 /// Operazioni testuali sui percorsi POSIX con la stessa semantica dei metodi .NET su Unix usati
 /// dall'app C# (`Path.GetFileName`, `Path.GetDirectoryName`, `Path.Combine`, `TrimEnd('/')`,
 /// `Path.GetFullPath`) e il confronto `OrdinalIgnoreCase`. Nessuna funzione tocca il filesystem.
 public enum PathText {
+    private static let slash = UInt8(ascii: "/")
+    private static let dot = UInt8(ascii: ".")
+
     /// Come `Path.GetFileName`: il testo dopo l'ultimo "/", vuoto se il percorso termina con "/".
+    /// Si cerca il byte "/" e non il carattere Swift: un segno combinante dopo "/" formerebbe con
+    /// esso un solo grafema e lo nasconderebbe.
     public static func fileName(_ path: String) -> String {
-        guard let slash = path.lastIndex(of: "/") else { return path }
-        return String(path[path.index(after: slash)...])
+        let bytes = path.utf8
+        guard let separator = bytes.lastIndex(of: slash) else { return path }
+        return String(decoding: bytes[bytes.index(after: separator)...], as: UTF8.self)
     }
 
     /// Come `Path.GetDirectoryName` su Unix (`GetDirectoryNameOffset` più la normalizzazione dei
@@ -41,16 +45,17 @@ public enum PathText {
 
     /// Come `Path.Combine` con due argomenti: un secondo argomento assoluto vince.
     public static func join(_ base: String, _ component: String) -> String {
-        if component.hasPrefix("/") || base.isEmpty { return component }
+        if component.utf8.first == slash || base.isEmpty { return component }
         if component.isEmpty { return base }
-        return base.hasSuffix("/") ? base + component : base + "/" + component
+        return base.utf8.last == slash ? base + component : base + "/" + component
     }
 
     /// Come `TrimEnd('/')`: "///" diventa la stringa vuota, esattamente come in .NET.
     public static func trimmingTrailingSlashes(_ path: String) -> String {
-        var result = Substring(path)
-        while result.hasSuffix("/") { result = result.dropLast() }
-        return String(result)
+        let bytes = Array(path.utf8)
+        var end = bytes.count
+        while end > 0, bytes[end - 1] == slash { end -= 1 }
+        return String(decoding: bytes[..<end], as: UTF8.self)
     }
 
     /// Normalizzazione testuale di un percorso assoluto, come `Path.GetFullPath` su Unix:
@@ -62,31 +67,65 @@ public enum PathText {
     /// consumatore, la risoluzione del bersaglio di un collegamento passata a PathGuard, lo elimina
     /// comunque.
     public static func normalize(_ absolutePath: String) -> String {
-        var segments: [Substring] = []
-        for segment in absolutePath.split(separator: "/", omittingEmptySubsequences: true) {
-            switch segment {
-            case ".":
-                continue
-            case "..":
+        var segments: [ArraySlice<UInt8>] = []
+        for segment in Array(absolutePath.utf8).split(separator: slash, omittingEmptySubsequences: true) {
+            if segment.elementsEqual([dot]) { continue }
+            if segment.elementsEqual([dot, dot]) {
                 if !segments.isEmpty { segments.removeLast() }
-            default:
-                segments.append(segment)
+                continue
             }
+            segments.append(segment)
         }
-        return "/" + segments.joined(separator: "/")
+        return "/" + segments.map { String(decoding: $0, as: UTF8.self) }.joined(separator: "/")
     }
 
-    /// Confronto ordinale senza distinzione fra maiuscole e minuscole (`OrdinalIgnoreCase`): APFS
-    /// è case-insensitive nella configurazione predefinita, quindi "~/documents" e "~/Documents"
+    /// Confronto senza distinzione fra maiuscole e minuscole con la semantica di `OrdinalIgnoreCase`:
+    /// scalare per scalare, senza equivalenza canonica, e la lunghezza non cambia mai (vedi `fold`).
+    /// APFS è case-insensitive nella configurazione predefinita, quindi "~/documents" e "~/Documents"
     /// sono la stessa cartella.
     public static func equalsIgnoringCase(_ lhs: String, _ rhs: String) -> Bool {
-        lhs.compare(rhs, options: [.caseInsensitive, .literal]) == .orderedSame
+        var left = lhs.unicodeScalars.makeIterator()
+        var right = rhs.unicodeScalars.makeIterator()
+        while true {
+            switch (left.next(), right.next()) {
+            case (nil, nil):
+                return true
+            case let (leftScalar?, rightScalar?):
+                if fold(leftScalar) != fold(rightScalar) { return false }
+            default:
+                return false
+            }
+        }
     }
 
     /// `StartsWith(prefix, OrdinalIgnoreCase)`; come in .NET, il prefisso vuoto è sempre presente.
+    /// Un prefisso riconosciuto occupa in `text` lo stesso numero di scalari di `prefix`.
     public static func hasPrefixIgnoringCase(_ text: String, _ prefix: String) -> Bool {
-        if prefix.isEmpty { return true }
-        return text.range(of: prefix, options: [.anchored, .caseInsensitive, .literal]) != nil
+        var textScalars = text.unicodeScalars.makeIterator()
+        for prefixScalar in prefix.unicodeScalars {
+            guard let textScalar = textScalars.next(), fold(textScalar) == fold(prefixScalar) else { return false }
+        }
+        return true
+    }
+
+    /// Il testo ripiegato per i confronti senza maiuscole: usato anche da `SimpleGlob`.
+    static func folded(_ text: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        scalars.append(contentsOf: text.unicodeScalars.map(fold))
+        return String(scalars)
+    }
+
+    /// Mappatura semplice alla maiuscola, come `OrdinalIgnoreCase` di .NET: uno scalare diventa la
+    /// sua maiuscola solo se questa è un singolo scalare. "ß" resta "ß" (mai "SS") e le legature
+    /// restano tali: Foundation `.caseInsensitive` le espande, cambiando la lunghezza dei testi
+    /// confrontati, e i controlli del PathGuard basati su prefissi smetterebbero di essere affidabili.
+    private static func fold(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
+        if scalar.isASCII {
+            let value = scalar.value
+            return (97...122).contains(value) ? Unicode.Scalar(UInt8(value - 32)) : scalar
+        }
+        let upper = scalar.properties.uppercaseMapping.unicodeScalars
+        return upper.count == 1 ? (upper.first ?? scalar) : scalar
     }
 
     /// Vero se `path` coincide con `ancestor` o vi è contenuto, rispettando il confine di

@@ -49,8 +49,9 @@ public protocol PathGuarding: Sendable {
 /// errore che un `catch` a monte potrebbe trasformare in un salto silenzioso. In Swift la regola
 /// è imposta dalla firma: `validate` e `validateRoot` non sono `throws`.
 public struct PathGuard: PathGuarding {
-    /// Limite di sostituzioni successive durante la risoluzione dei collegamenti di una root: una
-    /// catena più lunga è quasi certamente un ciclo — nega invece di girare all'infinito.
+    /// Limite di sostituzioni successive durante la risoluzione dei collegamenti di una root:
+    /// una catena più lunga è quasi certamente un ciclo nel doppio di test, non uno scenario
+    /// reale — nega invece di girare all'infinito.
     private static let maxSymlinkResolutions = 32
 
     private let denyList: DenyList
@@ -138,18 +139,25 @@ public struct PathGuard: PathGuarding {
 
         // 5. Collegamenti simbolici fra l'elemento e la root: la root e ciò che sta sopra sono già
         //    stati verificati da validateRoot, quindi qui si risale fino a lì, non oltre.
+        // Il limite è semantico (strettamente sotto la root), non una lunghezza: un ripiegamento delle maiuscole non può accorciarlo.
         var ancestor = PathText.parent(path)
-        while let current = ancestor, current.utf16.count > root.utf16.count {
+        while let current = ancestor, PathText.hasPrefixIgnoringCase(current, root + "/") {
             if links.isSymbolicLink(current) {
                 return .deny(String(localized: "antenato è un collegamento simbolico: \(current)", bundle: .module), path)
             }
             ancestor = PathText.parent(current)
         }
 
-        // 6. Un elemento che coincide con la root dichiarata cancellerebbe la root invece di
-        //    svuotarla. Lo scanner non lo produce mai, ma l'elenco è manipolabile fra scansione e
-        //    conferma. Deliberatamente dopo il punto 4, che nega con un motivo più specifico quando
-        //    la root è la home o un suo figlio diretto.
+        // 6. Un elemento che coincide esattamente con la root dichiarata cancellerebbe la
+        //    root per intero invece di svuotarla — il contratto di ogni regola (in
+        //    particolare quelle a svuotamento) è che la root sopravvive. Lo scanner non
+        //    produce mai un elemento così (ClearContents elenca solo i figli diretti della
+        //    root, mai la root stessa), ma il modello di minaccia dichiara esplicitamente
+        //    l'elenco manipolabile fra la scansione e la conferma. Deliberatamente l'ultimo
+        //    controllo, dopo quello di profondità (punto 4): quando root e home coincidono
+        //    (o la root è un figlio diretto della home), quella regola già nega con un
+        //    motivo più specifico ("profondità insufficiente"), e non va scavalcata da un
+        //    motivo più generico qui.
         if PathText.equalsIgnoringCase(path, root) {
             return .deny(String(localized: "l'elemento coincide con la root della regola: \(root)", bundle: .module), path)
         }
@@ -197,7 +205,9 @@ public struct PathGuard: PathGuarding {
                             String(localized: "la root o un suo antenato è un collegamento simbolico la cui destinazione non è determinabile: \(candidate)", bundle: .module),
                             current))
                     }
-                    let suffix = current.count > candidate.count ? String(current.dropFirst(candidate.count)) : ""
+                    // `candidate` è un prefisso in byte di `current` (lo produce PathText.parent): il taglio
+                    // avviene in byte UTF-8, così un separatore che segue uno scalare "Prepend" non va perso.
+                    let suffix = current.utf8.count > candidate.utf8.count ? String(decoding: current.utf8.dropFirst(candidate.utf8.count), as: UTF8.self) : ""
                     substituted = PathText.trimmingTrailingSlashes(target) + suffix
                     break
                 }
@@ -214,6 +224,7 @@ public struct PathGuard: PathGuarding {
     private func isHomeOrDirectChild(_ path: String) -> Bool {
         if PathText.equalsIgnoringCase(path, home) { return true }
         guard PathText.hasPrefixIgnoringCase(path, home + "/") else { return false }
-        return !path.dropFirst(home.count + 1).contains("/")
+        // hasPrefixIgnoringCase garantisce che il prefisso riconosciuto abbia lo stesso numero di scalari di home + "/".
+        return !path.unicodeScalars.dropFirst(home.unicodeScalars.count + 1).contains("/")
     }
 }

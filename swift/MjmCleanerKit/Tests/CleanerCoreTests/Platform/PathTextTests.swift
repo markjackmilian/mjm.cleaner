@@ -11,6 +11,7 @@ struct PathTextTests {
 
     @Test(arguments: [
         ("/a/b", "/a" as String?), ("/a", "/"), ("/", nil), ("", nil), ("/a/b/", "/a/b"), ("relativo", ""),
+        ("//", "/"), ("/a//b", "/a"), ("/a//b/c", "/a/b"), ("/a/b//", "/a/b"),
     ])
     func parentMatchesDotNetGetDirectoryNameOnUnix(path: String, expected: String?) {
         #expect(PathText.parent(path) == expected)

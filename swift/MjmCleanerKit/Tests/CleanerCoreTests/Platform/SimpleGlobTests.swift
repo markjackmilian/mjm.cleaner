@@ -17,6 +17,11 @@ struct SimpleGlobTests {
         ("[ab].txt", "[ab].txt", true),
         ("", "", true),
         ("", "x", false),
+        ("a*", "a*b", true),
+        ("*a", "*ba", true),
+        ("*.csproj", "*foo.csproj", true),
+        ("?", "😀", false),
+        ("??", "😀", true),
     ])
     func matchesLikeDotNetSimpleExpression(pattern: String, name: String, expected: Bool) {
         #expect(SimpleGlob.matches(pattern, name) == expected)

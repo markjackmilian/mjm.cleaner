@@ -10,14 +10,33 @@ public enum PathText {
         return String(path[path.index(after: slash)...])
     }
 
-    /// Come `Path.GetDirectoryName` su Unix: `nil` per "/" e per la stringa vuota, "/" per un
-    /// figlio diretto della radice, altrimenti il testo prima dell'ultimo "/". Un percorso
-    /// relativo senza "/" restituisce la stringa vuota.
+    /// Come `Path.GetDirectoryName` su Unix (`GetDirectoryNameOffset` più la normalizzazione dei
+    /// separatori di .NET): `nil` per la stringa vuota e per la sola radice "/", "/" per un figlio
+    /// diretto della radice, altrimenti il testo prima dell'ultimo "/", senza i separatori finali e
+    /// con i separatori ripetuti ridotti a uno ("/a//b" dà "/a"). Un percorso relativo senza "/"
+    /// restituisce la stringa vuota.
     public static func parent(_ path: String) -> String? {
-        if path.isEmpty || path == "/" { return nil }
-        guard let slash = path.lastIndex(of: "/") else { return "" }
-        if slash == path.startIndex { return "/" }
-        return String(path[..<slash])
+        let slash = UInt16(UInt8(ascii: "/"))
+        let units = Array(path.utf16)
+        let rootLength = units.first == slash ? 1 : 0
+        if units.count <= rootLength { return nil }
+
+        var end = units.count
+        while end > rootLength {
+            end -= 1
+            if units[end] == slash { break }
+        }
+        while end > rootLength, units[end - 1] == slash {
+            end -= 1
+        }
+
+        var collapsed: [UInt16] = []
+        collapsed.reserveCapacity(end)
+        for unit in units[..<end] {
+            if unit == slash, collapsed.last == slash { continue }
+            collapsed.append(unit)
+        }
+        return String(decoding: collapsed, as: UTF16.self)
     }
 
     /// Come `Path.Combine` con due argomenti: un secondo argomento assoluto vince.
@@ -38,7 +57,10 @@ public enum PathText {
     /// separatori ripetuti ridotti, segmenti "." eliminati, ".." risolto sul segmento precedente
     /// SENZA seguire i collegamenti. Serve solo a riprodurre la `FullName` che .NET restituiva per
     /// la destinazione di un collegamento simbolico: non va mai usata per validare un percorso da
-    /// eliminare (vedi `CanonicalPath`, che i segmenti "." e ".." li rifiuta).
+    /// eliminare (vedi `CanonicalPath`, che i segmenti "." e ".." li rifiuta). Diversamente da
+    /// `Path.GetFullPath`, il "/" finale non viene conservato (`/a/` diventa `/a`): l'unico
+    /// consumatore, la risoluzione del bersaglio di un collegamento passata a PathGuard, lo elimina
+    /// comunque.
     public static func normalize(_ absolutePath: String) -> String {
         var segments: [Substring] = []
         for segment in absolutePath.split(separator: "/", omittingEmptySubsequences: true) {

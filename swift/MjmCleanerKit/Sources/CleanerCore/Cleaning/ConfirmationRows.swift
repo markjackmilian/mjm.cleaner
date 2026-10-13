@@ -12,7 +12,8 @@ public struct ConfirmationCategory: Sendable, Equatable {
 
 /// Le righe del passo di conferma: un percorso, una riga, in tutto il passo.
 public enum ConfirmationRows {
-    /// Deduplica GLOBALMENTE per percorso (confronto esatto): lo stesso percorso proposto da due
+    /// Deduplica GLOBALMENTE per percorso (equivalenza canonica di String: le grafie NFC e NFD dello
+    /// stesso file sono un solo percorso, che APFS risolve allo stesso file): lo stesso percorso proposto da due
     /// categorie (cartelle dei file grandi sovrapposte a una root del catalogo) produceva due righe,
     /// il totale lo contava due volte e deselezionarlo in una categoria non lo escludeva dall'altra.
     /// Si tiene il primo incontrato, nell'ordine del catalogo: stesso file, stessa dimensione.

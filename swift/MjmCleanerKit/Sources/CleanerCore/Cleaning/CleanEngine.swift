@@ -71,9 +71,12 @@ public struct CleanEngine: CleanPerforming {
             // non vedrebbe un collegamento sulla root stessa. L'elenco arriva dall'interfaccia dopo
             // la conferma (manipolabile) e può essere scaduto (root sostituita da un collegamento
             // fra scansione e conferma): richiamare validateRoot qui copre entrambi i casi.
-            var rootVerdicts: [String: GuardVerdict] = [:]
+            // Chiave: i byte UTF-8 del percorso ripiegato (OrdinalIgnoreCase). Una chiave String
+            // unirebbe percorsi canonicamente equivalenti che .NET distingue (U+212A e "K", NFC e
+            // NFD): una root erediterebbe il verdetto di un'altra senza essere mai validata.
+            var rootVerdicts: [[UInt8]: GuardVerdict] = [:]
             for item in selections.flatMap(\.items) {
-                let key = item.declaredRoot.lowercased()
+                let key = Self.rootKey(item.declaredRoot)
                 if rootVerdicts[key] == nil {
                     rootVerdicts[key] = pathGuard.validateRoot(item.declaredRoot)
                 }
@@ -95,8 +98,9 @@ public struct CleanEngine: CleanPerforming {
 
                     // Root negata: fallisce solo QUESTO elemento, non l'intera pulizia. In Swift una
                     // root nulla è impossibile per tipo; una root vuota viene negata da validateRoot.
-                    guard let rootVerdict = rootVerdicts[item.declaredRoot.lowercased()], rootVerdict.isAllowed else {
-                        let reason = rootVerdicts[item.declaredRoot.lowercased()]?.reason
+                    let rootEntry = rootVerdicts[Self.rootKey(item.declaredRoot)]
+                    guard let rootVerdict = rootEntry, rootVerdict.isAllowed else {
+                        let reason = rootEntry?.reason
                             ?? String(localized: "root dichiarata non riconosciuta", bundle: .module)
                         fail(ScanError(path: item.path, kind: .other, message: reason), item.path)
                         continue
@@ -120,7 +124,7 @@ public struct CleanEngine: CleanPerforming {
 
                     do {
                         // Si contano solo i byte davvero liberati, rimisurati subito prima.
-                        let size = measureRealSize(target, isDirectory: item.isDirectory)
+                        let size = try measureRealSize(target, isDirectory: item.isDirectory)
 
                         if item.isDirectory {
                             try fileSystem.deleteDirectoryRecursively(target)
@@ -162,6 +166,12 @@ public struct CleanEngine: CleanPerforming {
             deletedPaths: deleted)
     }
 
+    /// Chiave di confronto per le root: la forma ripiegata in byte UTF-8, non una `String`, perché
+    /// `String` confronta per equivalenza canonica.
+    private static func rootKey(_ root: String) -> [UInt8] {
+        Array(PathText.folded(root).utf8)
+    }
+
     /// Riporta `path` dal sistema di riferimento della root DICHIARATA a quello della sua
     /// risoluzione. Se `path` non comincia con la root dichiarata (confine di segmento, senza
     /// distinzione fra maiuscole e minuscole) non c'è nulla da riscrivere: validate lo rileverà.
@@ -180,17 +190,24 @@ public struct CleanEngine: CleanPerforming {
     }
 
     /// Dimensione reale letta subito prima di cancellare, mai quella dichiarata dall'interfaccia.
-    /// Se la lettura fallisce vale zero: il tentativo di cancellazione che segue registrerà
-    /// l'errore con la classificazione corretta.
+    /// Se la lettura fallisce con un `FileSystemError` vale zero: il tentativo di cancellazione che
+    /// segue registrerà l'errore con la classificazione corretta. Gli errori fuori da quel contratto
+    /// si propagano fino al catch esterno del motore (spec §8.2).
     ///
     /// Differenza voluta rispetto al C#: `EnumerateFiles(…, AllDirectories)` scendeva anche nei
     /// collegamenti a cartelle (misurato su .NET 10), accreditando byte che la cancellazione — che
     /// non segue i collegamenti — non libera. Qui non si scende mai in un collegamento, come
     /// prescrive la spec originale (§7: «I symlink non vengono mai seguiti»).
-    private func measureRealSize(_ path: String, isDirectory: Bool) -> Int64 {
+    private func measureRealSize(_ path: String, isDirectory: Bool) throws -> Int64 {
         do {
-            return isDirectory ? try sumOfFiles(under: path) : try fileSystem.fileLength(path)
-        } catch {
+            if isDirectory {
+                // Un elemento-cartella diventato collegamento dopo la scansione: la cancellazione
+                // rimuove solo il collegamento, quindi non si accreditano i byte della destinazione.
+                if try fileSystem.itemInfo(path).kind == .symbolicLink { return 0 }
+                return try sumOfFiles(under: path)
+            }
+            return try fileSystem.fileLength(path)
+        } catch is FileSystemError {
             return 0
         }
     }

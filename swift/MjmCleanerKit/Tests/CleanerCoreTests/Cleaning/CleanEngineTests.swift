@@ -378,15 +378,53 @@ struct CleanEngineTests {
         fs.addFile("\(Self.cacheRoot)/a.tmp", size: 10)
         fs.addFile("\(Self.cacheRoot)/b.tmp", size: 10)
         let journal = RecordingJournal()
+        // Il diario deve già contenere ogni percorso quando ne viene segnalato l'avanzamento: un
+        // diario riempito in blocco alla fine passerebbe il solo controllo sul contenuto finale.
+        let countsAtProgress = Recorder<Int>()
 
         _ = try await create(fs).clean(
             [selection("caches",
                        item("\(Self.cacheRoot)/a.tmp", 10),
                        item("\(Self.cacheRoot)/sparito.tmp", 10),
                        item("\(Self.cacheRoot)/b.tmp", 10))],
-            progress: nil, journal: journal)
+            progress: { _ in countsAtProgress.append(journal.paths.values.count) }, journal: journal)
 
         #expect(journal.paths.values == ["\(Self.cacheRoot)/a.tmp", "\(Self.cacheRoot)/b.tmp"])
+        #expect(countsAtProgress.values == [1, 1, 2])
+    }
+
+    // Solo Swift: una chiave String unirebbe root che OrdinalIgnoreCase distingue.
+    @Test func everyDistinctRootIsValidatedEvenWhenAnotherRootIsCanonicallyEquivalent() async throws {
+        let fs = InMemoryFileSystem()
+        let decoyRoot = "\(Self.home)/Des\u{212A}top"
+        let protectedRoot = "\(Self.home)/Desktop"
+        fs.addFile("\(decoyRoot)/decoy.tmp", size: 1)
+        fs.addFile("\(protectedRoot)/secret.txt", size: 10)
+        // Su APFS il segno KELVIN (U+212A), ripiegato in "k", è la stessa cartella di ~/Desktop: il
+        // vecchio codice avrebbe riscritto secret.txt proprio in questa grafia. Il filesystem simulato
+        // confronta le chiavi per equivalenza canonica e non ripiega come APFS, quindi il file va
+        // registrato anche sotto la grafia decoy, dove il vecchio codice lo cercherebbe.
+        fs.addFile("\(decoyRoot)/secret.txt", size: 10)
+
+        let report = try await create(fs).clean(
+            [selection("bug",
+                       item("\(decoyRoot)/decoy.tmp", 1, root: decoyRoot),
+                       item("\(protectedRoot)/secret.txt", 10, root: protectedRoot))],
+            progress: nil, journal: nil)
+
+        #expect(fs.fileExists("\(protectedRoot)/secret.txt"))
+        #expect(fs.fileExists("\(decoyRoot)/secret.txt"))
+        #expect(!report.deletedPaths.contains { $0.hasSuffix("secret.txt") })
+    }
+
+    // Solo Swift: U+03B9 (2 byte) e U+1FBE (3 byte) hanno lo stesso ripiegamento (U+0399), quindi il
+    // resto va tagliato per scalari, né per byte né per Character. U+0600 è un Prepend: con i
+    // Character il "/" che lo segue si fonde con lui e il taglio perderebbe la "/" iniziale.
+    @Test func rewriteSlicesTheRemainderByScalarsAfterACaseInsensitiveMatch() {
+        #expect(CleanEngine.rewriteToResolvedRoot("/VAR/\u{1FBE}/xé.tmp", declaredRoot: "/var/\u{03B9}", resolvedRoot: "/private/var/\u{03B9}")
+            == "/private/var/\u{03B9}/xé.tmp")
+        #expect(CleanEngine.rewriteToResolvedRoot("/VAR/\u{0600}/x.tmp", declaredRoot: "/var/\u{0600}", resolvedRoot: "/private/var/\u{0600}")
+            == "/private/var/\u{0600}/x.tmp")
     }
 
     private final class RecordingJournal: DeletionRecording {

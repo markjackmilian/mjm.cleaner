@@ -1,5 +1,6 @@
 import CleanerCore
 import Foundation
+import Synchronization
 
 /// Porting di `TestTimeProvider.cs`.
 struct FixedWallClock: WallClock {
@@ -24,4 +25,18 @@ func days(_ count: Double) -> TimeInterval {
 /// (annullamento a metà, deterministico perché il callback gira nel task stesso).
 func cancelCurrentTask() {
     withUnsafeCurrentTask { $0?.cancel() }
+}
+
+/// Raccoglie valori da callback `@Sendable` (avanzamento, diario): l'equivalente della lista
+/// protetta da `lock` nei test C#.
+final class Recorder<Value: Sendable>: Sendable {
+    private let storage = Mutex<[Value]>([])
+
+    func append(_ value: Value) {
+        storage.withLock { $0.append(value) }
+    }
+
+    var values: [Value] {
+        storage.withLock { $0 }
+    }
 }

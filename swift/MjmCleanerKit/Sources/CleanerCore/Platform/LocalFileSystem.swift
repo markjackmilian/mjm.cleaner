@@ -28,8 +28,11 @@ public struct LocalFileSystem: FileSystem {
         defer { closedir(directory) }
 
         var entries: [String] = []
-        errno = 0
-        while let entry = readdir(directory) {
+        while true {
+            // `errno` si azzera a ogni chiamata: una libreria può lasciarlo non nullo anche con una
+            // lettura riuscita, e senza questo azzeramento ne seguirebbe un errore spurio.
+            errno = 0
+            guard let entry = readdir(directory) else { break }
             let length = Int(entry.pointee.d_namlen)
             let name = withUnsafeBytes(of: entry.pointee.d_name) { bytes in
                 String(decoding: bytes.prefix(length), as: UTF8.self)
@@ -38,7 +41,9 @@ public struct LocalFileSystem: FileSystem {
                 entries.append(PathText.join(path, name))
             }
         }
-        if errno != 0 { throw FileSystemError(code: errno, path: path) }
+        // Lettura subito dopo l'ultimo `readdir`: `errno` è valido solo qui, prima di altre chiamate.
+        let failure = errno
+        if failure != 0 { throw FileSystemError(code: failure, path: path) }
         return entries.sorted()
     }
 
@@ -68,17 +73,24 @@ public struct LocalFileSystem: FileSystem {
     }
 
     public func deleteDirectoryRecursively(_ path: String) throws {
+        // Senza normalizzazione, "collegamento/" farebbe risolvere `lstat` al bersaglio (come
+        // "collegamento/."): il controllo sotto vedrebbe una cartella e cancellerebbe il suo
+        // contenuto. Il "/" finale si toglie prima; la radice "/" resta "/", una stringa vuota
+        // resta vuota e fallisce con ENOENT come prima.
+        let trimmed = PathText.trimmingTrailingSlashes(path)
+        let target = trimmed.isEmpty && path.hasPrefix("/") ? "/" : trimmed
+
         var status = stat()
-        guard lstat(path, &status) == 0 else { throw FileSystemError(code: errno, path: path) }
+        guard lstat(target, &status) == 0 else { throw FileSystemError(code: errno, path: target) }
         if (status.st_mode & S_IFMT) == S_IFLNK {
             // Come .NET: su un collegamento a cartella si rimuove il collegamento, mai il contenuto
             // della destinazione.
-            if unlink(path) != 0 { throw FileSystemError(code: errno, path: path) }
+            if unlink(target) != 0 { throw FileSystemError(code: errno, path: target) }
             return
         }
 
         var firstError: FileSystemError?
-        removeTree(path, firstError: &firstError)
+        removeTree(target, firstError: &firstError)
         if let firstError { throw firstError }
     }
 

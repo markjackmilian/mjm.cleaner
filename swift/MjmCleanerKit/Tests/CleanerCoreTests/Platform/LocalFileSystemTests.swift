@@ -106,6 +106,17 @@ struct LocalFileSystemTests {
         #expect(FileManager.default.fileExists(atPath: precious))
     }
 
+    @Test func deleteDirectoryRecursivelyOnALinkWithTrailingSlashRemovesOnlyTheLink() throws {
+        let tmp = try TemporaryDirectory(); defer { tmp.remove() }
+        let precious = try tmp.file("Documents/tesi.docx", contents: "dati")
+        let link = try tmp.symlink("link", to: tmp.path + "/Documents")
+
+        try fs.deleteDirectoryRecursively(link + "/")
+
+        #expect(!FileManager.default.fileExists(atPath: link))
+        #expect(FileManager.default.fileExists(atPath: precious))
+    }
+
     @Test func deleteDirectoryRecursivelyReportsTheChildAccessDenied() throws {
         let tmp = try TemporaryDirectory(); defer { tmp.remove() }
         let locked = try tmp.directory("locked/sub")

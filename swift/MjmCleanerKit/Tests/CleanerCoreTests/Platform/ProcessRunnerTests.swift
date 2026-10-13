@@ -37,10 +37,19 @@ struct ProcessRunnerTests {
     }
 
     @Test func callerCancellationPropagatesAsCancellation() async throws {
+        let clock = ContinuousClock()
         let task = Task { try await runner.run("/bin/sleep", ["30"], timeout: .seconds(60)) }
         try await Task.sleep(for: .milliseconds(200))
+        let start = clock.now
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(clock.now - start < .seconds(5))
+    }
+
+    @Test func childStartsWithDefaultSignalHandling() async throws {
+        let result = try await runner.run("/bin/sh", ["-c", "kill -TERM $$; echo survived"], timeout: .seconds(5))
+        #expect(result.exitCode == 143)
+        #expect(result.standardOutput.isEmpty)
     }
 
     @Test func environmentOverridesAreVisibleToTheChild() async throws {

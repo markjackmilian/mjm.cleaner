@@ -96,7 +96,7 @@ enum WaitOutcome: Sendable {
 /// Processo figlio avviato con `posix_spawnp` in un proprio process group: al timeout o
 /// all'annullamento si termina l'intero gruppo, come `Kill(entireProcessTree: true)` in C#.
 /// Foundation `Process` terminerebbe solo il figlio diretto, lasciando vivo `simctl` dietro `xcrun`.
-final class SpawnedProcess: @unchecked Sendable {
+final class SpawnedProcess: Sendable {
     let pid: pid_t
     private let stdoutTask: Task<Data, Never>
     private let stderrTask: Task<Data, Never>
@@ -130,7 +130,21 @@ final class SpawnedProcess: @unchecked Sendable {
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
-        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT))
+        // I thread del pool cooperativo di Swift hanno quasi tutti i segnali bloccati e il figlio
+        // erediterebbe la maschera: come .NET (pal_process.c), il figlio parte con maschera vuota e
+        // gestori predefiniti.
+        var noSignals = sigset_t()
+        sigemptyset(&noSignals)
+        posix_spawnattr_setsigmask(&attributes, &noSignals)
+        var defaults = sigset_t()
+        sigfillset(&defaults)
+        sigdelset(&defaults, SIGKILL)
+        sigdelset(&defaults, SIGSTOP)
+        posix_spawnattr_setsigdefault(&attributes, &defaults)
+        posix_spawnattr_setflags(
+            &attributes,
+            Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF)
+        )
         posix_spawnattr_setpgroup(&attributes, 0)
 
         var merged = ProcessInfo.processInfo.environment
@@ -187,7 +201,15 @@ final class SpawnedProcess: @unchecked Sendable {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 var status: Int32 = 0
-                while waitpid(pid, &status, 0) == -1 && errno == EINTR {}
+                var result: pid_t = -1
+                repeat {
+                    result = waitpid(pid, &status, 0)
+                } while result == -1 && errno == EINTR
+                if result == -1 {
+                    // Stato non recuperabile: non viene mai riportato come successo.
+                    continuation.resume(returning: -1)
+                    return
+                }
                 // WIFEXITED/WEXITSTATUS e WTERMSIG sono macro C, non importate in Swift.
                 let exitCode: Int32 = (status & 0x7f) == 0 ? (status >> 8) & 0xff : 128 + (status & 0x7f)
                 continuation.resume(returning: exitCode)

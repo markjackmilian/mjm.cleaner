@@ -437,3 +437,9 @@ FodyWeavers.xsd
 
 # Superpowers brainstorming artifacts
 .superpowers/
+
+# Swift
+swift/**/.build/
+swift/**/.swiftpm/
+swift/**/xcuserdata/
+swift/**/*.xcuserstate

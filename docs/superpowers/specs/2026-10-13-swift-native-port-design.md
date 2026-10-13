@@ -131,6 +131,9 @@ Per i test: un `InMemoryFileSystem`, più i decoratori di guasto esistenti in C#
 | Confronti di percorso | `OrdinalIgnoreCase` | confronto ordinale case-insensitive, con una sola funzione condivisa |
 | Età di un elemento | max(`LastAccessTimeUtc`, `LastWriteTimeUtc`) | max(`atime`, `mtime`) |
 | Dimensione | `FileInfo.Length` (logica) | `st_size` (logica) |
+| Dimensione e date di un collegamento simbolico | `FileInfo`/`DirectoryInfo` leggono il collegamento stesso (`lstat`), misurato su .NET 10 | identico (`lstat`) |
+| `File.Exists` / `Directory.Exists` su collegamenti | collegamento a cartella: `File.Exists` falso, `Directory.Exists` vero; collegamento interrotto: `File.Exists` vero | identico, anche dove produce un difetto (registro di parità, candidati) |
+| Misura reale di una cartella prima di cancellarla | `EnumerateFiles(…, AllDirectories)` scende nei collegamenti a cartelle | **differenza voluta**: non si scende nei collegamenti, come prescrive la spec originale §7; la cancellazione non li segue, quindi quei byte non venivano comunque liberati |
 | Cartella che fallisce a metà | elemento fallito, 0 byte accreditati | identico |
 | Dimensione accreditata | rimisurata subito prima della cancellazione, mai quella dell'interfaccia | identico |
 | Percorso cancellato | quello restituito dal `PathGuard` dopo la riscrittura sulla root risolta | identico |
@@ -145,7 +148,7 @@ Per i test: un `InMemoryFileSystem`, più i decoratori di guasto esistenti in C#
 
 - **Storico:** modulo `SQLite3` di sistema con un wrapper minimo (apertura, statement preparati, transazione). Lo schema è identico a quello attuale (`CleanSession`, `SessionCategory`, `PRAGMA user_version = 1`) e restano le stesse regole: totale calcolato con `SUM`, solo byte effettivamente liberati, timestamp UTC ISO 8601, lo storico non fa mai fallire la pulizia. Scartato SwiftData: schema opaco e migrazioni implicite per due tabelle.
 - **Impostazioni:** `settings.json` con `Codable` e decodifica tollerante: campo mancante → default, aspetto sconosciuto → Auto. Campi e default identici a `CleanerSettings`.
-- **Log di sessione:** `session-NNNNNN.jsonl.gz`, un record JSON per elemento, retention delle ultime 20 sessioni. La compressione gzip usa la zlib di sistema tramite un target `systemLibrary`: Foundation non scrive gzip, e il file deve restare leggibile con `zcat`.
+- **Log di sessione:** `session-NNNNNN.jsonl.gz`, un record JSON per elemento, retention delle ultime 20 sessioni. La compressione gzip usa la zlib di sistema tramite un target `systemLibrary`: Foundation non scrive gzip, e il file deve restare leggibile con `gzip -dc` (su macOS `zcat` legge solo il formato `.Z`).
 
 ### 5.6 Docker e Xcode
 

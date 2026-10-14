@@ -7,8 +7,10 @@
 /// Le regex sono il porting di quelle generate del C# con la semantica di .NET 10 (misurata durante
 /// la stesura del piano 2): corrispondenza per scalare (`.unicodeScalar`), `.` di .NET come `[^\n]`,
 /// `\w` di .NET come `[[\p{L}\p{Mn}\p{Nd}\p{Pc}]&&[\x{0}-\x{FFFF}]]`, `$` di .NET come `\n?$`, e
-/// per `IgnoreCase` la "i" anche come U+0130, che .NET le equipara e Swift no. `Regex` non è
-/// `Sendable`: le regex si costruiscono a ogni ricerca, una volta per file.
+/// `.ignoresCase()` per `IgnoreCase`: le regex generate (cultura invariante) non equiparano "i" e
+/// U+0130, e `.ignoresCase()` di Swift coincide con esse sulle lettere ASCII (U+212A, il segno
+/// Kelvin, equivale a "k" in entrambi). `Regex` non è `Sendable`: le regex si costruiscono nelle
+/// funzioni che le usano, le due dei nomi di file una volta per `scan`, le altre una volta per file.
 public struct ProjectReferenceScanner: Sendable {
     private static let maxFileBytes: Int64 = 1024 * 1024
     private static let maxDepth = 12

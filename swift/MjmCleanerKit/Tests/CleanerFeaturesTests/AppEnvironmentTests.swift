@@ -25,12 +25,62 @@ struct AppEnvironmentTests {
     @Test func categoriesAndProjectRootsFollowTheCurrentSettings() throws {
         var initial = CleanerSettings()
         initial.projectRoots = ["~/src", "/Volumes/Dati/progetti"]
-        let environment = try makeEnvironment(settings: FakeSettingsStore(initial))
+        let store = FakeSettingsStore(initial)
+        let environment = try makeEnvironment(settings: store)
 
         #expect(environment.expandedProjectRoots() == ["/Users/tester/src", "/Volumes/Dati/progetti"])
         #expect(environment.categories().map(\.id) == [
             "system-caches", "dev-caches", "nuget-packages", "project-build-output", "logs", "trash", "downloads-large",
         ])
+        #expect(environment.categories().first { $0.id == "project-build-output" }?.rules.map(\.root)
+            == ["/Users/tester/src", "/Volumes/Dati/progetti"])
+
+        // Ogni lettura segue le impostazioni salvate nel frattempo.
+        var changed = initial
+        changed.projectRoots = ["~/altro"]
+        try store.save(changed)
+
+        #expect(environment.expandedProjectRoots() == ["/Users/tester/altro"])
+        #expect(environment.categories().first { $0.id == "project-build-output" }?.rules.map(\.root) == ["/Users/tester/altro"])
+    }
+
+    // Solo Swift (review del Task 2): la home passata a `live` arriva alla deny-list del `clean` e
+    // all'espansore. La home passa da `realpath`: sotto /var, collegamento a /private/var, la
+    // deny-list non riconoscerebbe la home (registro, «Candidati a miglioramento»).
+    @Test func liveCompositionUsesTheGivenHomeForTheGuardAndTheExpander() async throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        guard let resolved = realpath(directory.path, nil) else {
+            throw UnexpectedTestError(description: "realpath non riuscito")
+        }
+        defer { free(resolved) }
+        let home = String(cString: resolved) + "/home"
+        let kept = home + "/Documents/keep.txt"
+        let cache = home + "/Library/Caches/app/x.bin"
+        for file in [kept, cache] {
+            try FileManager.default.createDirectory(atPath: PathText.parent(file) ?? home, withIntermediateDirectories: true)
+            try Data("x".utf8).write(to: URL(fileURLWithPath: file))
+        }
+
+        let environment = try await AppEnvironment.live(
+            paths: AppPaths(supportDirectory: directory.path + "/dati"), home: home, tempDirectory: directory.path + "/tmp")
+        var settings = CleanerSettings()
+        settings.projectRoots = ["~/src"]
+        try environment.settings.save(settings)
+        let report = await environment.clean.clean(
+            [
+                CategorySelection(categoryId: "prova", items: [
+                    ScanItem(path: kept, sizeBytes: 1, isDirectory: false, declaredRoot: home + "/Documents"),
+                    ScanItem(path: cache, sizeBytes: 1, isDirectory: false, declaredRoot: home + "/Library/Caches"),
+                ]),
+            ],
+            progress: nil,
+            journal: nil)
+
+        #expect(environment.expandedProjectRoots() == [home + "/src"])
+        #expect(FileManager.default.fileExists(atPath: kept))
+        #expect(!FileManager.default.fileExists(atPath: cache))
+        #expect(report.itemsDeleted == 1)
     }
 
     @Test func defaultPathsUseTheBundleIdentifierOrTheProvisionalOne() {

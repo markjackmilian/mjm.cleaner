@@ -1,0 +1,10 @@
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+      { "name": "iPhone 16", "state": "Shutdown", "isAvailable": true }
+    ]
+  },
+  "runtimes": [
+    { "identifier": "com.apple.CoreSimulator.SimRuntime.iOS-18-0", "name": "iOS 18.0", "version": "18.0", "buildversion": "22A3351", "platform": "iOS", "isAvailable": true }
+  ]
+}

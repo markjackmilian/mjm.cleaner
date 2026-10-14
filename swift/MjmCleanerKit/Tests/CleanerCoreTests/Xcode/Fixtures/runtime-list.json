@@ -1,0 +1,10 @@
+{
+  "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE": {
+    "identifier": "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE",
+    "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-18-0",
+    "version": "18.0",
+    "build": "22A3351",
+    "deletable": true,
+    "sizeBytes": 8000000000
+  }
+}

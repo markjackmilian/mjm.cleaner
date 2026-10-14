@@ -92,6 +92,22 @@ struct DockerCleanExecutorTests {
         #expect(result.report.errors.allSatisfy { $0.message.contains("KEEP") })
     }
 
+    // Solo Swift: la guardia sul KEEP vale per ogni tipo, anche per la cache di build, che non ha
+    // altre guardie sull'ID: senza questo controllo `builder prune -f` partirebbe comunque.
+    @Test func keepBuildCacheIsRefusedWithoutPruning() async throws {
+        let cli = succeedingCli()
+        let keptCache = DockerCandidate(
+            kind: .buildCache, id: DockerClassifier.buildCacheId, displayName: "Cache di build", sizeBytes: 1_000,
+            verdict: .keep, ruleId: "build-cache", reason: "m", cost: "c")
+
+        let result = try await execute(cli, keptCache)
+
+        #expect(!cli.calls.contains { $0.first == "builder" })
+        #expect(result.report.itemsDeleted == 0)
+        #expect(result.report.itemsFailed == 1)
+        #expect(result.report.errors.allSatisfy { $0.message.contains("KEEP") })
+    }
+
     @Test(arguments: ["testcontainers/ryuk:0.14.0", "sha256:abc", "-f"])
     func imageIdentifiersThatAreNotFullIdsAreRefused(id: String) async throws {
         let cli = succeedingCli()
@@ -110,6 +126,23 @@ struct DockerCleanExecutorTests {
 
         #expect(!cli.calls.contains { $0.first == "volume" })
         #expect(result.report.itemsFailed == 1)
+    }
+
+    // Solo Swift: le guardie sugli ID tengono il `$` stretto di Swift, che vale solo alla fine del
+    // testo. Il `$` di .NET accetterebbe un "\n" finale (la tabella delle convenzioni lo traduce in
+    // `\n?$` ovunque tranne qui): un ID con il "\n" non è né un `sha256:` di 64 cifre né un nome di
+    // volume valido, e non deve arrivare a `rmi` o a `volume rm`.
+    @Test func identifiersWithATrailingNewlineAreRefused() async throws {
+        let cli = succeedingCli()
+
+        let result = try await execute(cli,
+            image(Self.ryukId + "\n", "ryuk"),
+            volume("old-data\n"))
+
+        #expect(!cli.calls.contains { $0.first == "rmi" || $0.first == "volume" })
+        #expect(result.report.itemsDeleted == 0)
+        #expect(result.report.itemsFailed == 2)
+        #expect(result.report.errors.map(\.path) == ["ryuk", "old-data\n"])
     }
 
     @Test func refusedImageIsReportedWithDockersReason() async throws {

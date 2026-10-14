@@ -66,6 +66,28 @@ struct DockerConfirmationGroupsTests {
         #expect(selection.count == groups.filter { $0.mode != .readOnly }.reduce(0) { $0 + $1.items.count })
     }
 
+    // Solo Swift: `build` confina le voci KEEP in un gruppo in sola lettura, quindi il test sopra non
+    // esercita il filtro finale di `selection`. Qui i gruppi sono costruiti a mano, con una voce KEEP
+    // anche in un gruppo a blocco e in uno selezionabile, come potrebbe consegnarli un chiamante
+    // sbagliato: la selezione deve comunque scartarla.
+    @Test func selectionDropsKeptResourcesEvenFromHandBuiltGroups() {
+        func candidate(_ id: String, _ verdict: DockerVerdict) -> DockerCandidate {
+            DockerCandidate(kind: .volume, id: id, displayName: id, sizeBytes: 1, verdict: verdict, ruleId: "rule", reason: "r", cost: "c")
+        }
+        let blockDelete = candidate("block-delete", .delete)
+        let blockKeep = candidate("block-keep", .keep)
+        let selectableAsk = candidate("selectable-ask", .ask)
+        let selectableKeep = candidate("selectable-keep", .keep)
+        let groups = [
+            DockerConfirmationGroup(id: "block", title: "t", description: "d", mode: .block, items: [blockKeep, blockDelete]),
+            DockerConfirmationGroup(id: "selectable", title: "t", description: "d", mode: .selectable, items: [selectableKeep, selectableAsk]),
+        ]
+
+        let selection = DockerConfirmationGroups.selection(groups, isGroupSelected: { _ in true }, isItemSelected: { _ in true })
+
+        #expect(selection == [blockDelete, selectableAsk])
+    }
+
     @Test func blockGroupIsAllOrNothing() throws {
         let groups = try realCaseGroups()
 

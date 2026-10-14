@@ -253,4 +253,52 @@ struct DockerCleanExecutorTests {
         #expect(result.after != nil)
         #expect(result.report.bytesFreed == 340_000_000)
     }
+
+    // Solo Swift: le due prove sopra annullano dal callback, cioè dopo che il comando è già tornato.
+    // Qui l'annullamento arriva mentre `rmi` è in corso: come `ProcessRunner`, il comando controlla
+    // l'annullamento solo dopo la risposta (`CancellationCheckingCli`), quindi senza l'isolamento
+    // dell'esecutore la cancellazione fallirebbe e il resoconto andrebbe perso.
+    @Test func cancellationDuringADeletionDoesNotInterruptIt() async throws {
+        let outer = Shared<Task<DockerCleanResult, any Error>?>(nil)
+        let cli = succeedingCli()
+            .on("rmi \(Self.ryukId)") {
+                outer.value?.cancel()
+                return FakeDockerCli.ok("Deleted")
+            }
+        let executor = DockerCleanExecutor(
+            cli: CancellationCheckingCli(inner: cli),
+            clock: FixedWallClock(now: Date(timeIntervalSince1970: 0)))
+        let selected = [image(Self.ryukId, "ryuk"), image(DockerFixtures.alpineId, "alpine")]
+        let (gate, open) = AsyncStream<Void>.makeStream()
+
+        // Il task attende il via prima di chiamare l'esecutore, così il riferimento è già salvato
+        // quando parte il primo `rmi`.
+        let task = Task<DockerCleanResult, any Error> {
+            for await _ in gate { break }
+            return try await executor.execute(selected, progress: nil)
+        }
+        outer.set(task)
+        open.yield(())
+        open.finish()
+
+        let result = try await task.value
+
+        #expect(result.report.itemsDeleted == 1)
+        #expect(result.report.deletedPaths == ["docker:image:\(Self.ryukId) (ryuk)"])
+        #expect(!cli.commandLines.contains("rmi \(DockerFixtures.alpineId)"))
+        #expect(result.after != nil)
+    }
+}
+
+/// Come `ProcessRunner`: il comando risponde e solo dopo controlla l'annullamento del task che lo
+/// attende (il processo reale viene ucciso da `onCancel`, e il suo esito si riconosce dopo l'uscita).
+/// `FakeDockerCli` controlla invece solo prima di rispondere.
+private struct CancellationCheckingCli: DockerCommandRunning {
+    let inner: FakeDockerCli
+
+    func run(_ arguments: [String], timeout: Duration?) async throws -> ProcessResult {
+        let result = try await inner.run(arguments, timeout: timeout)
+        try Task.checkCancellation()
+        return result
+    }
 }

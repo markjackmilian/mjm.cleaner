@@ -88,4 +88,33 @@ struct ChooseStepTests {
         #expect(CategoryVisuals.visual(for: "sconosciuta").tileColorName == "TileNeutral")
         #expect([RiskLevel.low, .medium, .high].map(\.colorName) == ["RiskLow", "RiskMedium", "RiskHigh"])
     }
+
+    // Solo Swift (review del Task 5): «Analizza» senza selezione non salva né apre il passo 2, e il
+    // salvataggio della selezione conserva le altre impostazioni (`Load() with { … }` del C#).
+    @Test func analyzeWithNothingSelectedDoesNothing() throws {
+        var settings = CleanerSettings()
+        settings.selectedCategoryIds = []
+        let store = FakeSettingsStore(settings)
+        let navigation = CleanupNavigationSpy()
+        let model = ChooseStepModel(environment: try makeEnvironment(settings: store), navigation: navigation)
+
+        model.analyze()
+
+        #expect(navigation.events.isEmpty)
+        #expect(store.saves == 0)
+    }
+
+    @Test func analyzeKeepsTheOtherSettings() throws {
+        var settings = CleanerSettings()
+        settings.selectedCategoryIds = ["logs"]
+        settings.projectRoots = ["~/code"]
+        settings.logsMinAgeDays = 7
+        settings.appearance = .dark
+        let store = FakeSettingsStore(settings)
+        let model = ChooseStepModel(environment: try makeEnvironment(settings: store), navigation: CleanupNavigationSpy())
+
+        model.analyze()
+
+        #expect(store.current == settings)
+    }
 }

@@ -69,11 +69,23 @@ public struct ProjectReferenceScanner: Sendable {
         var images: [ImageReference] = []
         var composeProjects = Set<String>()
 
+        // Costruite una volta per ricerca e passate a `classify` per ogni file: costruirle per ogni
+        // file, anche per quelli che non sono progetti, costava più della ricerca stessa. Restano
+        // locali (`Regex` non è `Sendable`): né proprietà statiche né proprietà di istanza.
+        // `^(docker-)?compose[\w.-]*\.ya?ml$`, IgnoreCase.
+        let composeFileName = /^(?:docker-)?compose[[\p{L}\p{Mn}\p{Nd}\p{Pc}.\-]&&[\x{0}-\x{FFFF}]]*\.ya?ml\n?$/
+            .ignoresCase()
+            .matchingSemantics(.unicodeScalar)
+        // `^((Dockerfile|Containerfile)[\w.-]*|[\w.-]+\.Dockerfile)$`, IgnoreCase.
+        let dockerfileName = /^(?:(?:Dockerfile|Containerfile)[[\p{L}\p{Mn}\p{Nd}\p{Pc}.\-]&&[\x{0}-\x{FFFF}]]*|[[\p{L}\p{Mn}\p{Nd}\p{Pc}.\-]&&[\x{0}-\x{FFFF}]]+\.Dockerfile)\n?$/
+            .ignoresCase()
+            .matchingSemantics(.unicodeScalar)
+
         for root in roots {
             try forEachFile(under: root) { file in
                 try Task.checkCancellation()
 
-                let kind = Self.classify(PathText.fileName(file))
+                let kind = Self.classify(PathText.fileName(file), composeFileName: composeFileName, dockerfileName: dockerfileName)
                 guard kind != .none, let text = read(file) else { return }
 
                 switch kind {
@@ -163,16 +175,8 @@ public struct ProjectReferenceScanner: Sendable {
         case yaml
     }
 
-    private static func classify(_ name: String) -> FileKind {
-        // `^(docker-)?compose[\w.-]*\.ya?ml$`, IgnoreCase.
-        let composeFileName = /^(?:docker-)?compose[[\p{L}\p{Mn}\p{Nd}\p{Pc}.\-]&&[\x{0}-\x{FFFF}]]*\.ya?ml\n?$/
-            .ignoresCase()
-            .matchingSemantics(.unicodeScalar)
-        // `^((Dockerfile|Containerfile)[\w.-]*|[\w.-]+\.Dockerfile)$`, IgnoreCase.
-        let dockerfileName = /^(?:(?:Dockerfile|Containerfile)[[\p{L}\p{Mn}\p{Nd}\p{Pc}.\-]&&[\x{0}-\x{FFFF}]]*|[[\p{L}\p{Mn}\p{Nd}\p{Pc}.\-]&&[\x{0}-\x{FFFF}]]+\.Dockerfile)\n?$/
-            .ignoresCase()
-            .matchingSemantics(.unicodeScalar)
-
+    /// Le regex dei nomi arrivano da `scan`, che le costruisce una volta per ricerca.
+    private static func classify(_ name: String, composeFileName: Regex<Substring>, dockerfileName: Regex<Substring>) -> FileKind {
         if name.firstMatch(of: composeFileName) != nil {
             return .compose
         }

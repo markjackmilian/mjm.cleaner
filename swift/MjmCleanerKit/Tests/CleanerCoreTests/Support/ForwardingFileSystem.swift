@@ -20,4 +20,7 @@ class ForwardingFileSystem: FileSystem, @unchecked Sendable {
     func writeData(_ path: String, _ data: Data) throws { try inner.writeData(path, data) }
     func appendData(_ path: String, _ data: Data) throws { try inner.appendData(path, data) }
     func createDirectory(_ path: String) throws { try inner.createDirectory(path) }
+    func availableFreeSpace(forVolumeContaining path: String) throws -> Int64 {
+        try inner.availableFreeSpace(forVolumeContaining: path)
+    }
 }

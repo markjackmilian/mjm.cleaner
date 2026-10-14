@@ -32,12 +32,17 @@ public struct FileItemInfo: Sendable, Equatable {
     public let size: Int64
     public let lastWrite: Date
     public let lastAccess: Date
+    /// Data di creazione (`st_birthtimespec`), come `CreationTimeUtc` di .NET su macOS: a
+    /// differenza di `lastWrite` non cambia quando il contenuto viene riscritto. Chi non la conosce
+    /// la omette e vale `lastWrite`.
+    public let creation: Date
 
-    public init(kind: FileItemKind, size: Int64, lastWrite: Date, lastAccess: Date) {
+    public init(kind: FileItemKind, size: Int64, lastWrite: Date, lastAccess: Date, creation: Date? = nil) {
         self.kind = kind
         self.size = size
         self.lastWrite = lastWrite
         self.lastAccess = lastAccess
+        self.creation = creation ?? lastWrite
     }
 
     /// Il più recente fra accesso e scrittura: l'«età» di ogni regola.
@@ -73,6 +78,10 @@ public protocol FileSystem: Sendable {
     /// Come `Directory.CreateDirectory`: crea anche i livelli intermedi; una cartella esistente
     /// non è un errore.
     func createDirectory(_ path: String) throws
+    /// Come `DriveInfo.AvailableFreeSpace` del volume che contiene `path`: i byte disponibili a un
+    /// processo senza privilegi (`statfs`: `f_bavail × f_bsize`), senza lo spazio eliminabile
+    /// che macOS libererebbe su richiesta.
+    func availableFreeSpace(forVolumeContaining path: String) throws -> Int64
 }
 
 extension FileSystem {

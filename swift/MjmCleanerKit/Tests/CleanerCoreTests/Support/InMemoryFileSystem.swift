@@ -15,25 +15,32 @@ final class InMemoryFileSystem: FileSystem {
         var contents: Data
         var lastWrite: Date
         var lastAccess: Date
+        var creation: Date
 
         static func directory(_ stamp: Date) -> Node {
-            Node(isDirectory: true, size: 0, contents: Data(), lastWrite: stamp, lastAccess: stamp)
+            Node(isDirectory: true, size: 0, contents: Data(), lastWrite: stamp, lastAccess: stamp, creation: stamp)
         }
     }
 
     private let nodes = Mutex<[String: Node]>(["/": .directory(Date())])
+    private let freeSpace = Mutex<Int64>(0)
 
     init() {}
 
     // MARK: - Costruzione dello scenario
 
     func addFile(_ path: String, size: Int64 = 0, stamp: Date = Date()) {
-        store(path, Node(isDirectory: false, size: size, contents: Data(), lastWrite: stamp, lastAccess: stamp))
+        store(path, Node(isDirectory: false, size: size, contents: Data(), lastWrite: stamp, lastAccess: stamp, creation: stamp))
     }
 
     func addFile(_ path: String, text: String, stamp: Date = Date()) {
         let data = Data(text.utf8)
-        store(path, Node(isDirectory: false, size: Int64(data.count), contents: data, lastWrite: stamp, lastAccess: stamp))
+        store(path, Node(isDirectory: false, size: Int64(data.count), contents: data, lastWrite: stamp, lastAccess: stamp, creation: stamp))
+    }
+
+    /// Lo spazio libero che `availableFreeSpace` riporta per ogni percorso esistente.
+    func setAvailableFreeSpace(_ bytes: Int64) {
+        freeSpace.withLock { $0 = bytes }
     }
 
     func addDirectory(_ path: String) {
@@ -79,7 +86,8 @@ final class InMemoryFileSystem: FileSystem {
                 kind: node.isDirectory ? .directory : .file,
                 size: node.isDirectory ? 0 : node.size,
                 lastWrite: node.lastWrite,
-                lastAccess: node.lastAccess)
+                lastAccess: node.lastAccess,
+                creation: node.creation)
         }
     }
 
@@ -130,6 +138,13 @@ final class InMemoryFileSystem: FileSystem {
         }
     }
 
+    /// Come `statfs`: un percorso inesistente lancia `ENOENT`.
+    func availableFreeSpace(forVolumeContaining path: String) throws -> Int64 {
+        let key = Self.key(path)
+        guard nodes.withLock({ $0[key] != nil }) else { throw FileSystemError(code: ENOENT, path: path) }
+        return freeSpace.withLock { $0 }
+    }
+
     // MARK: - Privati
 
     private func store(_ path: String, _ node: Node) {
@@ -149,7 +164,10 @@ final class InMemoryFileSystem: FileSystem {
             }
             if nodes[key]?.isDirectory == true { throw FileSystemError(code: EISDIR, path: path) }
             let data = transform(nodes[key]?.contents)
-            nodes[key] = Node(isDirectory: false, size: Int64(data.count), contents: data, lastWrite: Date(), lastAccess: Date())
+            let now = Date()
+            nodes[key] = Node(
+                isDirectory: false, size: Int64(data.count), contents: data,
+                lastWrite: now, lastAccess: now, creation: nodes[key]?.creation ?? now)
         }
     }
 

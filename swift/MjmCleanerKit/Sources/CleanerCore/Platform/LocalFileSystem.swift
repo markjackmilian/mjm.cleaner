@@ -63,7 +63,8 @@ public struct LocalFileSystem: FileSystem {
             kind: kind,
             size: Int64(status.st_size),
             lastWrite: Self.date(status.st_mtimespec),
-            lastAccess: Self.date(status.st_atimespec))
+            lastAccess: Self.date(status.st_atimespec),
+            creation: Self.date(status.st_birthtimespec))
     }
 
     public func deleteFile(_ path: String) throws {
@@ -129,6 +130,17 @@ public struct LocalFileSystem: FileSystem {
             if code == EEXIST && directoryExists(path) { return }
             throw FileSystemError(code: code, path: path)
         }
+    }
+
+    public func availableFreeSpace(forVolumeContaining path: String) throws -> Int64 {
+        var volume = statfs()
+        guard statfs(path, &volume) == 0 else { throw FileSystemError(code: errno, path: path) }
+        // Come DriveInfo.AvailableFreeSpace su Unix: blocchi disponibili ai processi senza
+        // privilegi per la dimensione del blocco. `volumeAvailableCapacityForImportantUsage`
+        // aggiungerebbe lo spazio eliminabile e darebbe un numero diverso dall'app C#.
+        let (bytes, overflow) = Int64(volume.f_bsize).multipliedReportingOverflow(by: Int64(clamping: volume.f_bavail))
+        guard !overflow else { throw FileSystemError(code: EOVERFLOW, path: path) }
+        return bytes
     }
 
     // MARK: - Privati

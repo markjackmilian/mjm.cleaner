@@ -1,0 +1,61 @@
+[
+  {
+    "Id": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+    "Created": "2026-09-21T07:48:01Z",
+    "Name": "/sqlserver2025",
+    "Image": "sha256:2b5b581621126574f3d1f75e78d3eebe8d05aedb59ad0cfdf9aa42cb0634d726",
+    "State": {
+      "Status": "exited",
+      "Running": false,
+      "ExitCode": 137
+    },
+    "Mounts": [
+      {
+        "Type": "volume",
+        "Name": "mssql2025-data",
+        "Source": "/var/lib/docker/volumes/mssql2025-data/_data",
+        "Destination": "/var/opt/mssql",
+        "Driver": "local"
+      }
+    ],
+    "Config": {
+      "Image": "mcr.microsoft.com/mssql/server:2025-latest",
+      "Labels": {
+        "com.microsoft.product": "Microsoft SQL Server",
+        "vendor": "Microsoft"
+      }
+    }
+  },
+  {
+    "Id": "e20bf2607c5baa55bcdf2b7d88c805db8ec61e386c6e858335fc66311eaa4f5a",
+    "Created": "2026-09-29T18:33:49Z",
+    "Name": "/storage-bedaxjvn",
+    "Image": "sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37",
+    "State": {
+      "Status": "exited",
+      "Running": false,
+      "ExitCode": 137
+    },
+    "Mounts": [
+      {
+        "Type": "volume",
+        "Name": "orbit.apphost-48d90b1972-storage-data",
+        "Source": "/var/lib/docker/volumes/orbit.apphost-48d90b1972-storage-data/_data",
+        "Destination": "/data",
+        "Driver": "local"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/tester/.aspire/certs",
+        "Destination": "/certs"
+      }
+    ],
+    "Config": {
+      "Image": "mcr.microsoft.com/azure-storage/azurite:3.35.0",
+      "Labels": {
+        "com.microsoft.developer.usvc-dev.name": "storage-bedaxjvn",
+        "com.microsoft.developer.usvc-dev.mountsLabel": "type=volume,src=orbit.apphost-48d90b1972-storage-data"
+      }
+    }
+  }
+]

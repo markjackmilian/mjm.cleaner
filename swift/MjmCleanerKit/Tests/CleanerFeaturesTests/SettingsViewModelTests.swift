@@ -135,4 +135,42 @@ struct SettingsViewModelTests {
         fixture.model.appearance = .auto
         #expect(fixture.appearance.applied.isEmpty)
     }
+
+    // Solo Swift (review del Task 3): limiti che il piano dichiara e che i test portati non fissavano.
+    @Test func saveClampsNegativeNuGetAgeAndHugeThresholds() {
+        let fixture = create()
+        fixture.model.nuGetMinAgeDays = -5
+        fixture.model.largeFileThresholdMegabytes = Int.max
+        fixture.model.save()
+        #expect(fixture.store.current.nuGetMinAgeDays == 0)
+        // I megabyte restano nell'intervallo di un `int` del C#: il prodotto non trabocca.
+        #expect(fixture.store.current.largeFileThresholdBytes == Int64(Int32.max) * 1024 * 1024)
+    }
+
+    @Test func foldersAreComparedOrdinallyWhenAddingAndRemoving() async {
+        let added = create(settings { $0.projectRoots = ["/x/Cafe\u{301}"] }, picked: "/x/Caf\u{E9}")
+        await added.model.addProjectRoot()
+        // NFC e NFD sono due percorsi diversi, come per `StringComparer.Ordinal`.
+        #expect(added.model.projectRoots.map { Array($0.utf8) } == [Array("/x/Cafe\u{301}".utf8), Array("/x/Caf\u{E9}".utf8)])
+
+        let removed = create(settings { $0.projectRoots = ["/x/Cafe\u{301}", "/x/Caf\u{E9}"] })
+        removed.model.selectedProjectRoot = "/x/Caf\u{E9}"
+        removed.model.removeProjectRoot()
+        #expect(removed.model.projectRoots.map { Array($0.utf8) } == [Array("/x/Cafe\u{301}".utf8)])
+    }
+
+    @Test func cancelledPickerKeepsTheCurrentSelection() async {
+        let fixture = create(settings {
+            $0.projectRoots = ["/a"]
+            $0.largeFileRoots = ["/b"]
+        }, picked: nil)
+        fixture.model.selectedProjectRoot = "/a"
+        fixture.model.selectedLargeFileRoot = "/b"
+
+        await fixture.model.addProjectRoot()
+        await fixture.model.addLargeFileRoot()
+
+        #expect(fixture.model.selectedProjectRoot == "/a")
+        #expect(fixture.model.selectedLargeFileRoot == "/b")
+    }
 }

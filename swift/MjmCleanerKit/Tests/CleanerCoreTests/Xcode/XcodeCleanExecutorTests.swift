@@ -32,6 +32,7 @@ struct XcodeCleanExecutorTests {
     private struct FakeCli: XcodeCliInvoking {
         let deletedDevices = Recorder<String>()
         let operationOrder = Recorder<String>()
+        let deletedRuntimes = Recorder<String>()
         var deviceResult = XcodeCleanExecutorTests.success
         var deviceResultForSecond = XcodeCleanExecutorTests.success
         var onDeviceDelete: (@Sendable (String) -> Void)?
@@ -49,6 +50,7 @@ struct XcodeCleanExecutorTests {
 
         func deleteRuntime(_ uuid: String) async throws -> ProcessResult {
             operationOrder.append("runtime")
+            deletedRuntimes.append(uuid)
             return XcodeCleanExecutorTests.success
         }
     }
@@ -146,15 +148,28 @@ struct XcodeCleanExecutorTests {
     private static let appPath = derivedDataRoot + "/App-abc"
     private static let appKey = "derived-data:" + appPath
 
-    /// `FileSnapshot` del C#: una cartella DerivedData con identità completa.
-    private func fileSnapshot(allocatedBytes: Int64?, logicalBytes: Int64 = 10 * 1024 * 1024 * 1024) -> XcodeSnapshot {
-        let scan = ScanItem(path: Self.appPath, sizeBytes: logicalBytes, isDirectory: true, declaredRoot: Self.derivedDataRoot)
-        let identity = XcodeFileIdentity(canonicalPath: Self.appPath, isDirectory: true, creationTime: Date(timeIntervalSince1970: 86_400),
+    /// Una cartella DerivedData con identità completa. I parametri opzionali alterano soltanto la
+    /// riga candidata o il percorso catturato nell'identità: servono ai test di rivalidazione.
+    private func folderSnapshot(
+        path: String = Self.appPath,
+        candidatePath: String? = nil,
+        identityPath: String? = nil,
+        allocatedBytes: Int64?,
+        logicalBytes: Int64 = 10 * 1024 * 1024 * 1024
+    ) -> XcodeSnapshot {
+        let key = "derived-data:" + path
+        let scan = ScanItem(path: path, sizeBytes: logicalBytes, isDirectory: true, declaredRoot: Self.derivedDataRoot)
+        let identity = XcodeFileIdentity(canonicalPath: identityPath ?? path, isDirectory: true, creationTime: Date(timeIntervalSince1970: 86_400),
                                          lastWriteTime: Date(timeIntervalSince1970: 2 * 86_400), logicalSizeBytes: logicalBytes)
         return XcodeSnapshot(
-            candidates: [XcodeCandidate(key: Self.appKey, kind: .derivedData, name: "App-abc", path: Self.appPath, sizeBytes: allocatedBytes)],
+            candidates: [XcodeCandidate(key: key, kind: .derivedData, name: "App-abc", path: candidatePath ?? path, sizeBytes: allocatedBytes)],
             warnings: [],
-            fileInventory: XcodeFileInventory([(Self.appKey, XcodeFileEntry(item: scan, identity: identity))]))
+            fileInventory: XcodeFileInventory([(key, XcodeFileEntry(item: scan, identity: identity))]))
+    }
+
+    /// `FileSnapshot` del C#: una cartella DerivedData con identità completa.
+    private func fileSnapshot(allocatedBytes: Int64?, logicalBytes: Int64 = 10 * 1024 * 1024 * 1024) -> XcodeSnapshot {
+        folderSnapshot(allocatedBytes: allocatedBytes, logicalBytes: logicalBytes)
     }
 
     private func single(_ result: XcodeCleanResult) throws -> XcodeItemResult {
@@ -512,5 +527,107 @@ struct XcodeCleanExecutorTests {
         #expect(fs.directoryExists(Self.derivedDataRoot))
         #expect(journal.paths.values == [Self.appPath])
         #expect(result.historyReport.deletedPaths == [Self.appPath])
+    }
+
+    // MARK: - Solo Swift: rivalidazione delle cartelle, diario, UUID dei runtime
+
+    // Un'identità o un percorso cambiati fra conferma ed eliminazione fermano la cartella prima del
+    // motore di pulizia: il confronto legge sempre l'inventario fresco, non il piano.
+    @Test func changedFolderIdentityIsSkippedWithoutCallingCleanEngine() async throws {
+        let plan = try confirm(fileSnapshot(allocatedBytes: 10, logicalBytes: 50), Self.appKey)
+        let clean = FakeCleanEngine(itemsDeleted: 1)
+
+        let result = await create(FakeCli(), QueueCollector(fileSnapshot(allocatedBytes: 10, logicalBytes: 60)), clean)
+            .execute(plan, progress: nil, journal: nil)
+
+        #expect(clean.calls.values.isEmpty)
+        #expect(try single(result).outcome == .skipped)
+    }
+
+    @Test func changedFolderPathIsSkippedWithoutCallingCleanEngine() async throws {
+        let plan = try confirm(fileSnapshot(allocatedBytes: 10, logicalBytes: 50), Self.appKey)
+        let clean = FakeCleanEngine(itemsDeleted: 1)
+        let moved = folderSnapshot(candidatePath: Self.appPath + "-moved", allocatedBytes: 10, logicalBytes: 50)
+
+        let result = await create(FakeCli(), QueueCollector(moved), clean).execute(plan, progress: nil, journal: nil)
+
+        #expect(clean.calls.values.isEmpty)
+        #expect(try single(result).outcome == .skipped)
+    }
+
+    // NFC e NFD dello stesso nome sono due percorsi diversi per Xcode e per la riverifica, che
+    // confronta i byte UTF-8 e non l'equivalenza canonica di String.
+    @Test func canonicallyEquivalentFolderIdentityIsSkippedWithoutCallingCleanEngine() async throws {
+        let composed = Self.derivedDataRoot + "/Caf\u{E9}-abc"
+        let decomposed = Self.derivedDataRoot + "/Cafe\u{301}-abc"
+        let plan = try confirm(folderSnapshot(path: composed, allocatedBytes: 10, logicalBytes: 50), "derived-data:" + composed)
+        let clean = FakeCleanEngine(itemsDeleted: 1)
+        let fresh = folderSnapshot(path: composed, identityPath: decomposed, allocatedBytes: 10, logicalBytes: 50)
+
+        let result = await create(FakeCli(), QueueCollector(fresh), clean).execute(plan, progress: nil, journal: nil)
+
+        #expect(clean.calls.values.isEmpty)
+        #expect(try single(result).outcome == .skipped)
+    }
+
+    @Test func unknownXcodeStateBlocksFilesWithoutCallingCleanEngine() async throws {
+        let source = fileSnapshot(allocatedBytes: 10, logicalBytes: 50)
+        let plan = try confirm(source, Self.appKey)
+        let clean = FakeCleanEngine(itemsDeleted: 1)
+        let executor = XcodeCleanExecutor(cli: FakeCli(), collector: QueueCollector(source), cleanEngine: clean, measures: FakeSizeProbe(),
+                                          runningProbe: QueueRunningProbe(.unknown), clock: SystemWallClock())
+
+        let result = await executor.execute(plan, progress: nil, journal: nil)
+
+        #expect(clean.calls.values.isEmpty)
+        #expect(try single(result).outcome == .skipped)
+    }
+
+    // Il diario riceve un simulatore solo quando la verifica successiva lo trova assente: né un
+    // comando riuscito con risorsa ancora presente, né un comando interrotto vi entrano.
+    @Test func stillPresentAfterSuccessfulCommandIsNotJournaled() async throws {
+        let plan = try confirm(snapshot(device()), Self.deviceId)
+        let journal = JournalRecorder()
+
+        let result = await create(FakeCli(), QueueCollector(snapshot(device()))).execute(plan, progress: nil, journal: journal)
+
+        #expect(try single(result).outcome == .failed)
+        #expect(journal.paths.values.isEmpty)
+    }
+
+    @Test func interruptedCommandIsNotJournaledEvenWhenTheDeviceIsAbsent() async throws {
+        let plan = try confirm(snapshot(device()), Self.deviceId)
+        var cli = FakeCli()
+        cli.deviceResult = ProcessResult(exitCode: 0, standardOutput: "", standardError: "", timedOut: true)
+        let journal = JournalRecorder()
+
+        let result = await create(cli, QueueCollector(snapshot(device()), snapshot())).execute(plan, progress: nil, journal: journal)
+
+        #expect(try single(result).outcome == .uncertain)
+        #expect(journal.paths.values.isEmpty)
+    }
+
+    // Il runtime va rimosso per UUID canonico, mai per chiave («runtime:» più l'UUID).
+    @Test func runtimeIsDeletedByItsCanonicalUuid() async throws {
+        let plan = try confirm(snapshot(runtime([])), "runtime:" + Self.runtimeId)
+        let cli = FakeCli()
+
+        let result = await create(cli, QueueCollector(snapshot(runtime([])), snapshot())).execute(plan, progress: nil, journal: nil)
+
+        #expect(cli.deletedRuntimes.values == [Self.runtimeId])
+        #expect(try single(result).outcome == .deleted)
+    }
+
+    // Se il motore non elimina la cartella, né lo storico né la stima la contano come rimossa.
+    @Test func folderNotRemovedByCleanEngineIsSkippedWithoutCredit() async throws {
+        let source = fileSnapshot(allocatedBytes: 10, logicalBytes: 50)
+        let plan = try confirm(source, Self.appKey)
+
+        let result = await create(FakeCli(), QueueCollector(source), FakeCleanEngine(itemsDeleted: 0))
+            .execute(plan, progress: nil, journal: nil)
+
+        #expect(try single(result).outcome == .skipped)
+        #expect(result.historyReport.bytesFreed == 0)
+        #expect(result.historyReport.deletedPaths.isEmpty)
     }
 }

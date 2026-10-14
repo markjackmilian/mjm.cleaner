@@ -75,4 +75,72 @@ struct ScanStepModelTests {
 
         #expect(model.progress.map(\.status) == ["in attesa", "1 elemento · 10 B"])
     }
+
+    // Solo Swift (review del Task 6): in ogni ramo l'avanzamento già segnalato è applicato prima di
+    // lasciare il passo (`relay.finish()` prima della navigazione).
+    private var drainUpdates: [ScanProgress] {
+        [
+            ScanProgress(categoryId: "logs", currentPath: "/a", itemsFound: 1, bytesFound: 10),
+            ScanProgress(categoryId: "logs", currentPath: "", itemsFound: 2, bytesFound: 2048),
+            ScanProgress(categoryId: "trash", currentPath: "/t", itemsFound: 0, bytesFound: 0),
+        ]
+    }
+
+    @Test func progressIsAppliedBeforeShowingTheConfirmStep() async throws {
+        let scan = FakeScan()
+        scan.respond(with: [], progress: drainUpdates)
+        let navigation = SnapshotNavigation()
+        let model = ScanStepModel(environment: try makeEnvironment(scan: scan), navigation: navigation, categories: categories)
+        navigation.model = model
+
+        await model.run?.value
+
+        #expect(navigation.statusesAtNavigation == [["2 elementi · 2 KB", "in corso…"]])
+        #expect(navigation.pathsAtNavigation == ["/t"])
+    }
+
+    @Test func progressIsAppliedBeforeGoingBackAfterACancel() async throws {
+        let scan = FakeScan()
+        scan.respond(with: [], progress: drainUpdates)
+        scan.waitForCancellation()
+        let navigation = SnapshotNavigation()
+        let model = ScanStepModel(environment: try makeEnvironment(scan: scan), navigation: navigation, categories: categories)
+        navigation.model = model
+        await scan.started.wait()
+
+        model.cancel()
+        await model.run?.value
+
+        #expect(navigation.statusesAtNavigation == [["2 elementi · 2 KB", "in corso…"]])
+    }
+
+    @Test func progressIsAppliedWhenTheScanFails() async throws {
+        let scan = FakeScan()
+        scan.respond(with: [], progress: drainUpdates)
+        scan.fail(with: UnexpectedTestError(description: "disco scollegato"))
+        let model = ScanStepModel(environment: try makeEnvironment(scan: scan), navigation: nil, categories: categories)
+
+        await model.run?.value
+
+        #expect(model.progress.map(\.status) == ["2 elementi · 2 KB", "in corso…"])
+    }
+}
+
+/// Fotografa il passo 2 nel momento in cui chiede di cambiare pagina.
+@MainActor
+private final class SnapshotNavigation: CleanupNavigating {
+    weak var model: ScanStepModel?
+    private(set) var statusesAtNavigation: [[String]] = []
+    private(set) var pathsAtNavigation: [String] = []
+
+    private func snapshot() {
+        statusesAtNavigation.append(model?.progress.map(\.status) ?? [])
+        pathsAtNavigation.append(model?.currentPath ?? "")
+    }
+
+    func startOver() { snapshot() }
+    func refreshTotal() async throws {}
+    func showScan(_ categories: [CleanupCategory]) {}
+    func showConfirm(_ categories: [CleanupCategory], results: [CategoryScanResult]) { snapshot() }
+    func showDone(_ report: CleanReport, journal: PendingJournal?) {}
 }

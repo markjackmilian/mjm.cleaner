@@ -630,4 +630,51 @@ struct XcodeCleanExecutorTests {
         #expect(result.historyReport.bytesFreed == 0)
         #expect(result.historyReport.deletedPaths.isEmpty)
     }
+
+    // MARK: - Solo Swift: completezza dell'inventario fresco per ogni gruppo di risorse
+
+    // Un simulatore «Unavailable» è rimovibile: il parser ne conserva il motivo di blocco, ma il
+    // classificatore lo toglie anche quando l'inventario dei dispositivi è incompleto, e l'anteprima
+    // ignora gli avvisi. L'unica barriera è il controllo di completezza dell'esecutore sul gruppo
+    // della risorsa: con una riga senza `udid` nell'inventario fresco il dispositivo non si rimuove.
+    @Test func unavailableDeviceInIncompleteFreshInventoryIsNotDeleted() async throws {
+        let complete = """
+            {"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Unavailable"}]},"runtimes":[]}
+            """
+        let incomplete = """
+            {"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Unavailable"},
+              {"name":"missing UUID","state":"Shutdown"}]},"runtimes":[]}
+            """
+        let analyzed = XcodeJson.parseInventory(complete, "{}", runtimeDeleteSupported: true)
+        let fresh = XcodeJson.parseInventory(incomplete, "{}", runtimeDeleteSupported: true)
+        let plan = try confirm(analyzed, Self.deviceId)
+        #expect(fresh.warnings.contains { $0.resourceGroup == .device && $0.kind == .completenessFailure })
+        // Premessa del test: il classificatore da solo lascerebbe passare il dispositivo.
+        let classified = try XcodeClassifier.classify(fresh, xcodeRunning: false)
+        #expect(try #require(classified.candidates.first { $0.key == Self.deviceId }).blockReason == nil)
+        let cli = FakeCli()
+
+        let result = await create(cli, QueueCollector(fresh)).execute(plan, progress: nil, journal: nil)
+
+        #expect(cli.deletedDevices.values.isEmpty)
+        #expect(cli.deletedRuntimes.values.isEmpty)
+        #expect(try single(result).outcome == .skipped)
+    }
+
+    // Lo stesso controllo vale per le cartelle: un avviso di completezza di DerivedData nell'inventario
+    // fresco ferma la cartella prima del motore di pulizia, anche se l'identità coincide.
+    @Test func derivedDataFolderInIncompleteFreshInventoryIsSkippedWithoutCallingCleanEngine() async throws {
+        let plan = try confirm(fileSnapshot(allocatedBytes: 10, logicalBytes: 50), Self.appKey)
+        var fresh = fileSnapshot(allocatedBytes: 10, logicalBytes: 50)
+        fresh.warnings = [XcodeInventoryWarning(resourceGroup: .derivedData, message: "derived data inventory incomplete")]
+        let clean = FakeCleanEngine(itemsDeleted: 1)
+
+        let result = await create(FakeCli(), QueueCollector(fresh), clean).execute(plan, progress: nil, journal: nil)
+
+        #expect(clean.calls.values.isEmpty)
+        #expect(try single(result).outcome == .skipped)
+        #expect(result.historyReport.bytesFreed == 0)
+    }
 }

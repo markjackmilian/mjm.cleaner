@@ -41,7 +41,17 @@ struct XcodeCliTests {
         #expect(calls.allSatisfy { $0.timeout == .seconds(300) })
     }
 
-    @Test(arguments: ["all", "unavailable", "not-a-uuid", "--unusable"])
+    // Solo Swift, oltre ai quattro casi portati: alias di simctl, UUID in forme diverse dalla "D"
+    // (con graffe, senza trattini), spazi, una cifra non esadecimale e una stringa di 36 byte che
+    // inizia con "--" (la lunghezza di un UUID non basta: un'opzione non deve arrivare a simctl).
+    @Test(arguments: [
+        "all", "unavailable", "not-a-uuid", "--unusable",
+        "booted", "", "   ",
+        "{11111111-1111-4111-8111-111111111111}",
+        "11111111111141118111111111111111",
+        "--11111111-1111-4111-8111-1111111111",
+        "1111111g-1111-4111-8111-111111111111",
+    ])
     func invalidDeleteIdentifiersNeverLaunchAProcess(id: String) async {
         let runner = FakeRunner { _ in Self.result(0, "", "") }
         let cli = XcodeCli(runner: runner, binaryPath: "/usr/bin/xcrun")

@@ -36,4 +36,17 @@ struct XcodeModelsTests {
         #expect(!candidate.canSelect)
         #expect(candidate.dependentDeviceKeys == ["d"])
     }
+
+    /// Test solo Swift: l'uguaglianza dell'identità confronta il percorso in modo ordinale, come il
+    /// record C#; un `==` sintetizzato fra `String` accetterebbe NFC e NFD dello stesso percorso.
+    @Test func fileIdentityComparesCanonicalPathsOrdinally() {
+        let date = Date(timeIntervalSince1970: 0)
+        func identity(_ path: String) -> XcodeFileIdentity {
+            XcodeFileIdentity(canonicalPath: path, isDirectory: true, creationTime: date,
+                              lastWriteTime: date, logicalSizeBytes: 1)
+        }
+
+        #expect(identity("/r/Caf\u{E9}") != identity("/r/Cafe\u{301}"))
+        #expect(identity("/r/Caf\u{E9}") == identity("/r/Caf\u{E9}"))
+    }
 }

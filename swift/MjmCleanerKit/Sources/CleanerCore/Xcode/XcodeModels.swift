@@ -110,6 +110,17 @@ public struct XcodeFileIdentity: Sendable, Equatable {
         self.lastWriteTime = lastWriteTime
         self.logicalSizeBytes = logicalSizeBytes
     }
+
+    /// Uguaglianza ordinale del percorso, come il record C# (`CanonicalPath` confrontato in modo
+    /// ordinale): fra `String` il `==` confronta per equivalenza canonica, quindi il confronto
+    /// sintetizzato accetterebbe come uguali NFC e NFD dello stesso percorso.
+    public static func == (lhs: XcodeFileIdentity, rhs: XcodeFileIdentity) -> Bool {
+        XcodeText.same(lhs.canonicalPath, rhs.canonicalPath)
+            && lhs.isDirectory == rhs.isDirectory
+            && lhs.creationTime == rhs.creationTime
+            && lhs.lastWriteTime == rhs.lastWriteTime
+            && lhs.logicalSizeBytes == rhs.logicalSizeBytes
+    }
 }
 
 public struct XcodeFileEntry: Sendable, Equatable {

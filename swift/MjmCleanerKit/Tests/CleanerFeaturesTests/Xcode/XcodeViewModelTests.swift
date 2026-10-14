@@ -262,6 +262,110 @@ struct XcodeViewModelTests {
         #expect(model.canRetry)
     }
 
+    // Solo Swift (review del Task 10): ciò che la pagina consegna all'esecutore e le guardie.
+
+    /// All'esecutore arrivano esattamente le risorse dell'anteprima: né quelle non selezionate né i
+    /// simulatori dipendenti che l'utente ha scelto di tenere.
+    @Test func executeReceivesExactlyThePreviewedResources() async throws {
+        let runtime = Self.candidate("runtime", .runtime, dependencies: ["device"])
+        let service = FakeXcode(Self.snapshot(runtime, Self.candidate("device", .device), Self.candidate("other", .device)))
+        service.respondImmediately(with: Self.result())
+        let model = Self.create(service)
+        await model.initialLoad?.value
+        try Self.onlyRow(model, .runtime).isSelected = true
+        model.preview()
+        model.acknowledgeDependencies = true
+
+        await model.confirmDelete()
+
+        #expect(service.executedKeys == [[runtime.key]])
+    }
+
+    /// Le righe bloccate non entrano mai nella selezione, nemmeno dalla casella del gruppo; i gruppi di
+    /// simulatori e runtime non hanno una casella che selezioni.
+    @Test func blockedRowsAndIndividualGroupsAreNeverSelectedTogether() async throws {
+        var blocked = Self.candidate("blocked", .derivedData)
+        blocked.blockReason = "Xcode è in esecuzione"
+        let service = FakeXcode(Self.snapshot(blocked, Self.candidate("free", .derivedData), Self.candidate("device", .device)))
+        let model = Self.create(service)
+        await model.initialLoad?.value
+        let derivedData = try Self.group(model, .derivedData)
+        let blockedRow = try #require(derivedData.rows.first { $0.candidate.name == "blocked" })
+
+        derivedData.isSelected = true
+        #expect(!blockedRow.isSelected)
+        #expect(model.selectedKeys() == ["free"])
+        #expect(model.totalText == "100 B stimati · 1 selezionate")
+
+        blockedRow.isSelected = true
+        #expect(model.selectedKeys() == ["free"])
+
+        try Self.group(model, .device).isSelected = true
+        #expect(try Self.onlyRow(model, .device).isSelected == false)
+        #expect(model.selectedKeys() == ["free"])
+    }
+
+    /// Una nuova analisi non lascia una conferma della precedente; una analisi fallita svuota la pagina.
+    @Test func retryDropsTheOldConfirmationAndAFailedRetryEmptiesThePage() async throws {
+        let service = FakeXcode(Self.snapshot(Self.candidate("device", .device)))
+        let model = Self.create(service)
+        await model.initialLoad?.value
+        try Self.onlyRow(model, .device).isSelected = true
+        model.preview()
+        #expect(model.hasConfirmation)
+
+        await model.retry()
+        #expect(!model.hasConfirmation)
+        #expect(!model.canConfirmDelete)
+
+        service.failAnalysis(with: UnexpectedTestError(description: "simctl non risponde"))
+        await model.retry()
+        #expect(model.groups.isEmpty)
+        model.preview()
+        #expect(!model.hasConfirmation)
+    }
+
+    /// Durante l'eliminazione anteprima e «Torna alla selezione» non toccano la conferma in corso; una
+    /// conferma vuota non abilita l'eliminazione.
+    @Test func previewAndBackToSelectionAreIgnoredWhileDeleting() async throws {
+        let service = FakeXcode(Self.snapshot(Self.candidate("runtime", .runtime, dependencies: ["device"]), Self.candidate("device", .device)))
+        let model = Self.create(service)
+        await model.initialLoad?.value
+        model.preview()
+        #expect(model.confirmation?.selectedCandidates.isEmpty == true)
+        #expect(!model.canConfirmDelete)
+
+        try Self.onlyRow(model, .runtime).isSelected = true
+        model.preview()
+        model.acknowledgeDependencies = true
+        let deleting = Task { await model.confirmDelete() }
+        await service.executionStarted.wait()
+
+        model.preview()
+        model.backToSelection()
+        #expect(model.hasConfirmation)
+        #expect(model.acknowledgeDependencies)
+
+        service.execution.open(Self.result())
+        await deleting.value
+    }
+
+    @Test func progressIsAppliedBeforeShowingTheReport() async throws {
+        let service = FakeXcode(Self.snapshot(Self.candidate("uno", .device), Self.candidate("due", .device), Self.candidate("tre", .device)))
+        service.respondImmediately(with: Self.result())
+        let navigation = ProgressSnapshotNavigation()
+        let model = XcodeModel(xcode: service, history: FakeHistory(), sessionLog: FakeSessionLog(), clock: Self.clock, navigation: navigation)
+        navigation.model = model
+        await model.initialLoad?.value
+        for row in try Self.group(model, .device).rows { row.isSelected = true }
+        model.preview()
+
+        await model.confirmDelete()
+
+        #expect(navigation.progressAtReport.count == 1)
+        #expect(navigation.progressAtReport.first?.hasPrefix("3 / 3 · ") == true)
+    }
+
     // MARK: Doppi e fixture (in C# classi interne di questa classe di test)
 
     static let clock = FixedWallClock(now: Date(timeIntervalSince1970: 1_790_000_000))
@@ -330,6 +434,7 @@ struct XcodeViewModelTests {
             var executeCount = 0
             var receivedJournal: [Bool] = []
             var observedCancellation: [Bool] = []
+            var executedKeys: [[String]] = []
         }
 
         let execution = Gate<XcodeCleanResult>()
@@ -343,6 +448,8 @@ struct XcodeViewModelTests {
         var executeCount: Int { state.withLock { $0.executeCount } }
         var receivedJournal: [Bool] { state.withLock { $0.receivedJournal } }
         var observedCancellation: [Bool] { state.withLock { $0.observedCancellation } }
+        /// Le chiavi dei candidati di ogni piano eseguito, nell'ordine.
+        var executedKeys: [[String]] { state.withLock { $0.executedKeys } }
 
         func respondImmediately(with result: XcodeCleanResult) { state.withLock { $0.behavior = .immediate(result) } }
         func returnWhenCancelled(_ result: XcodeCleanResult) { state.withLock { $0.behavior = .untilCancelled(result) } }
@@ -363,9 +470,13 @@ struct XcodeViewModelTests {
             let behavior = state.withLock { state -> Behavior in
                 state.executeCount += 1
                 state.receivedJournal.append(journal != nil)
+                state.executedKeys.append(plan.candidates.map(\.key))
                 return state.behavior
             }
             executionStarted.open()
+            for (index, candidate) in plan.candidates.enumerated() {
+                progress?(CleanProgress(currentPath: candidate.name, itemsDone: index + 1, itemsTotal: plan.candidates.count, bytesFreed: 0))
+            }
             switch behavior {
             case .waitForGate:
                 return await execution.wait()
@@ -391,5 +502,18 @@ struct XcodeViewModelTests {
         func showXcodeReport(_ report: XcodeReportModel) {
             record("xcodeReport")
         }
+    }
+}
+
+/// Fotografa il testo d'avanzamento della pagina Xcode quando chiede il resoconto.
+@MainActor
+private final class ProgressSnapshotNavigation: NavigationSpy, XcodeNavigating {
+    weak var model: XcodeModel?
+    private(set) var progressAtReport: [String] = []
+
+    func showXcode() {}
+
+    func showXcodeReport(_ report: XcodeReportModel) {
+        progressAtReport.append(model?.progressText ?? "")
     }
 }

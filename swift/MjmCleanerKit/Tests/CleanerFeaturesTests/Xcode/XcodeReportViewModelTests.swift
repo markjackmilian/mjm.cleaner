@@ -136,4 +136,53 @@ struct XcodeReportViewModelTests {
 
         #expect(navigation.events == ["refreshTotal", "xcode", "startOver"])
     }
+
+    // Solo Swift (review del Task 10): il diario sugli altri punti di arresto, come al passo 4, e i
+    // conteggi del riepilogo.
+    @Test func aFailedTotalRefreshStillDiscardsTheJournal() async throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let events = Recorder<String>()
+        let log = FakeSessionLog(events: events, journalDirectory: directory.path)
+        let journal = try #require(log.openJournal(startedAt: Fixture.clock.now))
+        let navigation = Fixture.FakeNavigation()
+        navigation.refreshFailure = UnexpectedTestError(description: "contatore illeggibile")
+        let model = XcodeReportModel(
+            history: FakeHistory(events: events), sessionLog: log, navigation: navigation, result: Self.partialResult(), journal: journal)
+
+        await model.persistence?.value
+
+        #expect(events.values == ["open", "save", "write", "discard"])
+        #expect(!FileManager.default.fileExists(atPath: journal.path))
+        #expect(model.historyWarning == "Cronologia e log salvati, ma il contatore cumulativo non è stato aggiornato: contatore illeggibile")
+    }
+
+    @Test func historyFailureKeepsTheJournal() async throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let events = Recorder<String>()
+        let history = FakeHistory(events: events)
+        history.failSaves(with: UnexpectedTestError(description: "database bloccato"))
+        let log = FakeSessionLog(events: events, journalDirectory: directory.path)
+        let journal = try #require(log.openJournal(startedAt: Fixture.clock.now))
+        let model = XcodeReportModel(
+            history: history, sessionLog: log, navigation: Fixture.FakeNavigation(), result: Self.partialResult(), journal: journal)
+
+        await model.persistence?.value
+
+        #expect(events.values == ["open", "save"])
+        #expect(FileManager.default.fileExists(atPath: journal.path))
+    }
+
+    @Test func summaryCountsEachOutcomeSeparately() {
+        func items(_ count: Int, _ outcome: XcodeItemOutcome) -> [XcodeItemResult] {
+            (0..<count).map { XcodeItemResult(candidate: Fixture.candidate("\(outcome)-\($0)", .device), outcome: outcome, reason: "", verifiedEstimatedBytes: nil) }
+        }
+        let model = Self.create(XcodeCleanResult(
+            historyReport: makeReport(itemsDeleted: 5),
+            items: items(1, .deleted) + items(2, .skipped) + items(3, .failed) + items(4, .uncertain),
+            freeBytesBefore: nil, freeBytesAfter: nil, warnings: []))
+
+        #expect(model.summaryText == "5 eliminate · 2 saltate · 3 non riuscite · 4 incerte")
+    }
 }

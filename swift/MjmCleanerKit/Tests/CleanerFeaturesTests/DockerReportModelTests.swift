@@ -109,4 +109,64 @@ struct DockerReportModelTests {
 
         #expect(navigation.events.filter { $0 != "refreshTotal" } == ["docker", "startOver"])
     }
+
+    // Solo Swift (review del Task 9): il Purge si suggerisce solo con eliminazioni e due misure, e il
+    // salvataggio segue storico → log → contatore come nel passo 4.
+    @Test func noPurgeHintWithoutDeletionsOrWithoutTheFirstMeasure() throws {
+        let nothingDeleted = DockerReportModel(
+            environment: try makeEnvironment(), navigation: nil,
+            result: DockerCleanResult(report: makeReport(itemsDeleted: 0), before: .empty, after: .empty, daemonLost: false),
+            diskBefore: disk(4 * Self.gigabyte), diskAfter: disk(4 * Self.gigabyte))
+        let unmeasuredBefore = DockerReportModel(
+            environment: try makeEnvironment(), navigation: nil,
+            result: DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: .empty, daemonLost: false),
+            diskBefore: disk(nil), diskAfter: disk(4 * Self.gigabyte))
+
+        #expect(nothingDeleted.purgeHint == "")
+        #expect(unmeasuredBefore.purgeHint == "")
+    }
+
+    @Test func persistenceWritesTheLogUnderTheSavedIdBeforeRefreshingTheTotal() async throws {
+        let events = Recorder<String>()
+        let sessionLog = FakeSessionLog(events: events)
+        let navigation = SharedEventsNavigation(events)
+        let model = DockerReportModel(
+            environment: try makeEnvironment(history: FakeHistory(events: events), sessionLog: sessionLog),
+            navigation: navigation,
+            result: DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: .empty, daemonLost: false),
+            diskBefore: nil, diskAfter: disk(nil))
+
+        await model.persistence?.value
+
+        #expect(events.values == ["save", "write", "refreshTotal"])
+        #expect(sessionLog.written.map { $0.sessionId } == [1])
+    }
+
+    @Test func sessionLogFailureWarns() async throws {
+        let sessionLog = FakeSessionLog()
+        sessionLog.failWrites(with: UnexpectedTestError(description: "disco pieno"))
+        let model = DockerReportModel(
+            environment: try makeEnvironment(sessionLog: sessionLog), navigation: nil,
+            result: DockerCleanResult(report: makeReport(), before: .empty, after: .empty, daemonLost: false),
+            diskBefore: nil, diskAfter: disk(nil))
+
+        await model.persistence?.value
+
+        #expect(model.historyWarning == "Pulizia completata, storico non aggiornato: disco pieno")
+    }
+}
+
+/// Navigazione che scrive `refreshTotal` nello stesso registro di storico e log.
+@MainActor
+private final class SharedEventsNavigation: DockerNavigating {
+    private let events: Recorder<String>
+
+    init(_ events: Recorder<String>) {
+        self.events = events
+    }
+
+    func startOver() {}
+    func refreshTotal() async throws { events.append("refreshTotal") }
+    func showDocker() {}
+    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage) {}
 }

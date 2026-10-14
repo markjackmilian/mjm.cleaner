@@ -1,4 +1,5 @@
 import CleanerCore
+import Synchronization
 import Testing
 @testable import CleanerFeatures
 
@@ -225,5 +226,108 @@ struct DockerModelTests {
         model.close()
 
         #expect(navigation.events == ["startOver"])
+    }
+
+    // Solo Swift (review del Task 9): garanzie di ciò che la pagina consegna a Docker.
+
+    /// Il tipo fa parte della chiave di riga: un volume con nome che si chiama come la cache di
+    /// build non eredita la riga della cache (spuntata nel gruppo a blocco).
+    @Test func volumeNamedLikeTheBuildCacheIsNotSelected() async throws {
+        let model = try await loaded([
+            dockerCandidate(.buildCache, "build-cache", verdict: .delete),
+            dockerCandidate(.volume, "build-cache", verdict: .propose, rule: "named-unused"),
+        ])
+
+        #expect(model.selection().map(\.kind) == [.buildCache])
+    }
+
+    @Test func deleteWithoutSelectionExecutesNothing() async throws {
+        let docker = FakeDocker()
+        let navigation = DockerNavigationSpy()
+        let model = try await loaded([dockerCandidate(.image, "dangling", verdict: .delete)], docker: docker, navigation: navigation)
+        try group(model, "safe").isSelected = false
+
+        await model.delete()
+
+        #expect(docker.executed.isEmpty)
+        #expect(navigation.events.isEmpty)
+    }
+
+    @Test func secondDeleteIsRefusedAndCancelReachesTheExecutor() async throws {
+        let docker = SequencedDocker(dockerAnalysis([dockerCandidate(.image, "dangling", verdict: .delete)]))
+        docker.waitForCancellation()
+        let model = DockerModel(environment: try makeEnvironment(docker: docker), navigation: nil)
+        await model.initialLoad?.value
+
+        let first = Task { await model.delete() }
+        await docker.started.wait()
+        #expect(model.isDeleting)
+        #expect(!model.canDelete)
+        await model.delete()
+        model.cancelDelete()
+        await first.value
+
+        #expect(docker.events.values.filter { $0 == "execute" }.count == 1)
+        #expect(docker.observedCancellation == [true])
+        #expect(!model.isDeleting)
+    }
+
+    /// Il disco si misura dopo l'esecuzione: misurato prima, il resoconto mostrerebbe un disco
+    /// invariato e suggerirebbe il Purge.
+    @Test func diskIsMeasuredAfterTheExecution() async throws {
+        let docker = SequencedDocker(dockerAnalysis([dockerCandidate(.image, "dangling", verdict: .delete)]))
+        let navigation = DockerNavigationSpy()
+        let model = DockerModel(environment: try makeEnvironment(docker: docker), navigation: navigation)
+        await model.initialLoad?.value
+
+        await model.delete()
+
+        #expect(docker.events.values == ["execute", "measure"])
+        #expect(navigation.reportDiskAfter?.allocatedBytes == Optional(Int64(1)))
+    }
+}
+
+/// Docker che registra l'ordine delle chiamate, misura un disco diverso dopo l'esecuzione e, se
+/// richiesto, resta sospeso nell'esecuzione finché non viene annullato (al massimo 5 secondi).
+private final class SequencedDocker: DockerCleanupServing {
+    private struct State {
+        var executed = false
+        var waitsForCancellation = false
+        var observedCancellation: [Bool] = []
+    }
+
+    let events = Recorder<String>()
+    let started = Gate<Void>()
+    private let analysis: DockerAnalysis
+    private let state = Mutex(State())
+
+    init(_ analysis: DockerAnalysis) {
+        self.analysis = analysis
+    }
+
+    var observedCancellation: [Bool] { state.withLock { $0.observedCancellation } }
+
+    func waitForCancellation() { state.withLock { $0.waitsForCancellation = true } }
+
+    func analyze(_ projectRoots: [String]) async throws -> DockerAnalysis {
+        analysis
+    }
+
+    func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
+        events.append("execute")
+        started.open()
+        if state.withLock({ $0.waitsForCancellation }) {
+            try? await Task.sleep(for: .seconds(5))
+            let cancelled = Task.isCancelled
+            state.withLock { $0.observedCancellation.append(cancelled) }
+        }
+        state.withLock { $0.executed = true }
+        return DockerCleanResult(report: makeReport(itemsDeleted: selected.count), before: .empty, after: .empty, daemonLost: false)
+    }
+
+    func measureDisk() async throws -> DockerDiskUsage {
+        events.append("measure")
+        let executed = state.withLock { $0.executed }
+        return DockerDiskUsage(path: "/Docker.raw", allocatedBytes: executed ? 1 : 999, apparentBytes: 10)
     }
 }

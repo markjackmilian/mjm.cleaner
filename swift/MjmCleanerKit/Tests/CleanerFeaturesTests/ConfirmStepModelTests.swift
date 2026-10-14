@@ -151,4 +151,107 @@ struct ConfirmStepModelTests {
 
         #expect(navigation.events == ["startOver"])
     }
+
+    // Solo Swift (review del Task 7): garanzie di sicurezza del passo che elimina.
+
+    /// Una riga deselezionata non arriva mai a `clean`, anche se la sua categoria ha altre righe
+    /// selezionate; ogni riga resta nella propria categoria.
+    @Test func onlyTheSelectedRowsOfEachCategoryReachTheCleanup() async throws {
+        let clean = FakeClean()
+        let model = ConfirmStepModel(environment: try makeEnvironment(clean: clean), navigation: nil, categories: categories, results: results)
+        model.nodes[0].paths[0].isSelected = false
+
+        await model.delete()
+
+        #expect(clean.selections.map { $0.map(\.categoryId) } == [["logs", "downloads-large"]])
+        #expect(clean.selections.first?.map { $0.items.map(\.path) } == [["/Users/tester/Library/Logs/b.log"], ["/Users/tester/Downloads/big.iso"]])
+    }
+
+    @Test func deleteWithNothingSelectedDoesNothing() async throws {
+        let clean = FakeClean()
+        let sessionLog = FakeSessionLog()
+        let navigation = CleanupNavigationSpy()
+        let model = ConfirmStepModel(
+            environment: try makeEnvironment(clean: clean, sessionLog: sessionLog), navigation: navigation, categories: categories, results: results)
+        for node in model.nodes {
+            for path in node.paths { path.isSelected = false }
+        }
+
+        await model.delete()
+
+        #expect(clean.selections.isEmpty)
+        #expect(sessionLog.events.values.isEmpty)
+        #expect(navigation.events.isEmpty)
+        #expect(!model.isDeleting)
+    }
+
+    /// Un secondo «Elimina» durante l'eliminazione non avvia una seconda pulizia né un secondo diario:
+    /// Annulla ferma ancora l'unica in corso.
+    @Test func secondDeleteWhileDeletingDoesNothing() async throws {
+        let clean = FakeClean()
+        clean.waitForCancellation()
+        let sessionLog = FakeSessionLog()
+        let navigation = CleanupNavigationSpy()
+        let model = ConfirmStepModel(
+            environment: try makeEnvironment(clean: clean, sessionLog: sessionLog), navigation: navigation, categories: categories, results: results)
+
+        let deleting = Task { await model.delete() }
+        await clean.started.wait()
+        await model.delete()
+
+        #expect(clean.selections.count == 1)
+        #expect(sessionLog.events.values == ["open"])
+
+        model.cancelDelete()
+        await deleting.value
+        #expect(clean.observedCancellation == [true])
+        #expect(navigation.events == ["done"])
+    }
+
+    @Test func progressIsAppliedBeforeShowingTheDoneStep() async throws {
+        let navigation = ProgressSnapshotNavigation()
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: navigation, categories: categories, results: results)
+        navigation.model = model
+
+        await model.delete()
+
+        #expect(navigation.progressAtDone == ["3 / 3 elementi · 0 B"])
+    }
+
+    @Test func totalsSaturateInsteadOfTrapping() throws {
+        let huge = [CategoryScanResult(
+            categoryId: "logs",
+            items: [makeItem("/Users/tester/Library/Logs/a.log", size: .max), makeItem("/Users/tester/Library/Logs/b.log", size: .max)],
+            totalBytes: .max, errors: [], exclusions: [])]
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: categories, results: huge)
+
+        #expect(model.nodes.map(\.summaryText) == ["2 elementi · 8388608 TB"])
+        #expect(model.totalText == "8388608 TB · 2 elementi")
+    }
+
+    @Test func singularTextsForOneExclusionAndExactlyFiveApps() throws {
+        let scanned = [CategoryScanResult(
+            categoryId: "logs", items: [], totalBytes: 0, errors: [],
+            exclusions: [GuardExclusion(path: "/Users/tester/Library/Caches/x", reason: "protetto")])]
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: categories, results: scanned)
+
+        #expect(model.exclusionsText == "1 elemento escluso dalle protezioni:\n· /Users/tester/Library/Caches/x — protetto")
+        #expect(ConfirmStepModel.runningAppsText(["A", "B", "C", "D", "E"])
+            == "A, B, C, D, E in esecuzione: le loro cache potrebbero rigenerarsi subito.")
+    }
+}
+
+/// Fotografa il testo d'avanzamento del passo 3 nel momento in cui chiede il passo 4.
+@MainActor
+private final class ProgressSnapshotNavigation: CleanupNavigating {
+    weak var model: ConfirmStepModel?
+    private(set) var progressAtDone: [String] = []
+
+    func startOver() {}
+    func refreshTotal() async throws {}
+    func showScan(_ categories: [CleanupCategory]) {}
+    func showConfirm(_ categories: [CleanupCategory], results: [CategoryScanResult]) {}
+    func showDone(_ report: CleanReport, journal: PendingJournal?) {
+        progressAtDone.append(model?.deleteProgressText ?? "")
+    }
 }

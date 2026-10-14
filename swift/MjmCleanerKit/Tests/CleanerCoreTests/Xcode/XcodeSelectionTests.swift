@@ -100,4 +100,124 @@ struct XcodeSelectionTests {
         candidates.append(file)
         #expect(plan.candidates.count == 1)
     }
+
+    /// Ogni caso guasta una sola condizione di `completeFileGuard`; `allCases` le elenca tutte.
+    enum FileGuardDefect: CaseIterable, Sendable {
+        case candidatePathMissing
+        case candidatePathDiffersFromCanonical
+        case itemPathDiffersFromCanonical
+        case canonicalPathBlank
+        case itemNotDirectory
+        case identityNotDirectory
+        case declaredRootEmpty
+        case declaredRootBlank
+        case creationTimeMissing
+        case lastWriteTimeMissing
+        case inventoryEntryMissing
+    }
+
+    /// Una cartella valida con la sua voce di guardia; `breakCondition` ne guasta una sola condizione.
+    private struct GuardedFolder {
+        var key = "derived-data:/one"
+        var path: String? = "/one"
+        var itemPath = "/one"
+        var canonicalPath = "/one"
+        var itemIsDirectory = true
+        var identityIsDirectory = true
+        var declaredRoot = "/"
+        var creationTime: Date? = Date(timeIntervalSince1970: 0)
+        var lastWriteTime: Date? = Date(timeIntervalSince1970: 0)
+        var hasInventoryEntry = true
+
+        mutating func breakCondition(_ defect: FileGuardDefect) {
+            switch defect {
+            case .candidatePathMissing: path = nil
+            case .candidatePathDiffersFromCanonical: path = "/two"
+            case .itemPathDiffersFromCanonical: itemPath = "/two"
+            case .canonicalPathBlank:
+                path = "  "
+                itemPath = "  "
+                canonicalPath = "  "
+            case .itemNotDirectory: itemIsDirectory = false
+            case .identityNotDirectory: identityIsDirectory = false
+            case .declaredRootEmpty: declaredRoot = ""
+            case .declaredRootBlank: declaredRoot = " \t"
+            case .creationTimeMissing: creationTime = nil
+            case .lastWriteTimeMissing: lastWriteTime = nil
+            case .inventoryEntryMissing: hasInventoryEntry = false
+            }
+        }
+
+        func snapshot() throws -> XcodeSnapshot {
+            let candidate = XcodeCandidate(key: key, kind: .derivedData, name: "One", path: path, sizeBytes: 3)
+            var classified = try XcodeClassifier.classify(XcodeSnapshot(candidates: [candidate], warnings: []), xcodeRunning: false)
+            if hasInventoryEntry {
+                let item = ScanItem(path: itemPath, sizeBytes: 3, isDirectory: itemIsDirectory, declaredRoot: declaredRoot)
+                let identity = XcodeFileIdentity(
+                    canonicalPath: canonicalPath, isDirectory: identityIsDirectory,
+                    creationTime: creationTime, lastWriteTime: lastWriteTime, logicalSizeBytes: 3)
+                classified.fileInventory = XcodeFileInventory([(key, XcodeFileEntry(item: item, identity: identity))])
+            }
+            return classified
+        }
+    }
+
+    /// Una condizione per volta: la cartella valida è accettata (controllo), ogni caso ne guasta una sola
+    /// e la selezione è rifiutata come la voce incompleta di `selectedFileWithIncompleteGuardedInventoryIsRejected`.
+    @Test(arguments: FileGuardDefect.allCases)
+    func incompleteFileGuardIsRejectedOneDefectAtATime(_ defect: FileGuardDefect) throws {
+        let valid = GuardedFolder()
+        #expect(try XcodeSelection.preview(valid.snapshot(), selectedKeys: [valid.key]).selectedCandidates.count == 1)
+
+        var broken = GuardedFolder()
+        broken.breakCondition(defect)
+        let built = try broken.snapshot()
+        #expect(throws: XcodeArgumentError.self) { try XcodeSelection.preview(built, selectedKeys: [broken.key]) }
+    }
+
+    /// NFC e NFD sono la stessa stringa per `String ==`, ma la guardia confronta i byte: ciascun caso
+    /// rende diverso un solo percorso.
+    @Test func canonicallyEquivalentPathsAreNotTheSameFolder() throws {
+        let nfc = "/r/Caf\u{E9}"
+        let nfd = "/r/Cafe\u{301}"
+
+        var folder = GuardedFolder()
+        folder.key = "derived-data:" + nfc
+        folder.path = nfc
+        folder.itemPath = nfc
+        folder.canonicalPath = nfc
+        let valid = try folder.snapshot()
+        #expect(try XcodeSelection.preview(valid, selectedKeys: [folder.key]).selectedCandidates.count == 1)
+
+        // Solo il percorso del candidato (NFC) diverso dal percorso canonico (NFD).
+        var candidateDiffers = folder
+        candidateDiffers.canonicalPath = nfd
+        candidateDiffers.itemPath = nfd
+        let candidateSnapshot = try candidateDiffers.snapshot()
+        #expect(throws: XcodeArgumentError.self) {
+            try XcodeSelection.preview(candidateSnapshot, selectedKeys: [candidateDiffers.key])
+        }
+
+        // Solo il percorso dell'elemento (NFD) diverso dal percorso canonico (NFC).
+        var itemDiffers = folder
+        itemDiffers.itemPath = nfd
+        let itemSnapshot = try itemDiffers.snapshot()
+        #expect(throws: XcodeArgumentError.self) {
+            try XcodeSelection.preview(itemSnapshot, selectedKeys: [itemDiffers.key])
+        }
+    }
+
+    /// La ricerca della chiave è ordinale sui byte: la forma NFD di una chiave NFC non è una riga nota.
+    @Test func canonicallyEquivalentSelectedKeyIsUnknown() throws {
+        var folder = GuardedFolder()
+        folder.key = "derived-data:/r/Caf\u{E9}"
+        folder.path = "/r/Caf\u{E9}"
+        folder.itemPath = "/r/Caf\u{E9}"
+        folder.canonicalPath = "/r/Caf\u{E9}"
+        let built = try folder.snapshot()
+        #expect(try XcodeSelection.preview(built, selectedKeys: [folder.key]).selectedCandidates.count == 1)
+
+        let nfdKey = "derived-data:/r/Cafe\u{301}"
+        #expect(throws: XcodeArgumentError.self) { try XcodeSelection.preview(built, selectedKeys: [nfdKey]) }
+    }
 }

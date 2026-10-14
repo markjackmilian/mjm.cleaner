@@ -1,0 +1,291 @@
+import CleanerCore
+import Observation
+
+/// Le destinazioni della sezione Docker.
+@MainActor
+public protocol DockerNavigating: Navigating {
+    func showDocker()
+    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage)
+}
+
+/// Una risorsa Docker nella schermata di conferma.
+@MainActor
+@Observable
+public final class DockerRow: Identifiable {
+    public let candidate: DockerCandidate
+    public let showCheckBox: Bool
+    public let requiresIndividualConfirmation: Bool
+    @ObservationIgnored fileprivate var onSelectionChanged: (@MainActor () -> Void)?
+
+    public var isSelected: Bool {
+        didSet {
+            if isSelected != oldValue { onSelectionChanged?() }
+        }
+    }
+
+    init(candidate: DockerCandidate, showCheckBox: Bool) {
+        self.candidate = candidate
+        self.showCheckBox = showCheckBox
+        requiresIndividualConfirmation = DockerConfirmationGroups.requiresIndividualConfirmation(candidate)
+        isSelected = candidate.selectedByDefault
+    }
+
+    public var name: String { candidate.displayName }
+    public var sizeText: String { candidate.sizeBytes.map(Formatting.bytes) ?? "—" }
+
+    public var kindLabel: String {
+        switch candidate.kind {
+        case .image: String(localized: "immagine", bundle: .module)
+        case .volume: String(localized: "volume", bundle: .module)
+        case .buildCache: String(localized: "cache", bundle: .module)
+        }
+    }
+
+    public var detailText: String {
+        let cost = candidate.cost.isEmpty ? "" : String(localized: " · costo: \(candidate.cost)", bundle: .module)
+        let individual = requiresIndividualConfirmation
+            ? String(localized: " · si conferma solo singolarmente", bundle: .module)
+            : ""
+        return candidate.reason + cost + individual
+    }
+}
+
+@MainActor
+@Observable
+public final class DockerGroupNode: Identifiable {
+    public let definition: DockerConfirmationGroup
+    public let rows: [DockerRow]
+    @ObservationIgnored private var syncing = false
+
+    /// Per un gruppo selezionabile, la casella seleziona solo le voci che non richiedono una
+    /// conferma singola: un volume con nome che nessuna regola sa ricondurre a un progetto non
+    /// entra mai con la casella del gruppo (registro del piano 2, follow-up).
+    public var isSelected: Bool {
+        didSet {
+            guard isSelected != oldValue, !syncing, definition.mode == .selectable else { return }
+            syncing = true
+            for row in rows where !row.requiresIndividualConfirmation {
+                row.isSelected = isSelected
+            }
+            syncing = false
+        }
+    }
+
+    init(_ definition: DockerConfirmationGroup) {
+        self.definition = definition
+        rows = definition.items.map { DockerRow(candidate: $0, showCheckBox: definition.mode == .selectable) }
+        isSelected = definition.selectedByDefault
+        for row in rows {
+            row.onSelectionChanged = { [weak self] in self?.rowChanged() }
+        }
+    }
+
+    public var title: String { definition.title }
+    public var description: String { definition.description }
+
+    /// Le voci da tenere restano chiuse: si guardano solo se servono.
+    public var isExpanded: Bool { definition.mode != .readOnly }
+
+    /// La casella del gruppo esiste per i blocchi e per i gruppi in cui almeno una voce si può
+    /// selezionare insieme alle altre: un gruppo di soli volumi con nome non ne ha bisogno.
+    public var showGroupCheckBox: Bool {
+        switch definition.mode {
+        case .block: true
+        case .selectable: rows.contains { !$0.requiresIndividualConfirmation }
+        case .readOnly: false
+        }
+    }
+
+    public var groupCheckBoxLabel: String {
+        definition.mode == .block
+            ? String(localized: "Elimina in blocco", bundle: .module)
+            : String(localized: "Seleziona tutte", bundle: .module)
+    }
+
+    public var summaryText: String {
+        let noun = Formatting.plural(rows.count, String(localized: "voce", bundle: .module), String(localized: "voci", bundle: .module))
+        let bytes = SafeSum.total(rows.map { $0.candidate.sizeBytes ?? 0 })
+        return "\(Formatting.integer(rows.count)) \(noun) · \(Formatting.bytes(bytes))"
+    }
+
+    private func rowChanged() {
+        guard !syncing else { return }
+        syncing = true
+        isSelected = rows.filter { !$0.requiresIndividualConfirmation }.allSatisfy(\.isSelected)
+        syncing = false
+    }
+}
+
+/// Porting di `DockerViewModel`: analisi in sola lettura, anteprima con selezione, esecuzione.
+/// L'anteprima è il dry-run: nessun comando distruttivo parte prima di «Elimina».
+@MainActor
+@Observable
+public final class DockerModel {
+    @ObservationIgnored private let environment: AppEnvironment
+    @ObservationIgnored private weak var navigation: (any DockerNavigating)?
+    @ObservationIgnored private var diskBefore: DockerDiskUsage?
+    @ObservationIgnored private var deleteTask: Task<DockerCleanResult, any Error>?
+
+    public private(set) var isLoading = true
+    public private(set) var errorText = ""
+    public private(set) var isReady = false
+    public private(set) var serverText = ""
+    public private(set) var diskText = ""
+    public private(set) var dfText = ""
+    public private(set) var groups: [DockerGroupNode] = []
+    public private(set) var isDeleting = false
+    public private(set) var deleteProgressText = ""
+    public private(set) var deleteErrorText = ""
+
+    @ObservationIgnored public private(set) var initialLoad: Task<Void, Never>?
+
+    public init(environment: AppEnvironment, navigation: (any DockerNavigating)?) {
+        self.environment = environment
+        self.navigation = navigation
+        initialLoad = Task { await self.load() }
+    }
+
+    public var hasError: Bool { !errorText.isEmpty }
+    public var hasDeleteError: Bool { !deleteErrorText.isEmpty }
+    public var canRetry: Bool { !isLoading }
+    public var canDelete: Bool { isReady && !isDeleting && !selection().isEmpty }
+    public var canCancelDelete: Bool { isDeleting }
+
+    public var totalText: String {
+        let selected = selection()
+        let noun = Formatting.plural(selected.count, String(localized: "voce", bundle: .module), String(localized: "voci", bundle: .module))
+        let bytes = SafeSum.total(selected.map { $0.sizeBytes ?? 0 })
+        return "\(Formatting.bytes(bytes)) · \(Formatting.integer(selected.count)) \(noun)"
+    }
+
+    public func retry() async {
+        await load()
+    }
+
+    public func delete() async {
+        guard canDelete else { return }
+        isDeleting = true
+        deleteErrorText = ""
+
+        let selected = selection()
+        let relay = ProgressRelay<CleanProgress> { [weak self] progress in
+            self?.deleteProgressText = "\(Formatting.integer(progress.itemsDone)) / \(Formatting.integer(progress.itemsTotal)) · \(progress.currentPath)"
+        }
+        let docker = environment.docker
+        let report = relay.report
+        let task = Task { try await docker.execute(selected, progress: report) }
+        deleteTask = task
+
+        do {
+            let result = try await task.value
+            await relay.finish()
+            let diskAfter = try await docker.measureDisk()
+            navigation?.showDockerReport(result, diskBefore: diskBefore, diskAfter: diskAfter)
+        } catch let error as DockerUnavailableError {
+            await relay.finish()
+            deleteErrorText = error.message
+        } catch {
+            await relay.finish()
+            deleteErrorText = String(localized: "Pulizia non riuscita: \(FeatureText.message(error))", bundle: .module)
+        }
+
+        deleteTask = nil
+        isDeleting = false
+    }
+
+    public func cancelDelete() {
+        deleteTask?.cancel()
+    }
+
+    public func close() {
+        navigation?.startOver()
+    }
+
+    /// Le voci da consegnare all'esecutore, decise dal Core (`DockerConfirmationGroups.selection`).
+    /// Gruppi e righe si ritrovano per identificativo con confronti ordinali: i valori `struct`
+    /// non hanno l'identità di riferimento che il C# usava (`ReferenceEquals`).
+    func selection() -> [DockerCandidate] {
+        var groupsById: [[UInt8]: DockerGroupNode] = [:]
+        var rowsByKey: [[UInt8]: DockerRow] = [:]
+        for group in groups {
+            if groupsById[FeatureText.ordinalKey(group.definition.id)] == nil {
+                groupsById[FeatureText.ordinalKey(group.definition.id)] = group
+            }
+            for row in group.rows where rowsByKey[Self.rowKey(row.candidate)] == nil {
+                rowsByKey[Self.rowKey(row.candidate)] = row
+            }
+        }
+
+        return DockerConfirmationGroups.selection(
+            groups.map(\.definition),
+            isGroupSelected: { groupsById[FeatureText.ordinalKey($0.id)]?.isSelected ?? false },
+            isItemSelected: { rowsByKey[Self.rowKey($0)]?.isSelected ?? false })
+    }
+
+    /// Tipo e identificativo: gli ID di Docker sono unici per tipo (immagini per digest, volumi per nome).
+    private static func rowKey(_ candidate: DockerCandidate) -> [UInt8] {
+        let kind = switch candidate.kind {
+        case .image: "image"
+        case .volume: "volume"
+        case .buildCache: "build-cache"
+        }
+        return FeatureText.ordinalKey(kind + ":" + candidate.id)
+    }
+
+    private func load() async {
+        isLoading = true
+        isReady = false
+        errorText = ""
+        groups = []
+
+        do {
+            let analysis = try await environment.docker.analyze(environment.expandedProjectRoots())
+            diskBefore = analysis.disk
+            serverText = String(localized: "Docker \(analysis.serverVersion) in esecuzione", bundle: .module)
+            diskText = Self.describeDisk(analysis.disk)
+            dfText = Self.describeDf(analysis.snapshot.df)
+            groups = DockerConfirmationGroups.build(analysis.candidates).map(DockerGroupNode.init)
+            isReady = true
+        } catch let error as DockerUnavailableError {
+            // Messaggio già pensato per l'utente: Docker Desktop non viene avviato da qui, è
+            // l'utente a deciderlo.
+            errorText = error.message
+        } catch {
+            errorText = String(localized: "Analisi di Docker non riuscita: \(FeatureText.message(error))", bundle: .module)
+        }
+
+        isLoading = false
+    }
+
+    static func describeDisk(_ disk: DockerDiskUsage) -> String {
+        guard disk.exists else {
+            return String(
+                localized: "Disco virtuale di Docker Desktop non trovato: lo spazio occupato sul Mac non è misurabile.",
+                bundle: .module)
+        }
+        guard let allocated = disk.allocatedBytes, let apparent = disk.apparentBytes else {
+            return String(localized: "Docker.raw trovato, ma lo spazio occupato non è misurabile.", bundle: .module)
+        }
+        return String(
+            localized: "Docker.raw occupa \(Formatting.bytes(allocated)) sul disco (dimensione apparente \(Formatting.bytes(apparent)): è il limite massimo del disco virtuale, non lo spazio usato).",
+            bundle: .module)
+    }
+
+    static func describeDf(_ df: DockerDfSummary) -> String {
+        df.entries
+            .filter { !FeatureText.same($0.type, "Containers") }
+            .map { entry in
+                String(
+                    localized: "\(typeLabel(entry.type)) \(Formatting.bytes(entry.sizeBytes)) (recuperabili \(Formatting.bytes(entry.reclaimableBytes)))",
+                    bundle: .module)
+            }
+            .joined(separator: " · ")
+    }
+
+    static func typeLabel(_ dfType: String) -> String {
+        if FeatureText.same(dfType, DockerDfSummary.imagesType) { return String(localized: "Immagini", bundle: .module) }
+        if FeatureText.same(dfType, DockerDfSummary.volumesType) { return String(localized: "Volumi", bundle: .module) }
+        if FeatureText.same(dfType, DockerDfSummary.buildCacheType) { return String(localized: "Cache di build", bundle: .module) }
+        return dfType
+    }
+}

@@ -7,6 +7,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [
         .library(name: "CleanerCore", targets: ["CleanerCore"]),
+        .library(name: "CleanerFeatures", targets: ["CleanerFeatures"]),
     ],
     targets: [
         // Module map verso la zlib di sistema: Foundation non sa scrivere gzip.
@@ -16,6 +17,13 @@ let package = Package(
             dependencies: ["CZlib"],
             resources: [.process("Resources")]
         ),
+        // Modelli di presentazione, navigazione e composizione (spec §4.1): niente SwiftUI né
+        // AppKit, così il comportamento delle pagine si verifica con `swift test`, senza l'app.
+        .target(
+            name: "CleanerFeatures",
+            dependencies: ["CleanerCore"],
+            resources: [.process("Resources")]
+        ),
         .testTarget(
             name: "CleanerCoreTests",
             dependencies: ["CleanerCore"],
@@ -23,6 +31,10 @@ let package = Package(
             // non da un bundle: escluderle evita che SwiftPM le rifiuti come file non gestiti, un
             // errore con -warnings-as-errors.
             exclude: ["Docker/Fixtures", "Xcode/Fixtures"]
+        ),
+        .testTarget(
+            name: "CleanerFeaturesTests",
+            dependencies: ["CleanerFeatures", "CleanerCore"]
         ),
     ]
 )

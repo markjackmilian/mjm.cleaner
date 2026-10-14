@@ -222,4 +222,72 @@ struct XcodeJsonTests {
         #expect(runtimes.allSatisfy { XcodeText.containsIgnoringCase($0.blockReason ?? "", "UUID") })
         #expect(runtimes.flatMap(\.dependentDeviceKeys).allSatisfy { $0 == uuid })
     }
+
+    @Test func repeatedDeviceUuidWithCanonicallyEquivalentNamesIsAConflict() throws {
+        // "é" in NFC e in NFD sono lo stesso testo per String, ma per simctl sono nomi diversi:
+        // il conflitto dei metadati si decide sui byte, non sull'equivalenza canonica.
+        let simctl = """
+            {"runtimes":[],"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-0":[
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone \u{E9}","state":"Shutdown"},
+              {"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone e\u{301}","state":"Shutdown"}]}}
+            """
+
+        let snapshot = XcodeJson.parseInventory(simctl, "{}", runtimeDeleteSupported: true)
+
+        let device = try single(snapshot, .device)
+        #expect(!device.canSelect)
+        #expect(XcodeText.containsIgnoringCase(try #require(device.blockReason), "UUID"))
+        #expect(snapshot.warnings.contains { $0.resourceGroup == .device && $0.kind == .completenessFailure && XcodeText.containsIgnoringCase($0.message, "UUID") })
+    }
+
+    @Test func repeatedDeviceUuidWithCanonicallyEquivalentRuntimeIdentifiersIsAConflict() throws {
+        // Le due chiavi di runtime sono NFC e NFD: per String coincidono, per simctl sono diverse.
+        let simctl = """
+            {"runtimes":[],"devices":{
+              "com.apple.CoreSimulator.SimRuntime.iOS-\u{E9}":[{"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Shutdown"}],
+              "com.apple.CoreSimulator.SimRuntime.iOS-e\u{301}":[{"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Shutdown"}]}}
+            """
+
+        let snapshot = XcodeJson.parseInventory(simctl, "{}", runtimeDeleteSupported: true)
+
+        let device = try single(snapshot, .device)
+        #expect(!device.canSelect)
+        #expect(XcodeText.containsIgnoringCase(try #require(device.blockReason), "UUID"))
+    }
+
+    @Test func runtimeImageMatchesLogicalRuntimeByOrdinalIdentifierOnly() throws {
+        // Identificatore NFC nel runtime logico e NFD nell'immagine: per String coincidono, per
+        // simctl no. L'associazione è quindi ambigua e il runtime non si seleziona.
+        let simctl = """
+            {"runtimes":[{"identifier":"com.apple.CoreSimulator.SimRuntime.iOS-\u{E9}","name":"iOS 18.0","version":"18.0","buildversion":"22A4000","platform":"iOS"}],"devices":{}}
+            """
+        let images = """
+            {"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE":{"identifier":"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE","runtimeIdentifier":"com.apple.CoreSimulator.SimRuntime.iOS-e\u{301}","version":"18.0","build":"22A4000","deletable":true}}
+            """
+
+        let snapshot = XcodeJson.parseInventory(simctl, images, runtimeDeleteSupported: true)
+
+        let runtime = try single(snapshot, .runtime)
+        #expect(!runtime.canSelect)
+        #expect(runtime.runtimeIdentifier == nil)
+        #expect(XcodeText.containsIgnoringCase(try #require(runtime.blockReason), "ambigua"))
+    }
+
+    @Test func dependentDeviceMatchesRuntimeIdentifierByOrdinalComparisonOnly() throws {
+        // Il simulatore è sotto la chiave NFC, l'immagine e il runtime logico usano la forma NFD.
+        // Per String coincidono, per simctl no: il simulatore non dipende da quel runtime.
+        let simctl = """
+            {"runtimes":[{"identifier":"com.apple.CoreSimulator.SimRuntime.iOS-e\u{301}","name":"iOS 18.0","version":"18.0","buildversion":"22A4000","platform":"iOS"}],
+             "devices":{"com.apple.CoreSimulator.SimRuntime.iOS-\u{E9}":[{"udid":"11111111-1111-4111-8111-111111111111","name":"iPhone 16","state":"Booted"}]}}
+            """
+        let images = """
+            {"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE":{"identifier":"AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE","runtimeIdentifier":"com.apple.CoreSimulator.SimRuntime.iOS-e\u{301}","version":"18.0","build":"22A4000","deletable":true}}
+            """
+
+        let snapshot = XcodeJson.parseInventory(simctl, images, runtimeDeleteSupported: true)
+
+        let runtime = try single(snapshot, .runtime)
+        #expect(runtime.canSelect)
+        #expect(runtime.dependentDeviceKeys.isEmpty)
+    }
 }

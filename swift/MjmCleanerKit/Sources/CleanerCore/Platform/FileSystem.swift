@@ -33,8 +33,11 @@ public struct FileItemInfo: Sendable, Equatable {
     public let lastWrite: Date
     public let lastAccess: Date
     /// Data di creazione (`st_birthtimespec`), come `CreationTimeUtc` di .NET su macOS: a
-    /// differenza di `lastWrite` non cambia quando il contenuto viene riscritto. Chi non la conosce
-    /// la omette e vale `lastWrite`.
+    /// differenza di `lastWrite` non cambia quando il contenuto viene riscritto sul posto (scrittura
+    /// o aggiunta in coda). `LocalFileSystem.writeData` però sostituisce il file (temporaneo +
+    /// rename), quindi un file riscritto con `writeData` riceve una nuova data di nascita; le
+    /// cartelle, per cui la legge Xcode, non ne sono toccate. Chi non la conosce la omette e vale
+    /// `lastWrite`.
     public let creation: Date
 
     public init(kind: FileItemKind, size: Int64, lastWrite: Date, lastAccess: Date, creation: Date? = nil) {

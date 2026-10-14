@@ -17,6 +17,8 @@ struct FeatureTextTests {
         #expect(FeatureText.ordinalKey(composed) != FeatureText.ordinalKey(decomposed))
         #expect(FeatureText.hasOrdinalPrefix("docker:image:sha", "docker:image:"))
         #expect(!FeatureText.hasOrdinalPrefix("docker:imag", "docker:image:"))
+        #expect(FeatureText.hasOrdinalPrefix("cafe\u{301}", "cafe"))
+        #expect(!FeatureText.hasOrdinalPrefix("caf\u{E9}", "cafe\u{301}"))
         #expect(FeatureText.distinct(["b", composed, "b", decomposed, composed]) == ["b", composed, decomposed])
     }
 

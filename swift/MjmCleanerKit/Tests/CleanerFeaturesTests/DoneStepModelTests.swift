@@ -101,4 +101,44 @@ struct DoneStepModelTests {
 
         #expect(navigation.events.contains("startOver"))
     }
+
+    // Solo Swift (review del Task 8): il log scritto prima di scartare il diario è quello della
+    // sessione salvata — stesso resoconto, con i percorsi eliminati, sotto l'id restituito dallo storico.
+    @Test func theSessionLogReceivesTheSavedReportUnderItsId() async throws {
+        let history = FakeHistory()
+        let sessionLog = FakeSessionLog()
+        let report = makeReport(
+            bytesFreed: 2048, itemsDeleted: 2,
+            deletedPaths: ["/Users/tester/Library/Logs/a.log", "/Users/tester/Library/Logs/b.log"])
+        let model = DoneStepModel(
+            environment: try makeEnvironment(history: history, sessionLog: sessionLog), navigation: nil, report: report, journal: nil)
+
+        await model.persistence?.value
+
+        #expect(history.saved == [report])
+        #expect(sessionLog.written.map { $0.sessionId } == [1])
+        #expect(sessionLog.written.map { $0.report } == [report])
+    }
+
+    /// Un contatore che non si aggiorna non trattiene il diario: storico e log sono già scritti.
+    @Test func aFailedTotalRefreshStillDiscardsTheJournal() async throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let events = Recorder<String>()
+        let sessionLog = FakeSessionLog(events: events, journalDirectory: directory.path)
+        let journal = try #require(sessionLog.openJournal(startedAt: Date(timeIntervalSince1970: 1_790_000_000)))
+        let navigation = CleanupNavigationSpy()
+        navigation.refreshFailure = UnexpectedTestError(description: "contatore illeggibile")
+        let model = DoneStepModel(
+            environment: try makeEnvironment(history: FakeHistory(events: events), sessionLog: sessionLog),
+            navigation: navigation, report: makeReport(itemsDeleted: 1), journal: journal)
+
+        await model.persistence?.value
+
+        #expect(events.values == ["open", "save", "write", "discard"])
+        #expect(navigation.events == ["refreshTotal"])
+        #expect(!FileManager.default.fileExists(atPath: journal.path))
+        // Stesso testo del C#, dove RefreshTotalAsync stava nello stesso try.
+        #expect(model.historyWarning == "Pulizia completata, storico non aggiornato: contatore illeggibile")
+    }
 }

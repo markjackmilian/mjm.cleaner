@@ -96,7 +96,7 @@ final class FakeHistory: HistoryStoring {
 /// restituisce `nil` come quando la cartella dei log non è scrivibile.
 final class FakeSessionLog: SessionLogWriting {
     private struct State {
-        var writes: [Int64] = []
+        var written: [(sessionId: Int64, report: CleanReport)] = []
         var discarded: [String] = []
         var writeFailure: (any Error)?
     }
@@ -112,7 +112,8 @@ final class FakeSessionLog: SessionLogWriting {
         }
     }
 
-    var writes: Int { state.withLock { $0.writes.count } }
+    var writes: Int { state.withLock { $0.written.count } }
+    var written: [(sessionId: Int64, report: CleanReport)] { state.withLock { $0.written } }
     var discarded: [String] { state.withLock { $0.discarded } }
 
     func failWrites(with error: any Error) {
@@ -123,7 +124,7 @@ final class FakeSessionLog: SessionLogWriting {
         events.append("write")
         try state.withLock { state in
             if let failure = state.writeFailure { throw failure }
-            state.writes.append(sessionId)
+            state.written.append((sessionId, report))
         }
     }
 

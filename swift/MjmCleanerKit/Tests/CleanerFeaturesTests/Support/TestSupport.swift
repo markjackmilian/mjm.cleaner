@@ -31,10 +31,6 @@ final class Gate<Value: Sendable>: Sendable {
 
     private let state = Mutex(State())
 
-    var isOpen: Bool {
-        state.withLock { $0.value != nil }
-    }
-
     func open(_ value: Value) {
         let waiters = state.withLock { state -> [CheckedContinuation<Value?, Never>] in
             guard state.value == nil else { return [] }

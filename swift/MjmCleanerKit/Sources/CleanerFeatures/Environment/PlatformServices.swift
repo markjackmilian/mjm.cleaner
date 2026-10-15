@@ -15,6 +15,19 @@ public protocol AppearanceApplying {
     func apply(_ preference: AppearancePreference)
 }
 
+extension AppearancePreference {
+    /// Il nome dell'`NSAppearance` che l'app assegna a `NSApp.appearance` (spec §6.4); `nil` segue
+    /// Impostazioni di Sistema e ne riprende i cambi in tempo reale. È `ThemeVariantFor` del C#,
+    /// qui senza AppKit: l'adattatore dell'app converte solo il nome.
+    public var appKitAppearanceName: String? {
+        switch self {
+        case .auto: nil
+        case .light: "NSAppearanceNameAqua"
+        case .dark: "NSAppearanceNameDarkAqua"
+        }
+    }
+}
+
 /// Ciò che ogni pagina chiede alla finestra principale: `IXcodeNavigation` del C# senza `GoTo`,
 /// che diventa un metodo per destinazione nei protocolli delle singole sezioni.
 @MainActor

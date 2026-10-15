@@ -35,6 +35,17 @@ public enum PageKind: Sendable, Hashable, CaseIterable {
         default: false
         }
     }
+
+    /// Il passo (1–4) che lo `StepIndicator` segna come corrente; `nil` fuori dal wizard.
+    public var wizardStep: Int? {
+        switch self {
+        case .choose: 1
+        case .scan: 2
+        case .confirm: 3
+        case .done: 4
+        default: nil
+        }
+    }
 }
 
 /// La pagina mostrata nella finestra principale, con il suo modello (spec §6.3).

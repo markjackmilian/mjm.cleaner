@@ -4116,8 +4116,10 @@ private struct NumberRow: View {
     var body: some View {
         LabeledContent(title) {
             HStack(spacing: 6) {
-                TextField(accessibilityName ?? title, value: clamped, format: .number)
+                // Il titolo resta il segnaposto corto del campo; VoiceOver legge il nome del C#.
+                TextField(title, value: clamped, format: .number)
                     .labelsHidden()
+                    .accessibilityLabel(accessibilityName ?? title)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
                 Text(unit)
@@ -4261,7 +4263,7 @@ swift/Scripts/screenshots.sh "$dir"
 ls "$dir" | wc -l
 ```
 
-Expected: 26 percorsi stampati, uscita 0, poi `26` (con lo schermo bloccato o spento le catture non riescono e lo script esce con 1: sbloccare il Mac è un'azione dell'utente, quindi il task si ferma qui finché lo schermo non è disponibile; lo stesso se il Mac è in uso: con un'altra app in primo piano lo script non cattura, «finestra non attiva…», e la cattura chiede all'utente un paio di minuti con Claude in primo piano, senza tastiera né mouse). Guardare ogni immagine: stesse schermate descritte negli Expected dei Task 4–10, in chiaro e in scuro, testo leggibile in entrambi, barra azioni e avvisi interi in fondo, nessuna pagina vuota o spostata.
+Expected: 26 percorsi stampati, uscita 0, poi `26` (con lo schermo bloccato o spento le catture non riescono e lo script esce con 1: sbloccare il Mac è un'azione dell'utente, quindi il task si ferma qui finché lo schermo non è disponibile; lo stesso se il Mac è in uso: con un'altra app in primo piano lo script non cattura, «finestra non attiva…», e la cattura chiede all'utente un paio di minuti con Claude in primo piano, senza tastiera né mouse). Con il Mac ancora fermo, provare che la demo rifiuta una pagina che non conosce (lo script la scarterebbe prima con uscita 2): `open -n "$(cd "${TMPDIR:-/tmp}" && pwd -P)/mjm-cleaner-screenshots/Build/Products/Debug/MjmCleaner.app" --args -MJMDemo pagina-inesistente -ApplePersistenceIgnoreState YES`; la finestra mostra la vista d'errore con «Pagina demo sconosciuta: pagina-inesistente.» e nessun dato vero; poi `pkill -f mjm-cleaner-screenshots/Build/Products/Debug/MjmCleaner.app`. Guardare ogni immagine: stesse schermate descritte negli Expected dei Task 4–10, in chiaro e in scuro, testo leggibile in entrambi, barra azioni e avvisi interi in fondo, nessuna pagina vuota o spostata.
 
 - [ ] **Step 4: Registro di parità**
 
@@ -4350,7 +4352,7 @@ controlli nel viewport: la barra azioni e la conferma stanno nell'area sicura in
 **con:**
 
 ```markdown
-| SettingsWindowTests.cs | 10 (3) | — | — | 4b | `ShowsTheFourSectionsAndTheEmptyFolderState`: le quattro sezioni negli screenshot `settings-*.png` e «Nessuna cartella. Premi + per aggiungerne una.» nel codice di `FolderList`; `DefaultHeightFitsA13InchDisplay` e `HeightIsCappedToTheWorkingAreaOfTheScreen`: lo sheet è 700×560 ed entra nella finestra minima 900×600; `ClosingTheWindowRestoresTheAppearance`: chiudere lo sheet dal sistema chiama `main.settings?.cancel()`, che ripristina l'aspetto (`closingFromTheTitleBarBehavesLikeCancel` lo prova sul modello, il collegamento della vista è stato provato a mano con la demo nel Task 4); `AppearanceCaptionSitsBelowTheCard` e `AllSectionCaptionsUseTheSameSize`: didascalie come `footer` delle sezioni del `Form`; `NumericFieldsUseTheCompactStepperWithNamedButtons`: `Stepper` nativo con il nome della riga, `StepperNames` non si porta (differenza registrata); `SteppingStillChangesTheBoundValueAndClamps`: campo e stepper restano in `thresholdMegabytesRange` e `minAgeDaysRange`; anello dell'aspetto e cornice dei campi (`SelectedAppearancePreviewHasAnUnclippedAccentRing`, `CompactFieldDoesNotPaintFluentTextBoxChrome`) sono tema Avalonia (spec §9.2) |
+| SettingsWindowTests.cs | 10 (3) | — | — | 4b | `ShowsTheFourSectionsAndTheEmptyFolderState`: le quattro sezioni negli screenshot `settings-*.png` e «Nessuna cartella. Premi + per aggiungerne una.» nel codice di `FolderList`; `DefaultHeightFitsA13InchDisplay` e `HeightIsCappedToTheWorkingAreaOfTheScreen`: lo sheet è 700×560 ed entra nella finestra minima 900×600; `ClosingTheWindowRestoresTheAppearance`: chiudere lo sheet dal sistema chiama `main.settings?.cancel()`, che ripristina l'aspetto (`closingFromTheTitleBarBehavesLikeCancel` lo prova sul modello, il collegamento della vista è stato provato a mano con la demo nel Task 4); `AppearanceCaptionSitsBelowTheCard` e `AllSectionCaptionsUseTheSameSize`: didascalie come `footer` delle sezioni del `Form`; `NumericFieldsUseTheCompactStepperWithNamedButtons`: `Stepper` nativo con il nome della riga, o il nome accessibile del C# per i tre campi d'età, `StepperNames` non si porta (differenza registrata); `SteppingStillChangesTheBoundValueAndClamps`: campo e stepper restano in `thresholdMegabytesRange` e `minAgeDaysRange`; anello dell'aspetto e cornice dei campi (`SelectedAppearancePreviewHasAnUnclippedAccentRing`, `CompactFieldDoesNotPaintFluentTextBoxChrome`) sono tema Avalonia (spec §9.2) |
 ```
 
 **In `docs/superpowers/porting/2026-10-13-parity.md`, sostituire:**
@@ -4434,7 +4436,9 @@ Piano eseguito il 2026-10-15; il ledger con ogni ruling è in `docs/superpowers/
   - demo: con `-MJMDemo` e una pagina sconosciuta l'app mostra la vista d'errore e non legge le impostazioni vere (blocchi del Task 3); lo script non cattura una finestra che non è in primo piano, chiude l'app anche con Ctrl-C e apre la finestra alla misura predefinita;
   - accessibilità: il pulsante «Impostazioni…» senza «⌘,», i nomi dei campi numerici del C#, il nome della categoria letto una volta al passo 1, icone decorative nascoste;
   - `.disabled` durante l'eliminazione sul contenuto e non sullo scorrimento; sfondo alle fasce in basso del passo 4 e del resoconto Docker; parametro generico `Title` in `CollapsibleCard`; celle dello Storico senza `frame` ridondante;
-  - registro di parità: conteggi dei test solo Swift, riga «Riselezione…» corretta, nove differenze e due candidati nuovi.
+  - registro di parità: conteggi dei test solo Swift, riga «Riselezione…» corretta, nove differenze e due candidati nuovi;
+  - un commento in `XcodeModel.load()`: il ramo `if !isDeleting` resta come difesa in profondità.
+- **Dopo la re-review della fix wave:** il segnaposto dei campi d'età torna il titolo corto (il nome del C# resta a VoiceOver con `accessibilityLabel`), il commento del doppio `SequencedDocker` torna sulla sua classe, la riga «Intestazione della sidebar» del registro dice dove compare il nome (menu dell'app e Dock) e il Task 11 prova il rifiuto di una pagina demo sconosciuta.
 - **CleanerFeatures:** il vincolo «cambiano solo le due funzioni pure e i test del Task 1» non vale più dopo il Task 10 e la fix wave; il Core resta intatto.
 - **Task 11:** suite, build e vincoli verificati prima della fix wave e di nuovo dopo; la cattura dei 26 screenshot si fa dopo la fix wave con il Mac fermo (con un'altra app in primo piano le finestre restano inattive e i tasti dell'utente finiscono nella demo); conteggi finali 172 + 496.
 

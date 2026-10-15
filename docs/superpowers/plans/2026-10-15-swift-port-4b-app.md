@@ -41,7 +41,7 @@ Dai piani 1–4a, invariati:
 - La demo esiste solo sotto `#if DEBUG`, non legge né scrive il disco e non entra nel Release.
 - Comandi di verifica standard, dalla radice del repository:
   - package: `(cd swift/MjmCleanerKit && swift test -Xswiftc -warnings-as-errors)`;
-  - app: `xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Debug -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1; grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"; grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"` — Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica` (gli avvisi Swift sono già errori: `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES`);
+  - app: `xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Debug -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1; grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"; grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"` — Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica` (gli avvisi Swift sono già errori: `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES`);
   - screenshot (dal Task 3): `swift/Scripts/screenshots.sh "${TMPDIR:-/tmp}/mjm-cleaner-shots" <pagine…>`.
 - Commit frequenti; ogni messaggio termina con la riga `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, anche se l'ambiente di chi esegue ne suggerisce un'altra.
 - Branch `feat/swift-port-app`, nessun push. Si mettono in stage solo percorsi espliciti: mai `git add -A`, `git add .` o una cartella intera. `.zed/` e `mjm-cleaner-ui-handoff.md` nella radice sono file dell'utente e non vanno mai in stage.
@@ -74,7 +74,8 @@ Valgono quelle dei piani 1–4a. Si aggiungono queste.
 - Un `Info.plist` generato (`GENERATE_INFOPLIST_FILE = YES`) sovrascrive `CFBundleName` con `PRODUCT_NAME` anche se `INFOPLIST_FILE` lo definisce: per avere «mjm.cleaner» nei menu serve un `Info.plist` completo e `GENERATE_INFOPLIST_FILE = NO`.
 - Icona da un solo PNG 1024: `"idiom" : "mac", "scale" : "2x", "size" : "512x512"`. La forma `"idiom" : "universal", "platform" : "macos"` dà gli avvisi «Unknown platform value "macos"» e «unassigned child».
 - Senza `ALWAYS_SEARCH_USER_PATHS = NO` compare l'avviso «Traditional headermap style is no longer supported».
-- Nei build puliti `appintentsmetadataprocessor` stampa `warning: Metadata extraction skipped, no AppIntents.framework dependency found`: è un log dello strumento, non una diagnostica del compilatore. Il controllo cerca solo righe che iniziano con un percorso: `grep -E '^/.*: (warning|error):'`.
+- Nei build puliti `appintentsmetadataprocessor` stampa `… appintentsmetadataprocessor[pid:tid] warning: Metadata extraction skipped, no AppIntents.framework dependency found`: è un log dello strumento, non una diagnostica. Il controllo `grep -E '(^|: )(warning|error): '` prende le diagnostiche del compilatore e degli asset (`<percorso>: warning: …`) e quelle del build system senza percorso (`warning: Traditional headermap style …`), non quella riga (preceduta da `] `).
+- `codesign -dv` dice `Signature=adhoc` anche quando Xcode non firma (`CODE_SIGNING_ALLOWED = NO`: firma automatica del linker, senza risorse sigillate). La firma «Sign to Run Locally» si riconosce da `codesign --verify --strict` valido e da `Sealed Resources version=2`.
 - `xcodebuild` non modifica il catalogo dei testi dell'app: resta `{"sourceLanguage":"it","strings":{}}` come quelli dei package. Un build da Xcode IDE può riempirlo: è atteso.
 - L'app avviata come processo figlio della shell dell'agente non ottiene finestre (`sandbox_extension_issue_file_to_process failed`); avviata con `open -n <app> --args …` (LaunchServices) sì. `screencapture -x -o -l<id>` cattura la finestra, sheet compreso; il permesso di registrazione dello schermo è concesso (`CGPreflightScreenCaptureAccess()` → `true`).
 - `.fixedSize(horizontal: false, vertical: true)` su un testo dentro un `safeAreaInset(edge: .bottom)` rompe il layout della finestra (pagina vuota, sidebar spostata o vuota): nei testi delle fasce in basso non si usa.
@@ -849,7 +850,7 @@ Expected: 17 file: il `Contents.json` della radice, quello di `AccentColor.color
 
 - [ ] **Step 4: Avvio, adattatori e vista d'errore**
 
-`AppDelegate.applicationWillFinishLaunching` applica l'aspetto salvato prima che la finestra compaia, come il C# prima di creare la `MainWindow`. `AppStartup.start()` compone l'ambiente; se fallisce mostra `StartupFailureView` con percorso e motivo. Il contatore si legge una volta all'avvio (`show(_:)`).
+`AppDelegate.applicationWillFinishLaunching` applica l'aspetto salvato prima che la finestra compaia, come il C# prima di creare la `MainWindow`. `AppStartup.start()` compone l'ambiente; se fallisce mostra `StartupFailureView` con percorso e motivo. Il contatore si legge una volta all'avvio (`show(_:)`). `AppKitFolderPicker` apre il pannello come foglio della finestra attiva (lo sheet delle Impostazioni), come `StorageFolderPicker(window)` del C#: un pannello libero lascerebbe chiudere le Impostazioni e perderebbe la cartella scelta dopo.
 
 **Creare `swift/MjmCleaner/App/MjmCleanerApp.swift`:**
 
@@ -1005,7 +1006,16 @@ struct AppKitFolderPicker: FolderPicking {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        guard await panel.begin() == .OK, let url = panel.url else { return nil }
+        // Come `StorageFolderPicker(window)` del C#: un foglio della finestra attiva (lo sheet delle
+        // Impostazioni), che resta bloccata finché non si sceglie o si annulla. Senza finestra attiva,
+        // un pannello modale. Un pannello libero lascerebbe chiudere le Impostazioni e perderebbe la
+        // cartella scelta dopo.
+        let response = if let window = NSApp.keyWindow {
+            await panel.beginSheetModal(for: window)
+        } else {
+            panel.runModal()
+        }
+        guard response == .OK, let url = panel.url else { return nil }
         return url.path(percentEncoded: false)
     }
 }
@@ -1068,7 +1078,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -1080,18 +1090,21 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination 'generic/platform=macOS' -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-release" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-release.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-release.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-release.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-release.log" || echo "nessuna diagnostica"
 app="${TMPDIR:-/tmp}/mjm-cleaner-release/Build/Products/Release/MjmCleaner.app"
 lipo -archs "$app/Contents/MacOS/MjmCleaner"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleName' -c 'Print :CFBundleIdentifier' -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist"
-codesign -dv "$app" 2>&1 | grep Signature
+codesign --verify --strict "$app" && echo "firma valida"
+codesign -dv "$app" 2>&1 | grep -E '^Signature=adhoc|^Sealed Resources version=2'
+xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Release -showBuildSettings 2>/dev/null \
+    | grep -E '^ *SWIFT_VERSION = '
 ```
 
-Expected: `** BUILD SUCCEEDED **`, `nessuna diagnostica`, `x86_64 arm64`, poi `mjm.cleaner`, `com.mjm.cleaner`, `15.0` e `Signature=adhoc`.
+Expected: `** BUILD SUCCEEDED **`, `nessuna diagnostica`, `x86_64 arm64`, poi `mjm.cleaner`, `com.mjm.cleaner`, `15.0`, `firma valida`, `Signature=adhoc`, `Sealed Resources version=2 …` (firma di Xcode, non quella automatica del linker) e `SWIFT_VERSION = 6.0`.
 
 - [ ] **Step 6: Registro di parità**
 
-`ApplicationIdentityTests` è verificato dallo Step 5; tre differenze nuove in fondo alle «Differenze rispetto al C#».
+`ApplicationIdentityTests` è verificato dallo Step 5; quattro differenze nuove in fondo alle «Differenze rispetto al C#».
 
 **In `docs/superpowers/porting/2026-10-13-parity.md`, sostituire:**
 
@@ -1116,8 +1129,9 @@ Expected: `** BUILD SUCCEEDED **`, `nessuna diagnostica`, `x86_64 arm64`, poi `m
 ```markdown
 | Nome della categoria di una riga del passo 3 | `categories.First(c => c.Id == row.CategoryId)`: lancia se la categoria manca | `?? row.categoryId`: la riga mostra l'identificativo (irraggiungibile: le righe vengono dalle categorie analizzate) | accettata |
 | Vista d'errore all'avvio | finestra separata (`FatalErrorWindow`) con «Chiudi» | vista nella finestra principale (`StartupFailureView`) con «Esci» | voluta (spec §6.2) |
-| Aspetto all'avvio | applicato dopo la composizione asincrona dei servizi, prima di creare la finestra | applicato in `applicationWillFinishLaunching` leggendo `settings.json` con un `SettingsStore` proprio, prima che l'ambiente esista | equivalente |
+| Aspetto all'avvio | applicato dopo la composizione asincrona dei servizi, prima di creare la finestra; non applicato se la composizione falliva (la `FatalErrorWindow` seguiva il sistema) | applicato in `applicationWillFinishLaunching` leggendo `settings.json` con un `SettingsStore` proprio, prima che l'ambiente esista, anche quando la composizione poi fallisce | accettata |
 | Contatore «Spazio liberato» all'avvio | `await RefreshTotalAsync()` in un `async void`: un errore di lettura dello storico non era intercettato | `try? await main.refreshTotal()`: il contatore resta «—» | accettata (lato sicuro) |
+| Errori intercettati all'avvio | solo `IOException`, `UnauthorizedAccessException` e `SqliteException` mostravano la `FatalErrorWindow`; gli altri chiudevano l'app | ogni errore di `AppEnvironment.live` mostra la vista d'errore | accettata (lato sicuro) |
 ```
 
 - [ ] **Step 7: Commit**
@@ -1745,7 +1759,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -2256,7 +2270,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -2272,13 +2286,13 @@ Expected: sei file. Sidebar con Pulizia, Docker, Xcode e Storico (voce seleziona
 **In `docs/superpowers/porting/2026-10-13-parity.md`, sostituire:**
 
 ```markdown
-| Contatore «Spazio liberato» all'avvio | `await RefreshTotalAsync()` in un `async void`: un errore di lettura dello storico non era intercettato | `try? await main.refreshTotal()`: il contatore resta «—» | accettata (lato sicuro) |
+| Errori intercettati all'avvio | solo `IOException`, `UnauthorizedAccessException` e `SqliteException` mostravano la `FatalErrorWindow`; gli altri chiudevano l'app | ogni errore di `AppEnvironment.live` mostra la vista d'errore | accettata (lato sicuro) |
 ```
 
 **con:**
 
 ```markdown
-| Contatore «Spazio liberato» all'avvio | `await RefreshTotalAsync()` in un `async void`: un errore di lettura dello storico non era intercettato | `try? await main.refreshTotal()`: il contatore resta «—» | accettata (lato sicuro) |
+| Errori intercettati all'avvio | solo `IOException`, `UnauthorizedAccessException` e `SqliteException` mostravano la `FatalErrorWindow`; gli altri chiudevano l'app | ogni errore di `AppEnvironment.live` mostra la vista d'errore | accettata (lato sicuro) |
 | Riselezione della voce corrente nella sidebar | un clic su Docker, Xcode o Storico già selezionati ricreava la pagina | `List(selection:)` non notifica una selezione invariata: la pagina resta (si ricarica con «Riprova», «Riprova analisi» o «Nuova analisi») | accettata |
 ```
 
@@ -2607,7 +2621,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -2879,7 +2893,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -3270,7 +3284,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -3641,7 +3655,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -3790,7 +3804,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -4030,7 +4044,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -4096,7 +4110,7 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"
 ```
 
 Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
@@ -4106,13 +4120,17 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination 'generic/platform=macOS' -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-release" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-release.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-release.log"
-grep -E '^/.*: (warning|error):' "${TMPDIR:-/tmp}/mjm-cleaner-release.log" || echo "nessuna diagnostica"
+grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-release.log" || echo "nessuna diagnostica"
 app="${TMPDIR:-/tmp}/mjm-cleaner-release/Build/Products/Release/MjmCleaner.app"
 lipo -archs "$app/Contents/MacOS/MjmCleaner"
 strings "$app/Contents/MacOS/MjmCleaner" | grep -c -E 'MJMDemo|DemoLaunch|DemoServices|DemoData' || true
+codesign --verify --strict "$app" && echo "firma valida"
+codesign -dv "$app" 2>&1 | grep -E '^Signature=adhoc|^Sealed Resources version=2'
+xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Release -showBuildSettings 2>/dev/null \
+    | grep -E '^ *SWIFT_VERSION = '
 ```
 
-Expected: `** BUILD SUCCEEDED **`, `nessuna diagnostica`, `x86_64 arm64`, `0`.
+Expected: `** BUILD SUCCEEDED **`, `nessuna diagnostica`, `x86_64 arm64`, `0`, `firma valida`, `Signature=adhoc`, `Sealed Resources version=2 …`, `SWIFT_VERSION = 6.0`.
 
 - [ ] **Step 2: Vincoli globali e confini**
 

@@ -1,0 +1,106 @@
+#if DEBUG
+import AppKit
+import CleanerCore
+import CleanerFeatures
+import Foundation
+
+/// Avvio dimostrativo per gli screenshot (spec §9.4), solo in Debug: `-MJMDemo <pagina>` apre la
+/// pagina con servizi finti e dati fissi, `-MJMAppearance light|dark` sceglie l'aspetto. Nessun
+/// servizio finto tocca il disco: un clic su «Elimina» restituisce un resoconto inventato.
+struct DemoLaunch: Sendable {
+    enum Page: String, CaseIterable, Sendable {
+        case choose
+        case scan
+        case confirm
+        case done
+        case docker
+        case dockerUnavailable = "docker-unavailable"
+        case dockerReport = "docker-report"
+        case xcode
+        case xcodePreview = "xcode-preview"
+        case xcodeReport = "xcode-report"
+        case history
+        case settings
+        case startupFailure = "startup-failure"
+    }
+
+    let page: Page
+    let appearance: AppearancePreference
+
+    static let current = parse(ProcessInfo.processInfo.arguments)
+
+    static func parse(_ arguments: [String]) -> DemoLaunch? {
+        guard let page = value(after: "-MJMDemo", in: arguments).flatMap(Page.init(rawValue:)) else { return nil }
+        let appearance: AppearancePreference = switch value(after: "-MJMAppearance", in: arguments) {
+        case "light": .light
+        case "dark": .dark
+        default: .auto
+        }
+        return DemoLaunch(page: page, appearance: appearance)
+    }
+
+    private static func value(after flag: String, in arguments: [String]) -> String? {
+        guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
+    }
+
+    /// Apre la pagina chiesta passando dai metodi di `MainModel`, come farebbe l'utente.
+    @MainActor
+    func open(into startup: AppStartup) {
+        // In primo piano, così gli screenshot mostrano la finestra attiva.
+        NSApp.activate()
+        guard page != .startupFailure else {
+            let denied = FileSystemError(code: EACCES, path: DemoServices.paths.databaseFile)
+            startup.fail(StartupFailure.message(paths: DemoServices.paths, error: denied))
+            return
+        }
+
+        let environment: AppEnvironment
+        do {
+            environment = try DemoServices.environment(page: page, appearance: appearance)
+        } catch {
+            startup.fail(StartupFailure.message(paths: DemoServices.paths, error: error))
+            return
+        }
+        let main = MainModel(environment: environment, appearance: AppKitAppearance(), folders: AppKitFolderPicker())
+        startup.show(main)
+        let categories = environment.categories().filter { DemoData.analyzedCategoryIds.contains($0.id) }
+
+        switch page {
+        case .choose, .startupFailure:
+            break
+        case .scan:
+            main.showScan(categories)
+        case .confirm:
+            main.showConfirm(categories, results: DemoData.scanResults)
+        case .done:
+            main.showDone(DemoData.cleanReport, journal: nil)
+        case .docker, .dockerUnavailable:
+            main.select(.docker)
+        case .dockerReport:
+            main.showDockerReport(DemoData.dockerResult, diskBefore: DemoData.diskBefore, diskAfter: DemoData.diskAfter)
+        case .xcode:
+            main.select(.xcode)
+        case .xcodePreview:
+            main.select(.xcode)
+            if case .xcode(let xcode) = main.page {
+                Task {
+                    await xcode.initialLoad?.value
+                    for row in xcode.groups.flatMap(\.rows) where DemoData.previewedXcodeKeys.contains(row.candidate.key) {
+                        row.isSelected = true
+                    }
+                    xcode.preview()
+                }
+            }
+        case .xcodeReport:
+            main.showXcodeReport(XcodeReportModel(
+                history: environment.history, sessionLog: environment.sessionLog, navigation: main,
+                result: DemoData.xcodeResult, journal: nil))
+        case .history:
+            main.select(.history)
+        case .settings:
+            main.showSettings()
+        }
+    }
+}
+#endif

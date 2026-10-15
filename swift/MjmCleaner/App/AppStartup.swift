@@ -29,12 +29,22 @@ final class AppStartup {
 
     /// La stessa lettura di `environment.settings.load()`, fatta prima che l'ambiente esista.
     static func savedAppearance() -> AppearancePreference {
-        SettingsStore(fileSystem: LocalFileSystem(), paths: paths).load().appearance
+        #if DEBUG
+        if let demo = DemoLaunch.current { return demo.appearance }
+        #endif
+        return SettingsStore(fileSystem: LocalFileSystem(), paths: paths).load().appearance
     }
 
     func start() async {
         guard !started else { return }
         started = true
+
+        #if DEBUG
+        if let demo = DemoLaunch.current {
+            demo.open(into: self)
+            return
+        }
+        #endif
 
         let paths = Self.paths
         do {

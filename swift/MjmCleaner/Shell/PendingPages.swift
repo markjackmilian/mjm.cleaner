@@ -5,14 +5,6 @@ import SwiftUI
 // il Task 10 cancella il file.
 
 
-struct HistoryView: View {
-    let model: HistoryModel
-
-    var body: some View {
-        Text(verbatim: "Storico")
-    }
-}
-
 struct SettingsView: View {
     let model: SettingsModel
 

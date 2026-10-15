@@ -245,8 +245,8 @@ final class FakeRunningApps: RunningAppsProbing {
     }
 }
 
-/// Docker finto: le analisi si consumano in ordine (l'ultima resta), l'esecuzione restituisce
-/// `executeResult` o lancia `executeFailure`.
+/// Docker finto: le analisi si consumano in ordine (l'ultima resta), l'esecuzione restituisce il
+/// risultato o lancia l'errore preparati con `respond(with:)`.
 final class FakeDocker: DockerCleanupServing {
     private struct State {
         var analyses: [Result<DockerAnalysis, any Error>] = []

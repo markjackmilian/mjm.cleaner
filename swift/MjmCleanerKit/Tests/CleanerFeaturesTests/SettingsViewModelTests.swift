@@ -159,6 +159,16 @@ struct SettingsViewModelTests {
         #expect(removed.model.projectRoots.map { Array($0.utf8) } == [Array("/x/Cafe\u{301}".utf8)])
     }
 
+    /// Le Impostazioni non mostrano la selezione del passo 1: Salva la conserva, perché parte da
+    /// `store.load()` e non da impostazioni nuove.
+    @Test func saveKeepsTheRememberedCategorySelection() {
+        let fixture = create(settings { $0.selectedCategoryIds = ["trash"] })
+
+        fixture.model.save()
+
+        #expect(fixture.store.current.selectedCategoryIds == ["trash"])
+    }
+
     @Test func cancelledPickerKeepsTheCurrentSelection() async {
         let fixture = create(settings {
             $0.projectRoots = ["/a"]

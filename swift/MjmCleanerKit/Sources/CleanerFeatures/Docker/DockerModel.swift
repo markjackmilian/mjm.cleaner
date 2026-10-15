@@ -179,7 +179,10 @@ public final class DockerModel {
         do {
             let result = try await task.value
             await relay.finish()
-            let diskAfter = try await docker.measureDisk()
+            // La misura non eredita l'annullamento di chi ha chiamato `delete()`, come il
+            // `CancellationToken.None` del C#: le voci sono già state rimosse e il resoconto va
+            // comunque mostrato e salvato.
+            let diskAfter = try await Task { try await docker.measureDisk() }.value
             navigation?.showDockerReport(result, diskBefore: diskBefore, diskAfter: diskAfter)
         } catch let error as DockerUnavailableError {
             await relay.finish()

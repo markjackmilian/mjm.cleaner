@@ -285,19 +285,42 @@ struct DockerModelTests {
         #expect(docker.events.values == ["execute", "measure"])
         #expect(navigation.reportDiskAfter?.allocatedBytes == Optional(Int64(1)))
     }
+
+    /// La misura finale non eredita l'annullamento di chi ha chiamato `delete()` (il C# usava
+    /// `CancellationToken.None`): le voci sono già state rimosse, il resoconto va comunque mostrato.
+    @Test func aCancelledCallerStillGetsTheReport() async throws {
+        let docker = SequencedDocker(dockerAnalysis([dockerCandidate(.image, "dangling", verdict: .delete)]))
+        docker.waitForRelease()
+        let navigation = DockerNavigationSpy()
+        let model = DockerModel(environment: try makeEnvironment(docker: docker), navigation: navigation)
+        await model.initialLoad?.value
+
+        let deleting = Task { await model.delete() }
+        await docker.started.wait()
+        deleting.cancel()
+        docker.release.open()
+        await deleting.value
+
+        #expect(docker.events.values == ["execute", "measure"])
+        #expect(navigation.events == ["dockerReport"])
+        #expect(model.deleteErrorText == "")
+    }
 }
 
 /// Docker che registra l'ordine delle chiamate, misura un disco diverso dopo l'esecuzione e, se
-/// richiesto, resta sospeso nell'esecuzione finché non viene annullato (al massimo 5 secondi).
+/// richiesto, resta sospeso nell'esecuzione finché il test non apre `release` o finché non viene
+/// annullato (al massimo 5 secondi). Come `DiskUsageProbe`, la misura fallisce in un task annullato.
 private final class SequencedDocker: DockerCleanupServing {
     private struct State {
         var executed = false
+        var waitsForRelease = false
         var waitsForCancellation = false
         var observedCancellation: [Bool] = []
     }
 
     let events = Recorder<String>()
     let started = Gate<Void>()
+    let release = Gate<Void>()
     private let analysis: DockerAnalysis
     private let state = Mutex(State())
 
@@ -307,6 +330,7 @@ private final class SequencedDocker: DockerCleanupServing {
 
     var observedCancellation: [Bool] { state.withLock { $0.observedCancellation } }
 
+    func waitForRelease() { state.withLock { $0.waitsForRelease = true } }
     func waitForCancellation() { state.withLock { $0.waitsForCancellation = true } }
 
     func analyze(_ projectRoots: [String]) async throws -> DockerAnalysis {
@@ -316,6 +340,9 @@ private final class SequencedDocker: DockerCleanupServing {
     func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
         events.append("execute")
         started.open()
+        if state.withLock({ $0.waitsForRelease }) {
+            await release.wait()
+        }
         if state.withLock({ $0.waitsForCancellation }) {
             try? await Task.sleep(for: .seconds(5))
             let cancelled = Task.isCancelled
@@ -326,6 +353,8 @@ private final class SequencedDocker: DockerCleanupServing {
     }
 
     func measureDisk() async throws -> DockerDiskUsage {
+        // Come `DiskUsageProbe`: `ProcessRunner.run` comincia con `Task.checkCancellation()`.
+        try Task.checkCancellation()
         events.append("measure")
         let executed = state.withLock { $0.executed }
         return DockerDiskUsage(path: "/Docker.raw", allocatedBytes: executed ? 1 : 999, apparentBytes: 10)

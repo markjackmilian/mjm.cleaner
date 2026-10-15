@@ -23,7 +23,16 @@ struct AppKitFolderPicker: FolderPicking {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
-        guard await panel.begin() == .OK, let url = panel.url else { return nil }
+        // Come `StorageFolderPicker(window)` del C#: un foglio della finestra attiva (lo sheet delle
+        // Impostazioni), che resta bloccata finché non si sceglie o si annulla. Senza finestra attiva,
+        // un pannello modale. Un pannello libero lascerebbe chiudere le Impostazioni e perderebbe la
+        // cartella scelta dopo.
+        let response = if let window = NSApp.keyWindow {
+            await panel.beginSheetModal(for: window)
+        } else {
+            panel.runModal()
+        }
+        guard response == .OK, let url = panel.url else { return nil }
         return url.path(percentEncoded: false)
     }
 }

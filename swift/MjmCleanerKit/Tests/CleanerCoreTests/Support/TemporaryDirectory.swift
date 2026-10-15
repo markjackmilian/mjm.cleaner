@@ -37,6 +37,20 @@ struct TemporaryDirectory {
         return full
     }
 
+    /// Una catena di cartelle `a/a/…/a` sotto `relative`, lunga quanto entra con un margine in
+    /// PATH_MAX (1024 byte, terminatore compreso), con un file a metà e uno in fondo. Restituisce la
+    /// cartella di partenza, i livelli e i byte dei due file.
+    func deepTree(_ relative: String) throws -> (root: String, depth: Int, bytes: Int64) {
+        let root = path + "/" + relative
+        let depth = (1000 - root.utf8.count) / 2
+        let middle = root + String(repeating: "/a", count: depth / 2)
+        let bottom = root + String(repeating: "/a", count: depth)
+        try FileManager.default.createDirectory(atPath: bottom, withIntermediateDirectories: true)
+        try Data("metà".utf8).write(to: URL(fileURLWithPath: middle + "/m"))
+        try Data("fondo".utf8).write(to: URL(fileURLWithPath: bottom + "/f"))
+        return (root, depth, Int64("metà".utf8.count + "fondo".utf8.count))
+    }
+
     /// Ripristina i permessi prima di rimuovere: alcuni test tolgono la scrittura a una cartella.
     func remove() {
         if let enumerator = FileManager.default.enumerator(atPath: path) {

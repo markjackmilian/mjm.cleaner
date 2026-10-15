@@ -130,6 +130,50 @@ struct LocalFileSystemTests {
         #expect(!FileManager.default.fileExists(atPath: tmp.path + "/locked/y.txt"))
     }
 
+    // Solo Swift (correzione del 2026-10-15): una sottocartella che non si legge resta al suo posto
+    // e il suo errore è il primo, prima di quello della cartella che non si svuota.
+    @Test func deleteDirectoryRecursivelyReportsAnUnreadableSubdirectory() throws {
+        let tmp = try TemporaryDirectory(); defer { tmp.remove() }
+        let unreadable = try tmp.directory("tree/chiusa")
+        try tmp.file("tree/chiusa/x.txt", contents: "x")
+        try tmp.file("tree/z.txt", contents: "z")
+        chmod(unreadable, 0o300)
+
+        #expect(throws: FileSystemError(code: EACCES, path: unreadable)) {
+            try fs.deleteDirectoryRecursively(tmp.path + "/tree")
+        }
+        #expect(FileManager.default.fileExists(atPath: unreadable + "/x.txt"))
+        #expect(!FileManager.default.fileExists(atPath: tmp.path + "/tree/z.txt"))
+    }
+
+    // Solo Swift (correzione del 2026-10-15): con più errori vale il primo nell'ordine di
+    // `contentsOfDirectory`, come nella cancellazione ricorsiva di .NET.
+    @Test func deleteDirectoryRecursivelyReportsTheFirstFailureInListingOrder() throws {
+        let tmp = try TemporaryDirectory(); defer { tmp.remove() }
+        let first = try tmp.directory("tree/a")
+        let second = try tmp.directory("tree/b")
+        try tmp.file("tree/a/x.txt", contents: "x")
+        try tmp.file("tree/b/x.txt", contents: "x")
+        chmod(first, 0o555)
+        chmod(second, 0o555)
+
+        #expect(throws: FileSystemError(code: EACCES, path: first + "/x.txt")) {
+            try fs.deleteDirectoryRecursively(tmp.path + "/tree")
+        }
+    }
+
+    // Solo Swift (crash del 2026-10-15 nell'app): la cancellazione scendeva di una chiamata per
+    // livello e una cartella di qualche centinaio di livelli esauriva lo stack del thread.
+    @Test func deleteDirectoryRecursivelyRemovesATreeDeeperThanTheStack() async throws {
+        let tmp = try TemporaryDirectory(); defer { tmp.remove() }
+        let deep = try tmp.deepTree("deep")
+        try #require(deep.depth >= 300)
+
+        try await onSmallStack { try LocalFileSystem().deleteDirectoryRecursively(deep.root) }
+
+        #expect(!FileManager.default.fileExists(atPath: deep.root))
+    }
+
     @Test func writeDataReplacesAndAppendDataCreatesThenAppends() throws {
         let tmp = try TemporaryDirectory(); defer { tmp.remove() }
         let file = tmp.path + "/impostazioni.json"

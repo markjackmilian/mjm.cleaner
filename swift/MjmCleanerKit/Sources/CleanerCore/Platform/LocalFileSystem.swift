@@ -145,34 +145,50 @@ public struct LocalFileSystem: FileSystem {
 
     // MARK: - Privati
 
-    /// Elimina tutto ciò che può sotto `path`, poi `path` stesso; ricorda solo il primo errore,
+    /// Elimina tutto ciò che può sotto `root`, poi `root` stesso; ricorda solo il primo errore,
     /// che è quello che .NET avrebbe lanciato.
-    private func removeTree(_ path: String, firstError: inout FileSystemError?) {
-        let children: [String]
-        do {
-            children = try contentsOfDirectory(path)
-        } catch let error as FileSystemError {
-            if firstError == nil { firstError = error }
-            return
-        } catch {
-            return
-        }
+    ///
+    /// Iterativa, con una pila esplicita: la versione ricorsiva scendeva di una chiamata per livello
+    /// e una cartella di qualche centinaio di livelli esauriva lo stack del thread (512 KB nei thread
+    /// di Swift Concurrency: crash del 2026-10-15). L'ordine delle operazioni, e quindi il primo
+    /// errore, resta quello della ricorsione: in profondità, i figli nell'ordine di
+    /// `contentsOfDirectory`, ogni cartella rimossa dopo il suo contenuto; una cartella che non si
+    /// legge registra l'errore e resta al suo posto.
+    private func removeTree(_ root: String, firstError: inout FileSystemError?) {
+        // Le cartelle aperte, dalla più esterna: il percorso da rimuovere alla fine e i figli ancora
+        // da visitare.
+        var open: [(path: String, children: IndexingIterator<[String]>)] = []
+        var entering: String? = root
 
-        for child in children {
+        while true {
+            if let directory = entering {
+                entering = nil
+                do {
+                    open.append((directory, try contentsOfDirectory(directory).makeIterator()))
+                } catch let error as FileSystemError {
+                    if firstError == nil { firstError = error }
+                } catch {}
+            }
+
+            guard var current = open.popLast() else { return }
+            guard let child = current.children.next() else {
+                if rmdir(current.path) != 0, firstError == nil {
+                    firstError = FileSystemError(code: errno, path: current.path)
+                }
+                continue
+            }
+            open.append(current)
+
             var status = stat()
             guard lstat(child, &status) == 0 else {
                 if firstError == nil { firstError = FileSystemError(code: errno, path: child) }
                 continue
             }
             if (status.st_mode & S_IFMT) == S_IFDIR {
-                removeTree(child, firstError: &firstError)
+                entering = child
             } else if unlink(child) != 0, firstError == nil {
                 firstError = FileSystemError(code: errno, path: child)
             }
-        }
-
-        if rmdir(path) != 0, firstError == nil {
-            firstError = FileSystemError(code: errno, path: path)
         }
     }
 

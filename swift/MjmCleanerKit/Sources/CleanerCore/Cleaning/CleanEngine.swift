@@ -212,13 +212,21 @@ public struct CleanEngine: CleanPerforming {
         }
     }
 
-    private func sumOfFiles(under directory: String) throws -> Int64 {
+    /// Iterativa, con una pila esplicita: la versione ricorsiva scendeva di una chiamata per livello
+    /// e una cartella di qualche centinaio di livelli esauriva lo stack del thread (crash del
+    /// 2026-10-15). Visita in profondità nello stesso ordine della ricorsione, quindi il primo errore
+    /// che interrompe la misura è lo stesso. Interna e non privata per le prove.
+    func sumOfFiles(under directory: String) throws -> Int64 {
         var total: Int64 = 0
-        for entry in try fileSystem.contentsOfDirectory(directory) {
+        // Per ogni cartella aperta, le voci ancora da visitare; in cima la più profonda.
+        var open = [try fileSystem.contentsOfDirectory(directory).makeIterator()]
+        while var entries = open.popLast() {
+            guard let entry = entries.next() else { continue }
+            open.append(entries)
             let info = try fileSystem.itemInfo(entry)
             switch info.kind {
             case .directory:
-                total += try sumOfFiles(under: entry)
+                open.append(try fileSystem.contentsOfDirectory(entry).makeIterator())
             case .symbolicLink where fileSystem.directoryExists(entry):
                 continue
             default:

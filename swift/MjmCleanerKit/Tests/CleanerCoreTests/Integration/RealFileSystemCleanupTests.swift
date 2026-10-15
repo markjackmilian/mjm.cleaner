@@ -102,4 +102,47 @@ struct RealFileSystemCleanupTests {
         #expect(String(decoding: try Gzip.decompress(log), as: UTF8.self).contains(deleted))
         #expect(!FileManager.default.fileExists(atPath: journal.path))
     }
+
+    // Solo Swift (crash del 2026-10-15 nell'app): misura e cancellazione scendevano di una chiamata
+    // per livello di cartella; una cartella di qualche centinaio di livelli esauriva lo stack.
+    @Test func aFolderDeeperThanTheStackIsMeasuredOnASmallStack() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let deep = try fixture.tmp.deepTree("home/Library/Caches/deep")
+        try #require(deep.depth >= 300)
+        let engine = fixture.engine
+
+        let size = try await onSmallStack { try engine.sumOfFiles(under: deep.root) }
+
+        #expect(size == deep.bytes)
+    }
+
+    // Solo Swift (correzione del 2026-10-15): dentro una cartella eliminata, un collegamento a una
+    // cartella non accredita né i byte della destinazione né quelli del collegamento.
+    @Test func aLinkToAFolderInsideADeletedFolderIsNotCredited() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let invoice = try fixture.tmp.file("home/Documents/fatture/2026.pdf", contents: String(repeating: "z", count: 500))
+        try fixture.tmp.file("home/Library/Caches/app/dati.bin", contents: String(repeating: "x", count: 100))
+        try fixture.tmp.symlink("home/Library/Caches/app/documenti", to: fixture.home + "/Documents")
+        let item = ScanItem(path: fixture.caches + "/app", sizeBytes: 0, isDirectory: true, declaredRoot: fixture.caches)
+
+        let report = await fixture.engine.clean([CategorySelection(categoryId: "caches", items: [item])], progress: nil, journal: nil)
+
+        #expect(report.itemsDeleted == 1)
+        #expect(report.bytesFreed == 100)
+        #expect(FileManager.default.fileExists(atPath: invoice))
+    }
+
+    @Test func aFolderDeeperThanTheStackIsMeasuredAndDeleted() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let deep = try fixture.tmp.deepTree("home/Library/Caches/deep")
+        try #require(deep.depth >= 300)
+        let item = ScanItem(path: deep.root, sizeBytes: 0, isDirectory: true, declaredRoot: fixture.caches)
+
+        let report = await fixture.engine.clean([CategorySelection(categoryId: "caches", items: [item])], progress: nil, journal: nil)
+
+        #expect(report.itemsDeleted == 1)
+        #expect(report.itemsFailed == 0)
+        #expect(report.bytesFreed == deep.bytes)
+        #expect(!FileManager.default.fileExists(atPath: deep.root))
+    }
 }

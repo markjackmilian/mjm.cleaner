@@ -337,10 +337,6 @@ struct DockerModelTests {
     }
 }
 
-/// Docker che registra l'ordine delle chiamate, misura un disco diverso dopo l'esecuzione e, se
-/// richiesto, resta sospeso nell'esecuzione finché il test non apre `release` (al massimo 5 secondi,
-/// poi il test fallisce) o finché non viene annullato (al massimo 5 secondi). Come `DiskUsageProbe`,
-/// la misura fallisce in un task annullato.
 /// La prima analisi resta sospesa finché il test non apre `release`; le successive rispondono subito.
 private final class SlowFirstAnalysisDocker: DockerCleanupServing {
     let started = Gate<Void>()
@@ -375,6 +371,10 @@ private final class SlowFirstAnalysisDocker: DockerCleanupServing {
     }
 }
 
+/// Docker che registra l'ordine delle chiamate, misura un disco diverso dopo l'esecuzione e, se
+/// richiesto, resta sospeso nell'esecuzione finché il test non apre `release` (al massimo 5 secondi,
+/// poi il test fallisce) o finché non viene annullato (al massimo 5 secondi). Come `DiskUsageProbe`,
+/// la misura fallisce in un task annullato.
 private final class SequencedDocker: DockerCleanupServing {
     private struct State {
         var executed = false

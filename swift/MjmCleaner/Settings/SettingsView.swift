@@ -175,8 +175,10 @@ private struct NumberRow: View {
     var body: some View {
         LabeledContent(title) {
             HStack(spacing: 6) {
-                TextField(accessibilityName ?? title, value: clamped, format: .number)
+                // Il titolo resta il segnaposto corto del campo; VoiceOver legge il nome del C#.
+                TextField(title, value: clamped, format: .number)
                     .labelsHidden()
+                    .accessibilityLabel(accessibilityName ?? title)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
                 Text(unit)

@@ -4,7 +4,8 @@ import Observation
 /// Porting di `MainWindowViewModel`: la pagina corrente, la sidebar, il contatore «Spazio
 /// liberato» e lo sheet delle Impostazioni. Il blocco della navigazione durante l'eliminazione
 /// Xcode è imposto qui, non solo dalla vista con `.disabled`, così che i test lo verifichino
-/// (spec §6.3).
+/// (spec §6.3). Vale anche per le richieste delle pagine: una pagina non più corrente (un'analisi
+/// o un'eliminazione abbandonata) non sostituisce la pagina Xcode mentre elimina.
 @MainActor
 @Observable
 public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigating {
@@ -81,6 +82,7 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
 
     /// Torna al passo 1 del wizard: all'avvio e ogni volta che un ciclo si conclude o viene annullato.
     public func startOver() {
+        guard canNavigateGlobally else { return }
         page = .choose(ChooseStepModel(environment: environment, navigation: self))
     }
 
@@ -92,15 +94,21 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
     // MARK: CleanupNavigating
 
     public func showScan(_ categories: [CleanupCategory]) {
+        guard canNavigateGlobally else { return }
         page = .scan(ScanStepModel(environment: environment, navigation: self, categories: categories))
     }
 
     public func showConfirm(_ categories: [CleanupCategory], results: [CategoryScanResult]) {
+        guard canNavigateGlobally else { return }
         page = .confirm(ConfirmStepModel(environment: environment, navigation: self, categories: categories, results: results))
     }
 
+    /// Il passo 4 si costruisce anche quando il cambio di pagina è rifiutato: il suo `init` salva
+    /// storico e log di una pulizia già avvenuta, che non deve andare persa.
     public func showDone(_ report: CleanReport, journal: PendingJournal?) {
-        page = .done(DoneStepModel(environment: environment, navigation: self, report: report, journal: journal))
+        let done = DoneStepModel(environment: environment, navigation: self, report: report, journal: journal)
+        guard canNavigateGlobally else { return }
+        page = .done(done)
     }
 
     // MARK: DockerNavigating
@@ -111,9 +119,12 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
         page = .docker(DockerModel(environment: environment, navigation: self))
     }
 
+    /// Come il passo 4: il resoconto salva la pulizia già avvenuta anche se la pagina non cambia.
     public func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage) {
-        page = .dockerReport(DockerReportModel(
-            environment: environment, navigation: self, result: result, diskBefore: diskBefore, diskAfter: diskAfter))
+        let report = DockerReportModel(
+            environment: environment, navigation: self, result: result, diskBefore: diskBefore, diskAfter: diskAfter)
+        guard canNavigateGlobally else { return }
+        page = .dockerReport(report)
     }
 
     // MARK: XcodeNavigating
@@ -128,6 +139,7 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
             navigation: self))
     }
 
+    /// Non bloccato: la pagina Xcode chiede il proprio resoconto mentre `isDeleting` è ancora vero.
     public func showXcodeReport(_ report: XcodeReportModel) {
         page = .xcodeReport(report)
     }

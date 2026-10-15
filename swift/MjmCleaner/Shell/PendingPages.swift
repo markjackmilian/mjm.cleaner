@@ -5,22 +5,6 @@ import SwiftUI
 // il Task 10 cancella il file.
 
 
-struct ChooseStepView: View {
-    let model: ChooseStepModel
-
-    var body: some View {
-        Text(verbatim: "Scegli")
-    }
-}
-
-struct ScanStepView: View {
-    let model: ScanStepModel
-
-    var body: some View {
-        Text(verbatim: "Analizza")
-    }
-}
-
 struct ConfirmStepView: View {
     let model: ConfirmStepModel
 

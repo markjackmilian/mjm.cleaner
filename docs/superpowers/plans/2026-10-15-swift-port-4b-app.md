@@ -42,7 +42,7 @@ Dai piani 1–4a, invariati:
 - Comandi di verifica standard, dalla radice del repository:
   - package: `(cd swift/MjmCleanerKit && swift test -Xswiftc -warnings-as-errors)`;
   - app: `xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Debug -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-build" build > "${TMPDIR:-/tmp}/mjm-cleaner-build.log" 2>&1; grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-build.log"; grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-build.log" || echo "nessuna diagnostica"` — Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica` (gli avvisi Swift sono già errori: `SWIFT_TREAT_WARNINGS_AS_ERRORS = YES`);
-  - screenshot (dal Task 3): `swift/Scripts/screenshots.sh "${TMPDIR:-/tmp}/mjm-cleaner-shots" <pagine…>`.
+  - screenshot (dal Task 3): `swift/Scripts/screenshots.sh "${TMPDIR:-/tmp}/mjm-cleaner-shots" <pagine…>` — rifiuta le pagine sconosciute (uscita 2), non cattura senza la demo nel binario ed esce con 1 se una cattura non riesce.
 - Commit frequenti; ogni messaggio termina con la riga `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, anche se l'ambiente di chi esegue ne suggerisce un'altra.
 - Branch `feat/swift-port-app`, nessun push. Si mettono in stage solo percorsi espliciti: mai `git add -A`, `git add .` o una cartella intera. `.zed/` e `mjm-cleaner-ui-handoff.md` nella radice sono file dell'utente e non vanno mai in stage.
 
@@ -78,6 +78,7 @@ Valgono quelle dei piani 1–4a. Si aggiungono queste.
 - `codesign -dv` dice `Signature=adhoc` anche quando Xcode non firma (`CODE_SIGNING_ALLOWED = NO`: firma automatica del linker, senza risorse sigillate). La firma «Sign to Run Locally» si riconosce da `codesign --verify --strict` valido e da `Sealed Resources version=2`.
 - `xcodebuild` non modifica il catalogo dei testi dell'app: resta `{"sourceLanguage":"it","strings":{}}` come quelli dei package. Un build da Xcode IDE può riempirlo: è atteso.
 - L'app avviata come processo figlio della shell dell'agente non ottiene finestre (`sandbox_extension_issue_file_to_process failed`); avviata con `open -n <app> --args …` (LaunchServices) sì. `screencapture -x -o -l<id>` cattura la finestra, sheet compreso; il permesso di registrazione dello schermo è concesso (`CGPreflightScreenCaptureAccess()` → `true`).
+- Con lo schermo bloccato o il display spento (`CGSSessionScreenIsLocked = 1`, `CGDisplayIsAsleep`) `screencapture -l` dice «could not create image from window» e la cattura a schermo intero è nera, anche con il permesso concesso: lo script lo segnala ed esce con 1.
 - `.fixedSize(horizontal: false, vertical: true)` su un testo dentro un `safeAreaInset(edge: .bottom)` rompe il layout della finestra (pagina vuota, sidebar spostata o vuota): nei testi delle fasce in basso non si usa.
 - `List(selection:)` non chiama il `set` del binding se si riclicca la voce già selezionata.
 - `XcodeSelection.preview` su un candidato DerivedData o Device Support richiede la voce nell'inventario dei file dello snapshot (`fileInventory`): la demo anteprima solo il runtime.
@@ -1666,7 +1667,7 @@ enum DemoData {
 
 - [ ] **Step 3: Script degli screenshot**
 
-L'app si avvia con `open -n` (LaunchServices): come processo figlio della shell non riceverebbe finestre. `window-id` trova la finestra in primo piano del processo (uno sheet aperto viene catturato con la sua finestra).
+L'app si avvia con `open -n` (LaunchServices): come processo figlio della shell non riceverebbe finestre. `window-id` trova la finestra in primo piano del processo (uno sheet aperto viene catturato con la sua finestra). Lo script non avvia mai l'app vera: rifiuta le pagine che `DemoLaunch.Page` non conosce (uscita 2) e controlla che la demo sia nel binario Debug (uscita 1); chiude l'app anche se si interrompe ed esce con 1 se una cattura non riesce.
 
 **Creare `swift/Scripts/window-id.swift`:**
 
@@ -1706,17 +1707,29 @@ exit(1)
 # Screenshot delle pagine dell'avvio dimostrativo (solo Debug), in chiaro e in scuro (spec §9.4).
 # Uso: swift/Scripts/screenshots.sh <cartella di uscita> [pagina…]
 # Senza pagine le cattura tutte. Durante la cattura si aprono e si chiudono finestre dell'app.
+# Esce con 1 se una cattura non riesce (per esempio con lo schermo bloccato o spento).
 set -euo pipefail
 
 here=${0:A:h}
 project=${here:h}/MjmCleaner.xcodeproj
 out=${1:?"uso: screenshots.sh <cartella di uscita> [pagina…]"}
 shift
+
+# Le pagine di `DemoLaunch.Page`. Con una pagina sconosciuta l'app partirebbe senza la demo, cioè
+# con i dati veri dell'utente: si rifiuta prima di avviare qualunque cosa.
+all=(choose scan confirm done docker docker-unavailable docker-report xcode xcode-preview xcode-report history settings startup-failure)
 if (( $# )); then
     pages=("$@")
 else
-    pages=(choose scan confirm done docker docker-unavailable docker-report xcode xcode-preview xcode-report history settings startup-failure)
+    pages=($all)
 fi
+for page in $pages; do
+    if (( ! ${all[(Ie)$page]} )); then
+        print -u2 "pagina demo sconosciuta: $page"
+        exit 2
+    fi
+done
+
 # Percorso risolto (/private/var/…): `pgrep -f` lo confronta con quello del processo avviato.
 build=${${TMPDIR:-/tmp}:A}/mjm-cleaner-screenshots
 
@@ -1727,6 +1740,23 @@ swiftc -O "$here/window-id.swift" -o "$build/window-id"
 bundle="$build/Build/Products/Debug/MjmCleaner.app"
 binary="$bundle/Contents/MacOS/MjmCleaner"
 
+# Senza la demo nel binario (un Debug senza la condizione DEBUG) ogni avvio sarebbe l'app vera.
+demo=0
+for file in "$binary" "$binary.debug.dylib"; do
+    if [[ -f $file ]] && (( $(strings "$file" | grep -c MJMDemo || true) > 0 )); then
+        demo=1
+    fi
+done
+if (( ! demo )); then
+    print -u2 "la demo non è nel binario Debug: nessuno screenshot"
+    exit 1
+fi
+
+# L'app aperta si chiude anche se lo script si interrompe.
+pid=""
+trap '[[ -n $pid ]] && kill "$pid" 2>/dev/null; true' EXIT
+
+failed=0
 for page in $pages; do
     for appearance in light dark; do
         # `open` avvia l'app da LaunchServices, come il Finder: un processo figlio di questa shell
@@ -1736,15 +1766,24 @@ for page in $pages; do
         sleep 3
         pid=$(pgrep -n -f "$binary" || true)
         if [[ -n $pid ]] && id=$("$build/window-id" "$pid" 10); then
-            screencapture -x -o -l"$id" "$out/$page-$appearance.png"
-            print "$out/$page-$appearance.png"
+            if screencapture -x -o -l"$id" "$out/$page-$appearance.png"; then
+                print "$out/$page-$appearance.png"
+            else
+                print -u2 "cattura non riuscita per $page ($appearance): lo schermo è bloccato o spento?"
+                failed=1
+            fi
         else
             print -u2 "nessuna finestra per $page ($appearance)"
+            failed=1
         fi
-        [[ -n $pid ]] && kill "$pid" 2>/dev/null || true
+        if [[ -n $pid ]]; then
+            kill "$pid" 2>/dev/null || true
+        fi
+        pid=""
         sleep 1
     done
 done
+exit $failed
 ```
 
 ```bash
@@ -1768,7 +1807,15 @@ Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
 swift/Scripts/screenshots.sh "${TMPDIR:-/tmp}/mjm-cleaner-shots" choose startup-failure
 ```
 
-Expected: quattro percorsi stampati (`choose-light.png`, `choose-dark.png`, `startup-failure-light.png`, `startup-failure-dark.png`), nessun «nessuna finestra per …». Durante la cattura si aprono e si chiudono finestre dell'app. Negli screenshot di `choose` la finestra provvisoria mostra al centro il contatore della demo, «9,4 GB»; in quelli di `startup-failure` compaiono «Impossibile accedere ai dati dell'applicazione», «Percorso: /Users/demo/Library/Application Support/com.mjm.cleaner», «Motivo: Permission denied» e il pulsante «Esci», in chiaro e in scuro.
+Poi una pagina sconosciuta, che non deve avviare niente:
+
+```bash
+swift/Scripts/screenshots.sh "${TMPDIR:-/tmp}/mjm-cleaner-shots" chose; echo "uscita $?"
+```
+
+Expected: `pagina demo sconosciuta: chose` e `uscita 2`, nessuna build e nessuna finestra.
+
+Expected della cattura: quattro percorsi stampati (`choose-light.png`, `choose-dark.png`, `startup-failure-light.png`, `startup-failure-dark.png`), nessun «nessuna finestra per …» né «cattura non riuscita…», uscita 0 (con lo schermo bloccato o spento ogni cattura non riesce e lo script esce con 1: va rifatto a schermo sbloccato). Durante la cattura si aprono e si chiudono finestre dell'app. Negli screenshot di `choose` la finestra provvisoria mostra al centro il contatore della demo, «9,4 GB»; in quelli di `startup-failure` compaiono «Impossibile accedere ai dati dell'applicazione», «Percorso: /Users/demo/Library/Application Support/com.mjm.cleaner», «Motivo: Permission denied» e il pulsante «Esci», in chiaro e in scuro.
 
 - [ ] **Step 5: La demo non entra nel Release**
 
@@ -1777,11 +1824,12 @@ xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration
     -destination 'generic/platform=macOS' -derivedDataPath "${TMPDIR:-/tmp}/mjm-cleaner-release" build \
     > "${TMPDIR:-/tmp}/mjm-cleaner-release.log" 2>&1
 grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-release.log"
-strings "${TMPDIR:-/tmp}/mjm-cleaner-release/Build/Products/Release/MjmCleaner.app/Contents/MacOS/MjmCleaner" | grep -c -E 'MJMDemo|DemoLaunch|DemoServices|DemoData' || true
-strings "${TMPDIR:-/tmp}/mjm-cleaner-build/Build/Products/Debug/MjmCleaner.app/Contents/MacOS/MjmCleaner.debug.dylib" | grep -c -E 'MJMDemo|DemoLaunch' || true
+strings "${TMPDIR:-/tmp}/mjm-cleaner-release/Build/Products/Release/MjmCleaner.app/Contents/MacOS/MjmCleaner" | grep -c -E 'MJMDemo|Demo[A-Z]|/Users/demo' || true
+strings "${TMPDIR:-/tmp}/mjm-cleaner-build/Build/Products/Debug/MjmCleaner.app/Contents/MacOS/MjmCleaner.debug.dylib" | grep -c -E 'MJMDemo|Demo[A-Z]|/Users/demo' || true
+grep -nE 'LocalFileSystem|SettingsStore|HistoryStore|SessionLogWriter|CleanEngine|ScanEngine|RuleScanner|ProcessRunner|AppEnvironment\.live|AppStartup\.paths'     swift/MjmCleaner/Demo/*.swift || echo "la demo non usa servizi su disco"
 ```
 
-Expected: `** BUILD SUCCEEDED **`, poi `0` (Release, nessuna traccia della demo) e un numero maggiore di zero (Debug: il controllo trova davvero le stringhe quando ci sono).
+Expected: `** BUILD SUCCEEDED **`, poi `0` (Release, nessuna traccia della demo: né i nomi dei tipi, né le classi dei servizi finti, né i dati sotto `/Users/demo`), un numero maggiore di zero (Debug: il controllo trova davvero le stringhe quando ci sono) e `la demo non usa servizi su disco`.
 
 - [ ] **Step 6: Commit**
 
@@ -4123,7 +4171,7 @@ grep -E '\*\* BUILD (SUCCEEDED|FAILED) \*\*' "${TMPDIR:-/tmp}/mjm-cleaner-releas
 grep -E '(^|: )(warning|error): ' "${TMPDIR:-/tmp}/mjm-cleaner-release.log" || echo "nessuna diagnostica"
 app="${TMPDIR:-/tmp}/mjm-cleaner-release/Build/Products/Release/MjmCleaner.app"
 lipo -archs "$app/Contents/MacOS/MjmCleaner"
-strings "$app/Contents/MacOS/MjmCleaner" | grep -c -E 'MJMDemo|DemoLaunch|DemoServices|DemoData' || true
+strings "$app/Contents/MacOS/MjmCleaner" | grep -c -E 'MJMDemo|Demo[A-Z]|/Users/demo' || true
 codesign --verify --strict "$app" && echo "firma valida"
 codesign -dv "$app" 2>&1 | grep -E '^Signature=adhoc|^Sealed Resources version=2'
 xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Release -showBuildSettings 2>/dev/null \
@@ -4141,10 +4189,11 @@ grep -rn 'fixedSize' swift/MjmCleaner
 grep -rn 'accessibilityLabel' swift/MjmCleaner
 grep -n -A3 'CommandGroup(replacing: .appSettings)' swift/MjmCleaner/App/MjmCleanerApp.swift
 grep -n 'settings?.cancel()' swift/MjmCleaner/Shell/MainView.swift
+grep -nE 'LocalFileSystem|SettingsStore|HistoryStore|SessionLogWriter|CleanEngine|ScanEngine|RuleScanner|ProcessRunner|AppEnvironment\.live|AppStartup\.paths'     swift/MjmCleaner/Demo/*.swift || echo "la demo non usa servizi su disco"
 git diff --name-only main...HEAD -- swift/MjmCleanerKit/Sources/CleanerCore swift/MjmCleanerKit/Tests/CleanerCoreTests src tests
 ```
 
-Expected: «nessuna violazione», «nessun forced unwrap» (il secondo pattern può segnalare falsi positivi in commenti e stringhe: controllare ogni riga), nessun `fixedSize` dentro un `safeAreaInset` o un `actionBar` (sono ammessi nel contenuto delle pagine, stato vuoto di Docker compreso, nelle chip dello Storico e nella vista d'errore), `accessibilityLabel` per «Avanzamento», «Aggiungi cartella» e «Rimuovi cartella selezionata», il comando «Impostazioni…» con `.keyboardShortcut(",", modifiers: .command)`, `showSettings()` e `.disabled(!(startup.main?.canShowSettings ?? false))`, il binding dello sheet con `main.settings?.cancel()`; l'ultimo comando non stampa nulla.
+Expected: «nessuna violazione», «nessun forced unwrap» (il secondo pattern può segnalare falsi positivi in commenti e stringhe: controllare ogni riga), nessun `fixedSize` dentro un `safeAreaInset` o un `actionBar` (sono ammessi nel contenuto delle pagine, stato vuoto di Docker compreso, nelle chip dello Storico e nella vista d'errore), `accessibilityLabel` per «Avanzamento», «Aggiungi cartella» e «Rimuovi cartella selezionata», il comando «Impostazioni…» con `.keyboardShortcut(",", modifiers: .command)`, `showSettings()` e `.disabled(!(startup.main?.canShowSettings ?? false))`, il binding dello sheet con `main.settings?.cancel()`, «la demo non usa servizi su disco»; l'ultimo comando non stampa nulla.
 
 - [ ] **Step 3: Screenshot di tutte le pagine**
 
@@ -4154,7 +4203,7 @@ swift/Scripts/screenshots.sh "$dir"
 ls "$dir" | wc -l
 ```
 
-Expected: `26`. Guardare ogni immagine: stesse schermate descritte negli Expected dei Task 4–10, in chiaro e in scuro, testo leggibile in entrambi, barra azioni e avvisi interi in fondo, nessuna pagina vuota o spostata.
+Expected: 26 percorsi stampati, uscita 0, poi `26` (con lo schermo bloccato o spento le catture non riescono e lo script esce con 1: sbloccare il Mac è un'azione dell'utente, quindi il task si ferma qui finché lo schermo non è disponibile). Guardare ogni immagine: stesse schermate descritte negli Expected dei Task 4–10, in chiaro e in scuro, testo leggibile in entrambi, barra azioni e avvisi interi in fondo, nessuna pagina vuota o spostata.
 
 - [ ] **Step 4: Registro di parità**
 

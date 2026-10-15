@@ -99,10 +99,10 @@ struct OptionalText: View {
 /// Un gruppo richiudibile in una card, con le righe in uno scorrimento proprio alto al più 360
 /// punti: come il `ListBox` del C#, anche una categoria con migliaia di voci crea solo le righe
 /// visibili.
-struct CollapsibleCard<Label: View, Header: View, Row: View, Item: Identifiable>: View {
+struct CollapsibleCard<Title: View, Header: View, Row: View, Item: Identifiable>: View {
     let items: [Item]
     @Binding var isExpanded: Bool
-    @ViewBuilder let label: () -> Label
+    @ViewBuilder let label: () -> Title
     @ViewBuilder let header: () -> Header
     @ViewBuilder let row: (Item) -> Row
 

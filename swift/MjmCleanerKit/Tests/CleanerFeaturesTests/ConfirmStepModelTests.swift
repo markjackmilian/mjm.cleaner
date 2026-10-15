@@ -152,6 +152,26 @@ struct ConfirmStepModelTests {
         #expect(navigation.events == ["startOver"])
     }
 
+    /// Solo Swift (fix wave finale del 4b): «Ricomincia» durante l'eliminazione non lascia il passo;
+    /// la vista lo disabilitava, ora lo rifiuta anche il modello. Annulla ferma ancora la pulizia.
+    @Test func restartWhileDeletingStaysOnTheStep() async throws {
+        let clean = FakeClean()
+        clean.waitForCancellation()
+        let navigation = CleanupNavigationSpy()
+        let model = ConfirmStepModel(
+            environment: try makeEnvironment(clean: clean), navigation: navigation, categories: categories, results: results)
+
+        let deleting = Task { await model.delete() }
+        try await clean.started.wait()
+        model.restart()
+        #expect(navigation.events.isEmpty)
+
+        model.cancelDelete()
+        await deleting.value
+        #expect(clean.observedCancellation == [true])
+        #expect(navigation.events == ["done"])
+    }
+
     // Solo Swift (review del Task 7): garanzie di sicurezza del passo che elimina.
 
     /// Una riga deselezionata non arriva mai a `clean`, anche se la sua categoria ha altre righe

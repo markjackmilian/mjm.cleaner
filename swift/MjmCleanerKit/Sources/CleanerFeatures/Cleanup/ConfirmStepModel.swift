@@ -154,8 +154,10 @@ public final class ConfirmStepModel {
     }
 
     /// Deliberatamente non «Indietro»: ricomincia dal passo 1 (la selezione resta ricordata nelle
-    /// impostazioni) invece di tornare al passo 2 conservando questa analisi.
+    /// impostazioni) invece di tornare al passo 2 conservando questa analisi. Durante l'eliminazione
+    /// non fa nulla: si resta sul passo, dove c'è «Interrompi».
     public func restart() {
+        guard !isDeleting else { return }
         navigation?.startOver()
     }
 

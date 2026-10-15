@@ -14,6 +14,7 @@ struct DoneStepView: View {
                         .foregroundStyle(.green)
                         .frame(width: 48, height: 48)
                         .background(.green.opacity(0.15), in: Circle())
+                        .accessibilityHidden(true)
                     Text("Pulizia completata")
                         .font(.system(size: 22, weight: .bold))
                     Text(model.freedText)
@@ -43,6 +44,7 @@ struct DoneStepView: View {
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 12)
+            .background(.background)
         }
         .actionBar {
             Spacer()

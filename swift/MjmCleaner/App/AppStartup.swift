@@ -31,6 +31,8 @@ final class AppStartup {
     static func savedAppearance() -> AppearancePreference {
         #if DEBUG
         if let demo = DemoLaunch.current { return demo.appearance }
+        // Una pagina demo sconosciuta non legge le impostazioni vere: `start()` la rifiuta.
+        if DemoLaunch.isRequested { return .auto }
         #endif
         return SettingsStore(fileSystem: LocalFileSystem(), paths: paths).load().appearance
     }
@@ -42,6 +44,11 @@ final class AppStartup {
         #if DEBUG
         if let demo = DemoLaunch.current {
             demo.open(into: self)
+            return
+        }
+        // Chi chiede la demo non ottiene mai l'app vera, nemmeno con una pagina che non esiste.
+        if DemoLaunch.isRequested {
+            fail(DemoLaunch.unknownPageMessage)
             return
         }
         #endif

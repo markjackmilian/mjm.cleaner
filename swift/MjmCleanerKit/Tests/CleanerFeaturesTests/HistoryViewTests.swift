@@ -60,6 +60,22 @@ struct HistoryViewTests {
         #expect(navigation.events == ["startOver"])
     }
 
+    /// Solo Swift (fix wave finale del 4b): la colonna Data della `Table` si ordina per `startedAt`, non
+    /// per il testo della data.
+    @Test func rowsKeepTheSessionStartForSorting() async throws {
+        let later = Date(timeIntervalSince1970: 1_790_000_000)
+        let earlier = Date(timeIntervalSince1970: 1_780_000_000)
+        let history = FakeHistory()
+        history.setSessions([
+            CleanSessionSummary(id: 2, startedAt: later, duration: .seconds(1), bytesFreed: 1, itemsDeleted: 1, itemsFailed: 0, categories: []),
+            CleanSessionSummary(id: 1, startedAt: earlier, duration: .seconds(1), bytesFreed: 1, itemsDeleted: 1, itemsFailed: 0, categories: []),
+        ])
+        let model = HistoryModel(environment: try makeEnvironment(history: history), navigation: nil)
+        await model.initialLoad?.value
+
+        #expect(model.rows.map(\.startedAt) == [later, earlier])
+    }
+
     @Test func unreadableHistoryLeavesThePageEmpty() async throws {
         let history = FakeHistory()
         history.failReads(with: UnexpectedTestError(description: "database bloccato"))

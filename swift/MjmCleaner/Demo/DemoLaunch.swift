@@ -29,6 +29,16 @@ struct DemoLaunch: Sendable {
 
     static let current = parse(ProcessInfo.processInfo.arguments)
 
+    /// `-MJMDemo` fra gli argomenti, con qualunque pagina: chi lancia vuole la demo, mai l'app vera.
+    static let isRequested = ProcessInfo.processInfo.arguments.contains("-MJMDemo")
+
+    /// Il testo della vista d'errore per una pagina che `Page` non conosce.
+    static var unknownPageMessage: String {
+        let page = value(after: "-MJMDemo", in: ProcessInfo.processInfo.arguments) ?? "nessuna"
+        let known = Page.allCases.map(\.rawValue).joined(separator: ", ")
+        return "Pagina demo sconosciuta: \(page). Pagine: \(known)."
+    }
+
     static func parse(_ arguments: [String]) -> DemoLaunch? {
         guard let page = value(after: "-MJMDemo", in: arguments).flatMap(Page.init(rawValue:)) else { return nil }
         let appearance: AppearancePreference = switch value(after: "-MJMAppearance", in: arguments) {

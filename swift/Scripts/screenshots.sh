@@ -1,8 +1,11 @@
 #!/bin/zsh
 # Screenshot delle pagine dell'avvio dimostrativo (solo Debug), in chiaro e in scuro (spec §9.4).
 # Uso: swift/Scripts/screenshots.sh <cartella di uscita> [pagina…]
-# Senza pagine le cattura tutte. Durante la cattura si aprono e si chiudono finestre dell'app.
-# Esce con 1 se una cattura non riesce (per esempio con lo schermo bloccato o spento).
+# Senza pagine le cattura tutte. Durante la cattura si aprono e si chiudono finestre dell'app: non
+# usare il Mac finché lo script non finisce (con Claude in primo piano), perché ogni finestra prende il
+# primo piano e i tasti premuti finirebbero nella demo.
+# Esce con 1 se una cattura non riesce (schermo bloccato o spento, oppure Mac in uso: una finestra
+# che non arriva in primo piano non si cattura).
 set -euo pipefail
 
 here=${0:A:h}
@@ -47,21 +50,36 @@ if (( ! demo )); then
     exit 1
 fi
 
-# L'app aperta si chiude anche se lo script si interrompe.
+# Il pid dell'app in primo piano; `lsappinfo` legge soltanto, non attiva nulla.
+front_pid() {
+    local info
+    info=$(lsappinfo info -only pid "$(lsappinfo front)" 2>/dev/null) || return 1
+    [[ $info =~ 'pid = ([0-9]+)' ]] && print -r -- $match[1]
+}
+
+# L'app aperta si chiude anche se lo script si interrompe (Ctrl-C compreso) o se `pgrep` non l'ha
+# trovata: `pkill` cerca il binario di questa build, mai l'app installata.
 pid=""
-trap '[[ -n $pid ]] && kill "$pid" 2>/dev/null; true' EXIT
+trap 'pkill -f "$binary" 2>/dev/null; true' EXIT
+trap 'exit 130' INT TERM
 
 failed=0
 for page in $pages; do
     for appearance in light dark; do
         # `open` avvia l'app da LaunchServices, come il Finder: un processo figlio di questa shell
         # potrebbe non ricevere finestre.
-        open -n "$bundle" --args -MJMDemo "$page" -MJMAppearance "$appearance"
+        # `-ApplePersistenceIgnoreState`: la finestra si apre alla misura predefinita, non a quella salvata.
+        open -n "$bundle" --args -MJMDemo "$page" -MJMAppearance "$appearance" -ApplePersistenceIgnoreState YES
         # Il tempo per caricare la pagina e, per le Impostazioni, aprire lo sheet.
         sleep 3
         pid=$(pgrep -n -f "$binary" || true)
         if [[ -n $pid ]] && id=$("$build/window-id" "$pid" 10); then
-            if screencapture -x -o -l"$id" "$out/$page-$appearance.png"; then
+            # Con il Mac in uso macOS non porta l'app davanti (attivazione cooperativa): la finestra
+            # inattiva ha i pulsanti in tinta grigi e non vale come base del confronto.
+            if [[ $(front_pid || true) != "$pid" ]]; then
+                print -u2 "finestra non attiva per $page ($appearance): il Mac è in uso? nessuna cattura"
+                failed=1
+            elif screencapture -x -o -l"$id" "$out/$page-$appearance.png"; then
                 print "$out/$page-$appearance.png"
             else
                 print -u2 "cattura non riuscita per $page ($appearance): lo schermo è bloccato o spento?"
@@ -71,9 +89,7 @@ for page in $pages; do
             print -u2 "nessuna finestra per $page ($appearance)"
             failed=1
         fi
-        if [[ -n $pid ]]; then
-            kill "$pid" 2>/dev/null || true
-        fi
+        pkill -f "$binary" 2>/dev/null || true
         pid=""
         sleep 1
     done

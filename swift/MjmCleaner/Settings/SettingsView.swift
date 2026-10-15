@@ -69,9 +69,15 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    NumberRow(title: "Download", unit: "giorni", value: $model.downloadsMinAgeDays, range: SettingsModel.minAgeDaysRange)
-                    NumberRow(title: "Log", unit: "giorni", value: $model.logsMinAgeDays, range: SettingsModel.minAgeDaysRange)
-                    NumberRow(title: "Pacchetti NuGet", unit: "giorni", value: $model.nuGetMinAgeDays, range: SettingsModel.minAgeDaysRange)
+                    NumberRow(
+                        title: "Download", accessibilityName: "Età minima dei download", unit: "giorni",
+                        value: $model.downloadsMinAgeDays, range: SettingsModel.minAgeDaysRange)
+                    NumberRow(
+                        title: "Log", accessibilityName: "Età minima dei log", unit: "giorni",
+                        value: $model.logsMinAgeDays, range: SettingsModel.minAgeDaysRange)
+                    NumberRow(
+                        title: "Pacchetti NuGet", accessibilityName: "Età minima dei pacchetti NuGet", unit: "giorni",
+                        value: $model.nuGetMinAgeDays, range: SettingsModel.minAgeDaysRange)
                 } header: {
                     Text("Età minima")
                 } footer: {
@@ -160,6 +166,8 @@ private struct FolderList: View {
 /// (`Minimum`/`Maximum` dei `NumericUpDown`), anche quando si scrive nel campo.
 private struct NumberRow: View {
     let title: LocalizedStringKey
+    /// Il nome di campo e stepper per VoiceOver, come `AutomationProperties.Name` del C#; senza, il titolo.
+    var accessibilityName: LocalizedStringKey?
     let unit: LocalizedStringKey
     @Binding var value: Int
     let range: ClosedRange<Int>
@@ -167,13 +175,13 @@ private struct NumberRow: View {
     var body: some View {
         LabeledContent(title) {
             HStack(spacing: 6) {
-                TextField(title, value: clamped, format: .number)
+                TextField(accessibilityName ?? title, value: clamped, format: .number)
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
                 Text(unit)
                     .foregroundStyle(.secondary)
-                Stepper(title, value: clamped, in: range)
+                Stepper(accessibilityName ?? title, value: clamped, in: range)
                     .labelsHidden()
             }
         }

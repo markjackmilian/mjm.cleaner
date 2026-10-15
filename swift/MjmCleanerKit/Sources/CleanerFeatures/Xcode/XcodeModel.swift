@@ -179,7 +179,10 @@ public final class XcodeModel {
         return confirmation.retainedDependentDevices.isEmpty || acknowledgeDependencies
     }
 
+    /// Come il pulsante «Riprova»: durante un'analisi o un'eliminazione non fa nulla, così la
+    /// conferma in corso resta quella che l'esecutore sta eseguendo.
     public func retry() async {
+        guard canRetry else { return }
         await load()
     }
 
@@ -274,6 +277,7 @@ public final class XcodeModel {
         acknowledgeDependencies = false
         groups = []
         snapshot = nil
+        // Difesa in profondità: `retry()` non arriva qui durante un'eliminazione (`canRetry`).
         if !isDeleting {
             executionStarted = false
         }

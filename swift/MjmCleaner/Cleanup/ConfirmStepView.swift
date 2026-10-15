@@ -17,8 +17,9 @@ struct ConfirmStepView: View {
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 24)
+            // Le caselle si fermano, lo scorrimento no.
+            .disabled(model.isDeleting)
         }
-        .disabled(model.isDeleting)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Banner(text: String(localized: "Eliminazione definitiva: questi file non finiscono nel Cestino e non sono recuperabili."))

@@ -30,6 +30,8 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
+                // Il nome del C#, senza la scorciatoia scritta accanto.
+                .accessibilityLabel("Impostazioni…")
                 .disabled(!main.canShowSettings)
             }
             .padding(12)

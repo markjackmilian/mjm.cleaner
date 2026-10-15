@@ -69,8 +69,9 @@ struct XcodeView: View {
                 }
                 .padding(.horizontal, 32)
                 .padding(.vertical, 24)
+                // Le caselle si fermano, lo scorrimento no.
+                .disabled(model.isDeleting)
             }
-            .disabled(model.isDeleting)
         }
     }
 }

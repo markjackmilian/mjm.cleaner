@@ -148,6 +148,30 @@ struct DockerModelTests {
         #expect(model.groups.count == 5)
     }
 
+    /// Solo Swift (fix wave finale del 4b): «Riprova» durante l'analisi non ne avvia un'altra; la
+    /// vista lo disabilitava con `canRetry`, ora lo rifiuta anche il modello.
+    @Test func retryWhileLoadingDoesNothing() async throws {
+        let docker = SlowFirstAnalysisDocker(dockerAnalysis(Self.mixed))
+        let model = DockerModel(environment: try makeEnvironment(docker: docker), navigation: nil)
+        try await docker.started.wait()
+        #expect(!model.canRetry)
+
+        await model.retry()
+        #expect(docker.analyses == 1)
+
+        docker.release.open()
+        await model.initialLoad?.value
+        #expect(model.isReady)
+        #expect(docker.analyses == 1)
+    }
+
+    /// Solo Swift (fix wave finale del 4b): hanno una casella solo le righe dei gruppi a selezione; i
+    /// blocchi si spuntano interi e le voci da tenere si guardano soltanto.
+    @Test func onlySelectableGroupsHaveRowCheckBoxes() async throws {
+        let model = try await loaded()
+        #expect(model.groups.map { $0.rows.map(\.showCheckBox) } == [[false], [true], [true], [true, true], [false]])
+    }
+
     @Test func otherAnalysisFailuresArePrefixed() async throws {
         let docker = FakeDocker()
         docker.enqueue(.failure(UnexpectedTestError(description: "JSON non valido")))
@@ -317,6 +341,40 @@ struct DockerModelTests {
 /// richiesto, resta sospeso nell'esecuzione finché il test non apre `release` (al massimo 5 secondi,
 /// poi il test fallisce) o finché non viene annullato (al massimo 5 secondi). Come `DiskUsageProbe`,
 /// la misura fallisce in un task annullato.
+/// La prima analisi resta sospesa finché il test non apre `release`; le successive rispondono subito.
+private final class SlowFirstAnalysisDocker: DockerCleanupServing {
+    let started = Gate<Void>()
+    let release = Gate<Void>()
+    private let analysis: DockerAnalysis
+    private let count = Mutex(0)
+
+    init(_ analysis: DockerAnalysis) {
+        self.analysis = analysis
+    }
+
+    var analyses: Int { count.withLock { $0 } }
+
+    func analyze(_ projectRoots: [String]) async throws -> DockerAnalysis {
+        let number = count.withLock { count -> Int in
+            count += 1
+            return count
+        }
+        if number == 1 {
+            started.open()
+            try await release.wait()
+        }
+        return analysis
+    }
+
+    func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
+        DockerCleanResult(report: makeReport(), before: .empty, after: .empty, daemonLost: false)
+    }
+
+    func measureDisk() async throws -> DockerDiskUsage {
+        DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil)
+    }
+}
+
 private final class SequencedDocker: DockerCleanupServing {
     private struct State {
         var executed = false

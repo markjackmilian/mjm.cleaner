@@ -29,6 +29,7 @@ struct ChooseStepView: View {
         .actionBar {
             Image(systemName: "checkmark.shield")
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text("L'analisi non elimina alcun file.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -58,8 +59,10 @@ private struct ChoiceRow: View {
                 .labelsHidden()
             CategoryTile(visual: choice.visual)
             VStack(alignment: .leading, spacing: 2) {
+                // Il nome lo legge già la casella: VoiceOver non lo ripete.
                 Text(choice.displayName)
                     .fontWeight(.semibold)
+                    .accessibilityHidden(true)
                 Text(choice.description)
                     .font(.callout)
                     .foregroundStyle(.secondary)

@@ -18,7 +18,6 @@ struct HistoryView: View {
                 Text(row.freed)
                     .fontWeight(.semibold)
                     .monospacedDigit()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .width(min: 80, ideal: 100, max: 120)
             .alignment(.trailing)
@@ -30,7 +29,6 @@ struct HistoryView: View {
                 Text(row.items)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .width(min: 70, ideal: 90, max: 120)
             .alignment(.trailing)

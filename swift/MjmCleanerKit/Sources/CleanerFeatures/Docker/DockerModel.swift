@@ -158,7 +158,9 @@ public final class DockerModel {
         return "\(Formatting.bytes(bytes)) · \(Formatting.integer(selected.count)) \(noun)"
     }
 
+    /// Come il pulsante «Riprova»: durante un'analisi non ne avvia un'altra.
     public func retry() async {
+        guard canRetry else { return }
         await load()
     }
 

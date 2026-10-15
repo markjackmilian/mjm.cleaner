@@ -38,6 +38,7 @@ struct DockerView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 72, height: 72)
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 18))
+                    .accessibilityHidden(true)
                 Text(model.errorText)
                     .font(.system(size: 17, weight: .semibold))
                     .multilineTextAlignment(.center)
@@ -75,8 +76,9 @@ struct DockerView: View {
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 24)
+            // Le caselle si fermano, lo scorrimento no.
+            .disabled(model.isDeleting)
         }
-        .disabled(model.isDeleting)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 10) {
                 Banner(text: String(localized: "Eliminazione definitiva: immagini e volumi eliminati non sono recuperabili. I volumi contengono dati."))

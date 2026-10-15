@@ -120,6 +120,27 @@ struct XcodeViewModelTests {
         await deleting.value
     }
 
+    /// Solo Swift (fix wave finale del 4b): «Riprova» durante l'eliminazione non rianalizza e non
+    /// toglie la conferma in corso; la vista lo disabilitava con `canRetry`, ora lo rifiuta anche il modello.
+    @Test func retryIsIgnoredWhileDeleting() async throws {
+        let service = FakeXcode(Self.snapshot(Self.candidate("device", .device)))
+        let model = Self.create(service)
+        await model.initialLoad?.value
+        try Self.onlyRow(model, .device).isSelected = true
+        model.preview()
+
+        let deleting = Task { await model.confirmDelete() }
+        try await service.executionStarted.wait()
+        #expect(!model.canRetry)
+        await model.retry()
+        #expect(model.hasConfirmation)
+        #expect(model.isDeleting)
+
+        service.execution.open(Self.result())
+        await deleting.value
+        #expect(service.executeCount == 1)
+    }
+
     @Test func cancelDeleteReturnsAndPersistsPartialReportOnce() async throws {
         let history = FakeHistory()
         let log = FakeSessionLog()
@@ -331,6 +352,7 @@ struct XcodeViewModelTests {
         let service = FakeXcode(Self.snapshot(Self.candidate("runtime", .runtime, dependencies: ["device"]), Self.candidate("device", .device)))
         let model = Self.create(service)
         await model.initialLoad?.value
+        #expect(!model.canPreview)
         model.preview()
         #expect(model.confirmation?.selectedCandidates.isEmpty == true)
         #expect(!model.canConfirmDelete)

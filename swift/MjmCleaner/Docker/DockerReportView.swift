@@ -62,6 +62,7 @@ struct DockerReportView: View {
             OptionalText(text: model.historyWarning)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 12)
+                .background(.background)
         }
         .actionBar {
             Spacer()

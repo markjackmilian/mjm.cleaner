@@ -29,12 +29,7 @@ public enum PageKind: Sendable, Hashable, CaseIterable {
     }
 
     /// I quattro passi del wizard di pulizia.
-    public var isWizardStep: Bool {
-        switch self {
-        case .choose, .scan, .confirm, .done: true
-        default: false
-        }
-    }
+    public var isWizardStep: Bool { wizardStep != nil }
 
     /// Il passo (1–4) che lo `StepIndicator` segna come corrente; `nil` fuori dal wizard.
     public var wizardStep: Int? {
@@ -43,7 +38,7 @@ public enum PageKind: Sendable, Hashable, CaseIterable {
         case .scan: 2
         case .confirm: 3
         case .done: 4
-        default: nil
+        case .docker, .dockerReport, .xcode, .xcodeReport, .history: nil
         }
     }
 }

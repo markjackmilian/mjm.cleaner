@@ -28,7 +28,7 @@ struct NavigationLockTests {
         try XcodeViewModelTests.onlyRow(xcode, .device).isSelected = true
         xcode.preview()
         let deleting = Task { await xcode.confirmDelete() }
-        await service.executionStarted.wait()
+        try await service.executionStarted.wait()
 
         #expect(xcode.isDeleting)
         #expect(main.isXcodeBusy)

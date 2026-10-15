@@ -260,7 +260,7 @@ struct DockerModelTests {
         await model.initialLoad?.value
 
         let first = Task { await model.delete() }
-        await docker.started.wait()
+        try await docker.started.wait()
         #expect(model.isDeleting)
         #expect(!model.canDelete)
         await model.delete()
@@ -273,14 +273,20 @@ struct DockerModelTests {
     }
 
     /// Il disco si misura dopo l'esecuzione: misurato prima, il resoconto mostrerebbe un disco
-    /// invariato e suggerirebbe il Purge.
+    /// invariato e suggerirebbe il Purge. L'esecuzione resta trattenuta finché il test non la
+    /// rilascia: una misura avviata insieme all'esecuzione la trova sempre ancora in corso.
     @Test func diskIsMeasuredAfterTheExecution() async throws {
         let docker = SequencedDocker(dockerAnalysis([dockerCandidate(.image, "dangling", verdict: .delete)]))
+        docker.waitForRelease()
         let navigation = DockerNavigationSpy()
         let model = DockerModel(environment: try makeEnvironment(docker: docker), navigation: navigation)
         await model.initialLoad?.value
 
-        await model.delete()
+        let deleting = Task { await model.delete() }
+        try await docker.started.wait()
+        #expect(docker.events.values == ["execute"])
+        docker.release.open()
+        await deleting.value
 
         #expect(docker.events.values == ["execute", "measure"])
         #expect(navigation.reportDiskAfter?.allocatedBytes == Optional(Int64(1)))
@@ -296,7 +302,7 @@ struct DockerModelTests {
         await model.initialLoad?.value
 
         let deleting = Task { await model.delete() }
-        await docker.started.wait()
+        try await docker.started.wait()
         deleting.cancel()
         docker.release.open()
         await deleting.value
@@ -308,8 +314,9 @@ struct DockerModelTests {
 }
 
 /// Docker che registra l'ordine delle chiamate, misura un disco diverso dopo l'esecuzione e, se
-/// richiesto, resta sospeso nell'esecuzione finché il test non apre `release` o finché non viene
-/// annullato (al massimo 5 secondi). Come `DiskUsageProbe`, la misura fallisce in un task annullato.
+/// richiesto, resta sospeso nell'esecuzione finché il test non apre `release` (al massimo 5 secondi,
+/// poi il test fallisce) o finché non viene annullato (al massimo 5 secondi). Come `DiskUsageProbe`,
+/// la misura fallisce in un task annullato.
 private final class SequencedDocker: DockerCleanupServing {
     private struct State {
         var executed = false
@@ -341,7 +348,7 @@ private final class SequencedDocker: DockerCleanupServing {
         events.append("execute")
         started.open()
         if state.withLock({ $0.waitsForRelease }) {
-            await release.wait()
+            try? await release.wait()
         }
         if state.withLock({ $0.waitsForCancellation }) {
             try? await Task.sleep(for: .seconds(5))
@@ -352,6 +359,9 @@ private final class SequencedDocker: DockerCleanupServing {
         return DockerCleanResult(report: makeReport(itemsDeleted: selected.count), before: .empty, after: .empty, daemonLost: false)
     }
 
+    /// Sul main actor, come la pagina: una misura avviata insieme all'esecuzione si accoda prima che il
+    /// test riprenda da `started`, quindi la trova sempre ancora trattenuta da `release`.
+    @MainActor
     func measureDisk() async throws -> DockerDiskUsage {
         // Come `DiskUsageProbe`: `ProcessRunner.run` comincia con `Task.checkCancellation()`.
         try Task.checkCancellation()

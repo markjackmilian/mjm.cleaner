@@ -1,6 +1,7 @@
 import CleanerCore
 import Foundation
 import Synchronization
+import Testing
 
 /// Raccoglie valori da callback `@Sendable` e da doppi chiamati fuori dal main actor.
 final class Recorder<Value: Sendable>: Sendable {
@@ -17,10 +18,15 @@ final class Recorder<Value: Sendable>: Sendable {
 
 /// Un segnale che si apre una volta sola, con un valore: chi attende prima dell'apertura resta
 /// sospeso, chi arriva dopo riceve subito il valore. Sostituisce i `TaskCompletionSource` del C#.
+///
+/// Ogni attesa ha un limite: il tratto `.timeLimit` di Swift Testing non interrompe un test sospeso
+/// su una continuation, così un segnale che una regressione non apre bloccherebbe la suite invece
+/// di farla fallire.
 final class Gate<Value: Sendable>: Sendable {
     private struct State {
         var value: Value?
-        var waiters: [CheckedContinuation<Value, Never>] = []
+        var nextWaiter = 0
+        var waiters: [Int: CheckedContinuation<Value?, Never>] = [:]
     }
 
     private let state = Mutex(State())
@@ -30,28 +36,46 @@ final class Gate<Value: Sendable>: Sendable {
     }
 
     func open(_ value: Value) {
-        let waiters = state.withLock { state -> [CheckedContinuation<Value, Never>] in
+        let waiters = state.withLock { state -> [CheckedContinuation<Value?, Never>] in
             guard state.value == nil else { return [] }
             state.value = value
-            defer { state.waiters = [] }
-            return state.waiters
+            defer { state.waiters = [:] }
+            return Array(state.waiters.values)
         }
         for waiter in waiters {
             waiter.resume(returning: value)
         }
     }
 
-    func wait() async -> Value {
-        await withCheckedContinuation { continuation in
-            let ready = state.withLock { state -> Value? in
-                if let value = state.value { return value }
-                state.waiters.append(continuation)
-                return nil
+    /// Il valore, atteso al massimo `limit`: allo scadere `nil`, e l'attesa viene tolta dal segnale.
+    func wait(within limit: Duration) async -> Value? {
+        var timer: Task<Void, Never>?
+        let value = await withCheckedContinuation { (continuation: CheckedContinuation<Value?, Never>) in
+            let waiter = state.withLock { state -> Int? in
+                guard state.value == nil else { return nil }
+                defer { state.nextWaiter += 1 }
+                state.waiters[state.nextWaiter] = continuation
+                return state.nextWaiter
             }
-            if let ready {
-                continuation.resume(returning: ready)
+            guard let waiter else {
+                continuation.resume(returning: state.withLock { $0.value })
+                return
+            }
+            // Il timer parte dopo la registrazione: non può scadere prima che l'attesa esista.
+            timer = Task {
+                do { try await Task.sleep(for: limit) } catch { return }
+                self.state.withLock { $0.waiters.removeValue(forKey: waiter) }?.resume(returning: nil)
             }
         }
+        timer?.cancel()
+        return value
+    }
+
+    /// Il valore, atteso al massimo 5 secondi: allo scadere il test fallisce qui e l'attesa lancia,
+    /// così chi attende non prosegue con uno stato che non c'è.
+    func wait(sourceLocation: SourceLocation = #_sourceLocation) async throws -> Value {
+        try #require(
+            await wait(within: .seconds(5)), "Il segnale non si è aperto entro 5 secondi", sourceLocation: sourceLocation)
     }
 }
 

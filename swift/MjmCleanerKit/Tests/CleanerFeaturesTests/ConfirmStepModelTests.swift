@@ -115,7 +115,7 @@ struct ConfirmStepModelTests {
             environment: try makeEnvironment(clean: clean), navigation: navigation, categories: categories, results: results)
 
         let deleting = Task { await model.delete() }
-        await clean.started.wait()
+        try await clean.started.wait()
 
         #expect(model.isDeleting)
         #expect(model.canCancelDelete)
@@ -196,7 +196,7 @@ struct ConfirmStepModelTests {
             environment: try makeEnvironment(clean: clean, sessionLog: sessionLog), navigation: navigation, categories: categories, results: results)
 
         let deleting = Task { await model.delete() }
-        await clean.started.wait()
+        try await clean.started.wait()
         await model.delete()
 
         #expect(clean.selections.count == 1)

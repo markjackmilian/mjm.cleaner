@@ -267,7 +267,7 @@ struct MainModelTests {
 
         main.showScan([makeCategory("logs")])
         let step = try #require(main.page.scanStep)
-        await scan.started.wait()
+        try await scan.started.wait()
 
         let deleting = try await Self.startXcodeDeletion(main, service)
 
@@ -313,7 +313,7 @@ struct MainModelTests {
         main.showDone(report, journal: journal)
 
         #expect(main.page.kind == .xcode)
-        #expect(await Self.opensWithinFiveSeconds(history.totalRead))
+        #expect(await history.totalRead.wait(within: .seconds(5)) != nil)
         #expect(history.saved == [report])
         #expect(sessionLog.written.map { $0.report } == [report])
         #expect(sessionLog.discarded == [journal.path])
@@ -343,7 +343,7 @@ struct MainModelTests {
         main.showDockerReport(result, diskBefore: nil, diskAfter: disk)
 
         #expect(main.page.kind == .xcode)
-        #expect(await Self.opensWithinFiveSeconds(history.totalRead))
+        #expect(await history.totalRead.wait(within: .seconds(5)) != nil)
         #expect(history.saved == [report])
         #expect(sessionLog.written.map { $0.report } == [report])
         #expect(events.values == ["open", "save", "write", "total"])
@@ -369,7 +369,7 @@ struct MainModelTests {
         try XcodeViewModelTests.onlyRow(xcode, .device).isSelected = true
         xcode.preview()
         let deleting = Task { await xcode.confirmDelete() }
-        await service.executionStarted.wait()
+        try await service.executionStarted.wait()
         #expect(main.isXcodeBusy)
         return deleting
     }
@@ -392,20 +392,6 @@ struct MainModelTests {
         navigate(main)
         #expect(main.page.kind == destination)
     }
-
-    /// Attende `gate` al massimo 5 secondi (il tratto `.timeLimit` non interrompe un'attesa
-    /// sospesa): `false` se non si apre. Allo scadere lo apre, così l'attesa termina.
-    private static func opensWithinFiveSeconds(_ gate: Gate<Void>) async -> Bool {
-        let timeout = Task {
-            try? await Task.sleep(for: .seconds(5))
-            guard !Task.isCancelled else { return false }
-            gate.open()
-            return true
-        }
-        await gate.wait()
-        timeout.cancel()
-        return !(await timeout.value)
-    }
 }
 
 /// Il modello di ciascuna pagina, per `#require`.
@@ -421,14 +407,15 @@ private extension Page {
     var historyModel: HistoryModel? { if case .history(let model) = self { model } else { nil } }
 }
 
-/// Analisi che resta sospesa finché il test non apre `release`.
+/// Analisi che resta sospesa finché il test non apre `release` (al massimo 5 secondi, poi il test
+/// fallisce).
 private final class GatedScan: ScanPerforming {
     let started = Gate<Void>()
     let release = Gate<Void>()
 
     func scan(_ categories: [CleanupCategory], progress: (@Sendable (ScanProgress) -> Void)?) async throws -> [CategoryScanResult] {
         started.open()
-        await release.wait()
+        try? await release.wait()
         return []
     }
 }

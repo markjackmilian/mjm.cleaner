@@ -39,7 +39,7 @@ struct ScanStepModelTests {
         scan.waitForCancellation()
         let navigation = CleanupNavigationSpy()
         let model = ScanStepModel(environment: try makeEnvironment(scan: scan), navigation: navigation, categories: categories)
-        await scan.started.wait()
+        try await scan.started.wait()
 
         model.cancel()
         await model.run?.value
@@ -106,7 +106,7 @@ struct ScanStepModelTests {
         let navigation = SnapshotNavigation()
         let model = ScanStepModel(environment: try makeEnvironment(scan: scan), navigation: navigation, categories: categories)
         navigation.model = model
-        await scan.started.wait()
+        try await scan.started.wait()
 
         model.cancel()
         await model.run?.value

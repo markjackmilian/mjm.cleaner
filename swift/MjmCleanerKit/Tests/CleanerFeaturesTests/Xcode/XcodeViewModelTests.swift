@@ -49,7 +49,7 @@ struct XcodeViewModelTests {
         model.preview()
 
         let first = Task { await model.confirmDelete() }
-        await service.executionStarted.wait()
+        try await service.executionStarted.wait()
         let second = Task { await model.confirmDelete() }
         await second.value
         #expect(service.executeCount == 1)
@@ -110,7 +110,7 @@ struct XcodeViewModelTests {
         model.preview()
 
         let deleting = Task { await model.confirmDelete() }
-        await service.executionStarted.wait()
+        try await service.executionStarted.wait()
         model.close()
         model.backToSelection()
 
@@ -135,7 +135,7 @@ struct XcodeViewModelTests {
         model.preview()
 
         let deleting = Task { await model.confirmDelete() }
-        await service.executionStarted.wait()
+        try await service.executionStarted.wait()
         model.cancelDelete()
         await deleting.value
         #expect(service.observedCancellation == [true])
@@ -339,7 +339,7 @@ struct XcodeViewModelTests {
         model.preview()
         model.acknowledgeDependencies = true
         let deleting = Task { await model.confirmDelete() }
-        await service.executionStarted.wait()
+        try await service.executionStarted.wait()
 
         model.preview()
         model.backToSelection()
@@ -418,8 +418,9 @@ struct XcodeViewModelTests {
     }
 
     /// `FakeXcode`: le analisi si consumano in ordine (l'ultima resta); l'esecuzione attende
-    /// `execution`, oppure risponde subito, oppure resta sospesa fino all'annullamento (al massimo
-    /// 5 secondi, poi `observedCancellation` registra se è arrivato).
+    /// `execution` (al massimo 5 secondi, poi il test fallisce), oppure risponde subito, oppure resta
+    /// sospesa fino all'annullamento (al massimo 5 secondi, poi `observedCancellation` registra se è
+    /// arrivato).
     final class FakeXcode: XcodeCleanupServing {
         private enum Behavior {
             case waitForGate
@@ -479,7 +480,9 @@ struct XcodeViewModelTests {
             }
             switch behavior {
             case .waitForGate:
-                return await execution.wait()
+                // Se il test non apre `execution`, fallisce allo scadere e l'esecuzione resta vuota.
+                return (try? await execution.wait())
+                    ?? XcodeCleanResult(historyReport: makeReport(), items: [], freeBytesBefore: 0, freeBytesAfter: 0, warnings: [])
             case .immediate(let result):
                 return result
             case .untilCancelled(let result):

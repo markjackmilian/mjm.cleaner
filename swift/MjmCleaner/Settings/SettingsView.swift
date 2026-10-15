@@ -10,9 +10,15 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Impostazioni")
-                .font(.headline)
-                .padding(.vertical, 14)
+            VStack(spacing: 4) {
+                Text("Impostazioni")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Personalizza i percorsi e le soglie usate durante l'analisi.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 12)
             Divider()
             Form {
                 Section {

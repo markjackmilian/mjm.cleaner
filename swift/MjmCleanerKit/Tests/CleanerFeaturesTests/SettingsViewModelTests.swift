@@ -92,6 +92,30 @@ struct SettingsViewModelTests {
         #expect(!fixture.model.canRemoveProjectRoot)
     }
 
+    // Solo Swift: «−» senza selezione non toglie nulla da nessuna delle due liste; nel C# lo
+    // impediva solo il CanExecute del comando.
+    @Test func removingWithoutSelectionKeepsBothLists() {
+        let fixture = create(settings {
+            $0.projectRoots = ["/a", "/b"]
+            $0.largeFileRoots = ["/c", "/d"]
+        })
+        fixture.model.removeProjectRoot()
+        fixture.model.removeLargeFileRoot()
+        #expect(fixture.model.projectRoots == ["/a", "/b"])
+        #expect(fixture.model.largeFileRoots == ["/c", "/d"])
+    }
+
+    // Solo Swift: la stessa guardia di `removeIsDisabledWithoutSelection` per i file grandi.
+    @Test func removeLargeFileRootIsDisabledWithoutSelection() {
+        let fixture = create(settings { $0.largeFileRoots = ["/c", "/d"] })
+        #expect(!fixture.model.canRemoveLargeFileRoot)
+        fixture.model.selectedLargeFileRoot = "/d"
+        #expect(fixture.model.canRemoveLargeFileRoot)
+        fixture.model.removeLargeFileRoot()
+        #expect(fixture.model.largeFileRoots == ["/c"])
+        #expect(!fixture.model.canRemoveLargeFileRoot)
+    }
+
     @Test func unchangedThresholdKeepsExactBytes() {
         let bytes: Int64 = 500 * 1024 * 1024 + 123
         let fixture = create(settings { $0.largeFileThresholdBytes = bytes })

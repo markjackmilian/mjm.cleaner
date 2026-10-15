@@ -33,7 +33,7 @@ Dai piani 1–4a, invariati:
 
 - Il codice Swift vive in `swift/`. Il C# (`src/`, `tests/`) **non si modifica**: è il riferimento eseguibile.
 - macOS 15, Swift 6 language mode (concorrenza stretta), nessuna dipendenza esterna. Librerie di sistema ammesse nell'app: SwiftUI, AppKit, Foundation, Observation, CoreGraphics (solo nello script degli screenshot), `Synchronization`.
-- **Nessun file sotto `swift/MjmCleanerKit/Sources/CleanerCore` o `swift/MjmCleanerKit/Tests/CleanerCoreTests` cambia.** In `CleanerFeatures` cambiano solo le due funzioni pure e i test del Task 1.
+- **Nessun file sotto `swift/MjmCleanerKit/Sources/CleanerCore` o `swift/MjmCleanerKit/Tests/CleanerCoreTests` cambia.** In `CleanerFeatures` cambiano solo le due funzioni pure e i test del Task 1 (emendato dopo l'esecuzione: il fix round del Task 10 e la fix wave finale hanno aggiunto test solo Swift e tre guardie nei modelli, vedi «Emendamenti dopo l'esecuzione»).
 - In tutto il codice Swift del piano, app compresa: vietati `!` di forced unwrap, `try!`, `as!` e accessi per indice non verificati.
 - Testi visibili: in italiano, identici al C#. Nell'app i testi letterali passano dal catalogo dell'app (`Text("…")`, `LocalizedStringKey`, `String(localized: "…")`, file `swift/MjmCleaner/Localizable.xcstrings`, lingua di sviluppo `it`); i testi dei modelli, già localizzati, si mostrano con `Text(model.x)`. I numeri si interpolano come `String`.
 - **Nessuna garanzia vive solo nella vista.** Ogni `.disabled(...)` ha la stessa guardia nel metodo del modello che il pulsante chiama (`delete()` → `canDelete`, sidebar → `select`, ⌘, → `showSettings()`); i pulsanti distruttivi chiamano solo il metodo del modello.
@@ -82,7 +82,9 @@ Valgono quelle dei piani 1–4a. Si aggiungono queste.
 - `.fixedSize(horizontal: false, vertical: true)` su un testo dentro un `safeAreaInset(edge: .bottom)` rompe il layout della finestra (pagina vuota, sidebar spostata o vuota): nei testi delle fasce in basso non si usa.
 - `List(selection:)` non chiama il `set` del binding se si riclicca la voce già selezionata.
 - `XcodeSelection.preview` su un candidato DerivedData o Device Support richiede la voce nell'inventario dei file dello snapshot (`fileInventory`): la demo anteprima solo il runtime.
-- Release: `strings` del binario non trova `MJMDemo`, `DemoLaunch`, `DemoServices` né `DemoData`; nel binario Debug (`MjmCleaner.debug.dylib`) sì.
+- Release: `strings` del binario non trova nulla che corrisponda a `MJMDemo|Demo[A-Z]|/Users/demo` (né i nomi delle pagine o i dati della demo); nel binario Debug (`MjmCleaner.debug.dylib`) sì.
+- Con un'altra app in primo piano (Mac in uso) `open` non porta l'app davanti (attivazione cooperativa di macOS): la finestra resta inattiva, con i pulsanti in tinta grigi; quando invece arriva davanti riceve i tasti di chi sta scrivendo. Le catture si fanno con il Mac fermo.
+- Lo stato salvato della finestra prevale su `.defaultSize`; con `-ApplePersistenceIgnoreState YES` la finestra si apre alla misura predefinita (provato con `.defaultSize(900, 600)`: finestra 900×652, sheet delle Impostazioni intero).
 
 ---
 
@@ -172,7 +174,7 @@ struct ThemeTests {
 - [ ] **Step 2: Verificare che la build dei test fallisca**
 
 Run: `(cd swift/MjmCleanerKit && swift build --build-tests -Xswiftc -warnings-as-errors 2>&1 | grep -E 'error:' | sort -u)`
-Expected: esattamente due errori, `value of type 'AppearancePreference' has no member 'appKitAppearanceName'` e `value of type 'PageKind' has no member 'wizardStep'`.
+Expected: tre diagnostiche con due messaggi distinti (`wizardStep` compare in due punti del test), `value of type 'AppearancePreference' has no member 'appKitAppearanceName'` e `value of type 'PageKind' has no member 'wizardStep'`.
 
 - [ ] **Step 3: Scrivere le due funzioni**
 
@@ -193,12 +195,7 @@ Expected: esattamente due errori, `value of type 'AppearancePreference' has no m
 
 ```swift
     /// I quattro passi del wizard di pulizia.
-    public var isWizardStep: Bool {
-        switch self {
-        case .choose, .scan, .confirm, .done: true
-        default: false
-        }
-    }
+    public var isWizardStep: Bool { wizardStep != nil }
 
     /// Il passo (1–4) che lo `StepIndicator` segna come corrente; `nil` fuori dal wizard.
     public var wizardStep: Int? {
@@ -207,7 +204,7 @@ Expected: esattamente due errori, `value of type 'AppearancePreference' has no m
         case .scan: 2
         case .confirm: 3
         case .done: 4
-        default: nil
+        case .docker, .dockerReport, .xcode, .xcodeReport, .history: nil
         }
     }
 }
@@ -271,7 +268,7 @@ extension AppearancePreference {
 Run: `(cd swift/MjmCleanerKit && swift test -Xswiftc -warnings-as-errors --filter ThemeTests 2>&1 | grep -E 'Test run with')`
 Expected: `Test run with 2 tests in 1 suite passed` (il test parametrico conta come uno, con 3 casi).
 
-Run: `(cd swift/MjmCleanerKit && swift test -Xswiftc -warnings-as-errors 2>&1 | grep -E 'Test run with|^/.*: (warning|error):')`
+Run: `(cd swift/MjmCleanerKit && swift test -Xswiftc -warnings-as-errors 2>&1 | grep -E 'Test run with|(^|: )(warning|error): ')`
 Expected: `Test run with 165 tests in 21 suites passed` (`CleanerFeaturesTests`, 163 + 2) e `Test run with 496 tests in 47 suites passed` (`CleanerCoreTests`, invariato), nessun warning.
 
 - [ ] **Step 6: Registro di parità**
@@ -1230,6 +1227,16 @@ struct DemoLaunch: Sendable {
 
     static let current = parse(ProcessInfo.processInfo.arguments)
 
+    /// `-MJMDemo` fra gli argomenti, con qualunque pagina: chi lancia vuole la demo, mai l'app vera.
+    static let isRequested = ProcessInfo.processInfo.arguments.contains("-MJMDemo")
+
+    /// Il testo della vista d'errore per una pagina che `Page` non conosce.
+    static var unknownPageMessage: String {
+        let page = value(after: "-MJMDemo", in: ProcessInfo.processInfo.arguments) ?? "nessuna"
+        let known = Page.allCases.map(\.rawValue).joined(separator: ", ")
+        return "Pagina demo sconosciuta: \(page). Pagine: \(known)."
+    }
+
     static func parse(_ arguments: [String]) -> DemoLaunch? {
         guard let page = value(after: "-MJMDemo", in: arguments).flatMap(Page.init(rawValue:)) else { return nil }
         let appearance: AppearancePreference = switch value(after: "-MJMAppearance", in: arguments) {
@@ -1637,6 +1644,8 @@ enum DemoData {
     static func savedAppearance() -> AppearancePreference {
         #if DEBUG
         if let demo = DemoLaunch.current { return demo.appearance }
+        // Una pagina demo sconosciuta non legge le impostazioni vere: `start()` la rifiuta.
+        if DemoLaunch.isRequested { return .auto }
         #endif
         return SettingsStore(fileSystem: LocalFileSystem(), paths: paths).load().appearance
     }
@@ -1660,6 +1669,11 @@ enum DemoData {
             demo.open(into: self)
             return
         }
+        // Chi chiede la demo non ottiene mai l'app vera, nemmeno con una pagina che non esiste.
+        if DemoLaunch.isRequested {
+            fail(DemoLaunch.unknownPageMessage)
+            return
+        }
         #endif
 
         let paths = Self.paths
@@ -1667,7 +1681,7 @@ enum DemoData {
 
 - [ ] **Step 3: Script degli screenshot**
 
-L'app si avvia con `open -n` (LaunchServices): come processo figlio della shell non riceverebbe finestre. `window-id` trova la finestra in primo piano del processo (uno sheet aperto viene catturato con la sua finestra). Lo script non avvia mai l'app vera: rifiuta le pagine che `DemoLaunch.Page` non conosce (uscita 2) e controlla che la demo sia nel binario Debug (uscita 1); chiude l'app anche se si interrompe ed esce con 1 se una cattura non riesce.
+L'app si avvia con `open -n` (LaunchServices): come processo figlio della shell non riceverebbe finestre. `window-id` trova la finestra in primo piano del processo (uno sheet aperto viene catturato con la sua finestra). Lo script non avvia mai l'app vera: rifiuta le pagine che `DemoLaunch.Page` non conosce (uscita 2) e controlla che la demo sia nel binario Debug (uscita 1); chiude l'app anche se si interrompe ed esce con 1 se una cattura non riesce o se la finestra non è in primo piano (Mac in uso). Anche l'app rifiuta una pagina sconosciuta: con `-MJMDemo` mostra la vista d'errore e non diventa mai l'app vera.
 
 **Creare `swift/Scripts/window-id.swift`:**
 
@@ -1706,8 +1720,11 @@ exit(1)
 #!/bin/zsh
 # Screenshot delle pagine dell'avvio dimostrativo (solo Debug), in chiaro e in scuro (spec §9.4).
 # Uso: swift/Scripts/screenshots.sh <cartella di uscita> [pagina…]
-# Senza pagine le cattura tutte. Durante la cattura si aprono e si chiudono finestre dell'app.
-# Esce con 1 se una cattura non riesce (per esempio con lo schermo bloccato o spento).
+# Senza pagine le cattura tutte. Durante la cattura si aprono e si chiudono finestre dell'app: non
+# usare il Mac finché lo script non finisce (con Claude in primo piano), perché ogni finestra prende il
+# primo piano e i tasti premuti finirebbero nella demo.
+# Esce con 1 se una cattura non riesce (schermo bloccato o spento, oppure Mac in uso: una finestra
+# che non arriva in primo piano non si cattura).
 set -euo pipefail
 
 here=${0:A:h}
@@ -1752,21 +1769,36 @@ if (( ! demo )); then
     exit 1
 fi
 
-# L'app aperta si chiude anche se lo script si interrompe.
+# Il pid dell'app in primo piano; `lsappinfo` legge soltanto, non attiva nulla.
+front_pid() {
+    local info
+    info=$(lsappinfo info -only pid "$(lsappinfo front)" 2>/dev/null) || return 1
+    [[ $info =~ 'pid = ([0-9]+)' ]] && print -r -- $match[1]
+}
+
+# L'app aperta si chiude anche se lo script si interrompe (Ctrl-C compreso) o se `pgrep` non l'ha
+# trovata: `pkill` cerca il binario di questa build, mai l'app installata.
 pid=""
-trap '[[ -n $pid ]] && kill "$pid" 2>/dev/null; true' EXIT
+trap 'pkill -f "$binary" 2>/dev/null; true' EXIT
+trap 'exit 130' INT TERM
 
 failed=0
 for page in $pages; do
     for appearance in light dark; do
         # `open` avvia l'app da LaunchServices, come il Finder: un processo figlio di questa shell
         # potrebbe non ricevere finestre.
-        open -n "$bundle" --args -MJMDemo "$page" -MJMAppearance "$appearance"
+        # `-ApplePersistenceIgnoreState`: la finestra si apre alla misura predefinita, non a quella salvata.
+        open -n "$bundle" --args -MJMDemo "$page" -MJMAppearance "$appearance" -ApplePersistenceIgnoreState YES
         # Il tempo per caricare la pagina e, per le Impostazioni, aprire lo sheet.
         sleep 3
         pid=$(pgrep -n -f "$binary" || true)
         if [[ -n $pid ]] && id=$("$build/window-id" "$pid" 10); then
-            if screencapture -x -o -l"$id" "$out/$page-$appearance.png"; then
+            # Con il Mac in uso macOS non porta l'app davanti (attivazione cooperativa): la finestra
+            # inattiva ha i pulsanti in tinta grigi e non vale come base del confronto.
+            if [[ $(front_pid || true) != "$pid" ]]; then
+                print -u2 "finestra non attiva per $page ($appearance): il Mac è in uso? nessuna cattura"
+                failed=1
+            elif screencapture -x -o -l"$id" "$out/$page-$appearance.png"; then
                 print "$out/$page-$appearance.png"
             else
                 print -u2 "cattura non riuscita per $page ($appearance): lo schermo è bloccato o spento?"
@@ -1776,9 +1808,7 @@ for page in $pages; do
             print -u2 "nessuna finestra per $page ($appearance)"
             failed=1
         fi
-        if [[ -n $pid ]]; then
-            kill "$pid" 2>/dev/null || true
-        fi
+        pkill -f "$binary" 2>/dev/null || true
         pid=""
         sleep 1
     done
@@ -1980,6 +2010,8 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
+                // Il nome del C#, senza la scorciatoia scritta accanto.
+                .accessibilityLabel("Impostazioni…")
                 .disabled(!main.canShowSettings)
             }
             .padding(12)
@@ -2186,10 +2218,10 @@ struct OptionalText: View {
 /// Un gruppo richiudibile in una card, con le righe in uno scorrimento proprio alto al più 360
 /// punti: come il `ListBox` del C#, anche una categoria con migliaia di voci crea solo le righe
 /// visibili.
-struct CollapsibleCard<Label: View, Header: View, Row: View, Item: Identifiable>: View {
+struct CollapsibleCard<Title: View, Header: View, Row: View, Item: Identifiable>: View {
     let items: [Item]
     @Binding var isExpanded: Bool
-    @ViewBuilder let label: () -> Label
+    @ViewBuilder let label: () -> Title
     @ViewBuilder let header: () -> Header
     @ViewBuilder let row: (Item) -> Row
 
@@ -2452,6 +2484,7 @@ struct ChooseStepView: View {
         .actionBar {
             Image(systemName: "checkmark.shield")
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text("L'analisi non elimina alcun file.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -2481,8 +2514,10 @@ private struct ChoiceRow: View {
                 .labelsHidden()
             CategoryTile(visual: choice.visual)
             VStack(alignment: .leading, spacing: 2) {
+                // Il nome lo legge già la casella: VoiceOver non lo ripete.
                 Text(choice.displayName)
                     .fontWeight(.semibold)
+                    .accessibilityHidden(true)
                 Text(choice.description)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -2735,8 +2770,9 @@ struct ConfirmStepView: View {
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 24)
+            // Le caselle si fermano, lo scorrimento no.
+            .disabled(model.isDeleting)
         }
-        .disabled(model.isDeleting)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Banner(text: String(localized: "Eliminazione definitiva: questi file non finiscono nel Cestino e non sono recuperabili."))
@@ -2833,6 +2869,7 @@ struct DoneStepView: View {
                         .foregroundStyle(.green)
                         .frame(width: 48, height: 48)
                         .background(.green.opacity(0.15), in: Circle())
+                        .accessibilityHidden(true)
                     Text("Pulizia completata")
                         .font(.system(size: 22, weight: .bold))
                     Text(model.freedText)
@@ -2862,6 +2899,7 @@ struct DoneStepView: View {
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 12)
+            .background(.background)
         }
         .actionBar {
             Spacer()
@@ -3042,6 +3080,7 @@ struct DockerView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 72, height: 72)
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 18))
+                    .accessibilityHidden(true)
                 Text(model.errorText)
                     .font(.system(size: 17, weight: .semibold))
                     .multilineTextAlignment(.center)
@@ -3079,8 +3118,9 @@ struct DockerView: View {
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 24)
+            // Le caselle si fermano, lo scorrimento no.
+            .disabled(model.isDeleting)
         }
-        .disabled(model.isDeleting)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 10) {
                 Banner(text: String(localized: "Eliminazione definitiva: immagini e volumi eliminati non sono recuperabili. I volumi contengono dati."))
@@ -3268,6 +3308,7 @@ struct DockerReportView: View {
             OptionalText(text: model.historyWarning)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 12)
+                .background(.background)
         }
         .actionBar {
             Spacer()
@@ -3448,8 +3489,9 @@ struct XcodeView: View {
                 }
                 .padding(.horizontal, 32)
                 .padding(.vertical, 24)
+                // Le caselle si fermano, lo scorrimento no.
+                .disabled(model.isDeleting)
             }
-            .disabled(model.isDeleting)
         }
     }
 }
@@ -3762,14 +3804,15 @@ struct HistoryView: View {
                 Text(row.when)
                     .monospacedDigit()
             }
-            .width(min: 150, ideal: 190)
+            .width(min: 150, ideal: 190, max: 220)
             TableColumn("Spazio", value: \.bytesFreed) { row in
                 Text(row.freed)
                     .fontWeight(.semibold)
                     .monospacedDigit()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .width(min: 80, ideal: 100)
+            .width(min: 80, ideal: 100, max: 120)
+            .alignment(.trailing)
+            // Categorie prende lo spazio che le altre colonne, a larghezza limitata, lasciano libero.
             TableColumn("Categorie") { row in
                 CategoryChips(names: row.categoryNames)
             }
@@ -3777,9 +3820,9 @@ struct HistoryView: View {
                 Text(row.items)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .width(min: 70, ideal: 100)
+            .width(min: 70, ideal: 90, max: 120)
+            .alignment(.trailing)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .navigationTitle("Storico delle pulizie")
@@ -3908,9 +3951,15 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Impostazioni")
-                .font(.headline)
-                .padding(.vertical, 14)
+            VStack(spacing: 4) {
+                Text("Impostazioni")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Personalizza i percorsi e le soglie usate durante l'analisi.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 12)
             Divider()
             Form {
                 Section {
@@ -3961,9 +4010,15 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    NumberRow(title: "Download", unit: "giorni", value: $model.downloadsMinAgeDays, range: SettingsModel.minAgeDaysRange)
-                    NumberRow(title: "Log", unit: "giorni", value: $model.logsMinAgeDays, range: SettingsModel.minAgeDaysRange)
-                    NumberRow(title: "Pacchetti NuGet", unit: "giorni", value: $model.nuGetMinAgeDays, range: SettingsModel.minAgeDaysRange)
+                    NumberRow(
+                        title: "Download", accessibilityName: "Età minima dei download", unit: "giorni",
+                        value: $model.downloadsMinAgeDays, range: SettingsModel.minAgeDaysRange)
+                    NumberRow(
+                        title: "Log", accessibilityName: "Età minima dei log", unit: "giorni",
+                        value: $model.logsMinAgeDays, range: SettingsModel.minAgeDaysRange)
+                    NumberRow(
+                        title: "Pacchetti NuGet", accessibilityName: "Età minima dei pacchetti NuGet", unit: "giorni",
+                        value: $model.nuGetMinAgeDays, range: SettingsModel.minAgeDaysRange)
                 } header: {
                     Text("Età minima")
                 } footer: {
@@ -4052,6 +4107,8 @@ private struct FolderList: View {
 /// (`Minimum`/`Maximum` dei `NumericUpDown`), anche quando si scrive nel campo.
 private struct NumberRow: View {
     let title: LocalizedStringKey
+    /// Il nome di campo e stepper per VoiceOver, come `AutomationProperties.Name` del C#; senza, il titolo.
+    var accessibilityName: LocalizedStringKey?
     let unit: LocalizedStringKey
     @Binding var value: Int
     let range: ClosedRange<Int>
@@ -4059,13 +4116,13 @@ private struct NumberRow: View {
     var body: some View {
         LabeledContent(title) {
             HStack(spacing: 6) {
-                TextField(title, value: clamped, format: .number)
+                TextField(accessibilityName ?? title, value: clamped, format: .number)
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
                 Text(unit)
                     .foregroundStyle(.secondary)
-                Stepper(title, value: clamped, in: range)
+                Stepper(accessibilityName ?? title, value: clamped, in: range)
                     .labelsHidden()
             }
         }
@@ -4101,7 +4158,7 @@ Expected: `** BUILD SUCCEEDED **` e `nessuna diagnostica`.
 swift/Scripts/screenshots.sh "${TMPDIR:-/tmp}/mjm-cleaner-shots" settings
 ```
 
-Expected: due file. Sopra la finestra del passo 1, lo sheet «Impostazioni»: sezione «Aspetto» con «Chiaro» selezionato in `settings-light` e «Scuro» in `settings-dark`, la didascalia «Automatico segue l'aspetto scelto in Impostazioni di Sistema.», «Progetti .NET» con `~/Progetti` e `~/Lavoro/clienti`, la barra «+ −», «Cartelle di progetto in cui cercare bin e obj.», «File grandi» con «Cartelle in cui cercare» e `~/Downloads`; in basso «Annulla» e «Salva» blu. Le sezioni sotto si raggiungono scorrendo.
+Expected: due file. Sopra la finestra del passo 1, lo sheet «Impostazioni» con sotto il titolo la riga grigia «Personalizza i percorsi e le soglie usate durante l'analisi.»: sezione «Aspetto» con «Chiaro» selezionato in `settings-light` e «Scuro» in `settings-dark`, la didascalia «Automatico segue l'aspetto scelto in Impostazioni di Sistema.», «Progetti .NET» con `~/Progetti` e `~/Lavoro/clienti`, la barra «+ −», «Cartelle di progetto in cui cercare bin e obj.», «File grandi» con «Cartelle in cui cercare» e `~/Downloads`; in basso «Annulla» e «Salva» blu. Le sezioni sotto si raggiungono scorrendo.
 
 - [ ] **Step 4: Registro di parità**
 
@@ -4148,10 +4205,10 @@ Nessun codice nuovo: la suite, i build, i vincoli globali, gli screenshot di tut
 - [ ] **Step 1: Suite e build**
 
 ```bash
-(cd swift/MjmCleanerKit && swift test -Xswiftc -warnings-as-errors 2>&1 | grep -E 'Test run with|^/.*: (warning|error):')
+(cd swift/MjmCleanerKit && swift test -Xswiftc -warnings-as-errors 2>&1 | grep -E 'Test run with|(^|: )(warning|error): ')
 ```
 
-Expected: `Test run with 165 tests in 21 suites passed` e `Test run with 496 tests in 47 suites passed`, nessun warning.
+Expected: `Test run with 172 tests in 21 suites passed` (165 dopo il Task 1, più 2 del fix round del Task 10 e 5 della fix wave finale) e `Test run with 496 tests in 47 suites passed`, nessun warning.
 
 ```bash
 xcodebuild -project swift/MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Debug \
@@ -4190,10 +4247,11 @@ grep -rn 'accessibilityLabel' swift/MjmCleaner
 grep -n -A3 'CommandGroup(replacing: .appSettings)' swift/MjmCleaner/App/MjmCleanerApp.swift
 grep -n 'settings?.cancel()' swift/MjmCleaner/Shell/MainView.swift
 grep -nE 'LocalFileSystem|SettingsStore|HistoryStore|SessionLogWriter|CleanEngine|ScanEngine|RuleScanner|ProcessRunner|AppEnvironment\.live|AppStartup\.paths'     swift/MjmCleaner/Demo/*.swift || echo "la demo non usa servizi su disco"
+grep -nE 'DemoLaunch\.|AppEnvironment\.live' swift/MjmCleaner/App/AppStartup.swift
 git diff --name-only main...HEAD -- swift/MjmCleanerKit/Sources/CleanerCore swift/MjmCleanerKit/Tests/CleanerCoreTests src tests
 ```
 
-Expected: «nessuna violazione», «nessun forced unwrap» (il secondo pattern può segnalare falsi positivi in commenti e stringhe: controllare ogni riga), nessun `fixedSize` dentro un `safeAreaInset` o un `actionBar` (sono ammessi nel contenuto delle pagine, stato vuoto di Docker compreso, nelle chip dello Storico e nella vista d'errore), `accessibilityLabel` per «Avanzamento», «Aggiungi cartella» e «Rimuovi cartella selezionata», il comando «Impostazioni…» con `.keyboardShortcut(",", modifiers: .command)`, `showSettings()` e `.disabled(!(startup.main?.canShowSettings ?? false))`, il binding dello sheet con `main.settings?.cancel()`, «la demo non usa servizi su disco»; l'ultimo comando non stampa nulla.
+Expected: «nessuna violazione», «nessun forced unwrap» (il secondo pattern può segnalare falsi positivi in commenti e stringhe: controllare ogni riga), nessun `fixedSize` dentro un `safeAreaInset` o un `actionBar` (sono ammessi nel contenuto delle pagine, stato vuoto di Docker compreso, nelle chip dello Storico e nella vista d'errore), `accessibilityLabel` per «Avanzamento», «Aggiungi cartella» e «Rimuovi cartella selezionata», il comando «Impostazioni…» con `.keyboardShortcut(",", modifiers: .command)`, `showSettings()` e `.disabled(!(startup.main?.canShowSettings ?? false))`, il binding dello sheet con `main.settings?.cancel()`, «la demo non usa servizi su disco»; in `AppStartup.swift` le righe con `DemoLaunch.` (pagina nota, pagina sconosciuta) vengono prima di `AppEnvironment.live`; l'ultimo comando non stampa nulla.
 
 - [ ] **Step 3: Screenshot di tutte le pagine**
 
@@ -4203,7 +4261,7 @@ swift/Scripts/screenshots.sh "$dir"
 ls "$dir" | wc -l
 ```
 
-Expected: 26 percorsi stampati, uscita 0, poi `26` (con lo schermo bloccato o spento le catture non riescono e lo script esce con 1: sbloccare il Mac è un'azione dell'utente, quindi il task si ferma qui finché lo schermo non è disponibile). Guardare ogni immagine: stesse schermate descritte negli Expected dei Task 4–10, in chiaro e in scuro, testo leggibile in entrambi, barra azioni e avvisi interi in fondo, nessuna pagina vuota o spostata.
+Expected: 26 percorsi stampati, uscita 0, poi `26` (con lo schermo bloccato o spento le catture non riescono e lo script esce con 1: sbloccare il Mac è un'azione dell'utente, quindi il task si ferma qui finché lo schermo non è disponibile; lo stesso se il Mac è in uso: con un'altra app in primo piano lo script non cattura, «finestra non attiva…», e la cattura chiede all'utente un paio di minuti con Claude in primo piano, senza tastiera né mouse). Guardare ogni immagine: stesse schermate descritte negli Expected dei Task 4–10, in chiaro e in scuro, testo leggibile in entrambi, barra azioni e avvisi interi in fondo, nessuna pagina vuota o spostata.
 
 - [ ] **Step 4: Registro di parità**
 
@@ -4220,7 +4278,7 @@ Piano 4a completato il 2026-10-15: 44 prove C# dell'app portate in `CleanerFeatu
 ```markdown
 Piano 4a completato il 2026-10-15: 44 prove C# dell'app portate in `CleanerFeaturesTests` (+ 119 nuove), suite Swift verde (496 + 163 test); le prove della vista restano al piano 4b.
 
-Piano 4b completato il AAAA-MM-GG: app SwiftUI in `swift/MjmCleaner.xcodeproj`, 13 pagine dell'ambiente dimostrativo fotografate in chiaro e in scuro in `docs/superpowers/verification/AAAA-MM-GG-swift-4b/`, suite Swift verde (496 + 165 test); ogni prova C# di vista ha il proprio metodo di verifica.
+Piano 4b completato il AAAA-MM-GG: app SwiftUI in `swift/MjmCleaner.xcodeproj`, 13 pagine dell'ambiente dimostrativo fotografate in chiaro e in scuro in `docs/superpowers/verification/AAAA-MM-GG-swift-4b/`, suite Swift verde (496 + 172 test); ogni prova C# di vista ha il proprio metodo di verifica.
 ```
 
 **In `docs/superpowers/porting/2026-10-13-parity.md`, sostituire:**
@@ -4232,7 +4290,7 @@ Piano 4b completato il AAAA-MM-GG: app SwiftUI in `swift/MjmCleaner.xcodeproj`, 
 **con:**
 
 ```markdown
-| AccessibilityTests.cs | 3 | — | — | 4b | verificate nel codice e negli screenshot (Task 11): le voci della sidebar sono `Label` con il titolo, i pulsanti hanno il proprio testo, i pulsanti solo icona + e − hanno `accessibilityLabel` «Aggiungi cartella» e «Rimuovi cartella selezionata» (spec §6.6), l'indicatore dei passi si legge come «Avanzamento»; le caselle senza testo visibile (righe del passo 1, del passo 3, di Docker e di Xcode) hanno come etichetta nascosta il nome della riga |
+| AccessibilityTests.cs | 3 | — | — | 4b | verificate nel codice (Task 11 e revisione finale): le voci della sidebar sono `Label` con il titolo e il pulsante delle Impostazioni si chiama «Impostazioni…» (`accessibilityLabel`, senza «⌘,»); i pulsanti hanno il proprio testo; + e − hanno «Aggiungi cartella» e «Rimuovi cartella selezionata» (spec §6.6); i campi numerici hanno i nomi del C# («Soglia file grandi», «Età minima dei download», «Età minima dei log», «Età minima dei pacchetti NuGet»); l'indicatore dei passi si legge «Avanzamento»; le caselle delle righe hanno il nome della riga, che al passo 1 non si ripete; tile e icone decorative sono nascoste a VoiceOver; la prova con VoiceOver resta al collaudo del piano 5 |
 ```
 
 **In `docs/superpowers/porting/2026-10-13-parity.md`, sostituire il testo (dentro la riga):**
@@ -4292,7 +4350,7 @@ controlli nel viewport: la barra azioni e la conferma stanno nell'area sicura in
 **con:**
 
 ```markdown
-| SettingsWindowTests.cs | 10 (3) | — | — | 4b | `ShowsTheFourSectionsAndTheEmptyFolderState`: le quattro sezioni negli screenshot `settings-*.png` e «Nessuna cartella. Premi + per aggiungerne una.» nel codice di `FolderList`; `DefaultHeightFitsA13InchDisplay` e `HeightIsCappedToTheWorkingAreaOfTheScreen`: lo sheet è 700×560 ed entra nella finestra minima 900×600; `ClosingTheWindowRestoresTheAppearance`: chiudere lo sheet dal sistema chiama `main.settings?.cancel()`, che ripristina l'aspetto (`closingFromTheTitleBarBehavesLikeCancel` lo prova sul modello); `AppearanceCaptionSitsBelowTheCard` e `AllSectionCaptionsUseTheSameSize`: didascalie come `footer` delle sezioni del `Form`; `NumericFieldsUseTheCompactStepperWithNamedButtons`: `Stepper` nativo con il nome della riga, `StepperNames` non si porta (differenza registrata); `SteppingStillChangesTheBoundValueAndClamps`: campo e stepper restano in `thresholdMegabytesRange` e `minAgeDaysRange`; anello dell'aspetto e cornice dei campi (`SelectedAppearancePreviewHasAnUnclippedAccentRing`, `CompactFieldDoesNotPaintFluentTextBoxChrome`) sono tema Avalonia (spec §9.2) |
+| SettingsWindowTests.cs | 10 (3) | — | — | 4b | `ShowsTheFourSectionsAndTheEmptyFolderState`: le quattro sezioni negli screenshot `settings-*.png` e «Nessuna cartella. Premi + per aggiungerne una.» nel codice di `FolderList`; `DefaultHeightFitsA13InchDisplay` e `HeightIsCappedToTheWorkingAreaOfTheScreen`: lo sheet è 700×560 ed entra nella finestra minima 900×600; `ClosingTheWindowRestoresTheAppearance`: chiudere lo sheet dal sistema chiama `main.settings?.cancel()`, che ripristina l'aspetto (`closingFromTheTitleBarBehavesLikeCancel` lo prova sul modello, il collegamento della vista è stato provato a mano con la demo nel Task 4); `AppearanceCaptionSitsBelowTheCard` e `AllSectionCaptionsUseTheSameSize`: didascalie come `footer` delle sezioni del `Form`; `NumericFieldsUseTheCompactStepperWithNamedButtons`: `Stepper` nativo con il nome della riga, `StepperNames` non si porta (differenza registrata); `SteppingStillChangesTheBoundValueAndClamps`: campo e stepper restano in `thresholdMegabytesRange` e `minAgeDaysRange`; anello dell'aspetto e cornice dei campi (`SelectedAppearancePreviewHasAnUnclippedAccentRing`, `CompactFieldDoesNotPaintFluentTextBoxChrome`) sono tema Avalonia (spec §9.2) |
 ```
 
 **In `docs/superpowers/porting/2026-10-13-parity.md`, sostituire:**
@@ -4363,10 +4421,27 @@ git status --short
 
 Expected: il commit con il trailer; `git status --short` mostra solo `?? .zed/` e `?? mjm-cleaner-ui-handoff.md`.
 
+## Emendamenti dopo l'esecuzione
+
+Piano eseguito il 2026-10-15; il ledger con ogni ruling è in `docs/superpowers/decisions/2026-10-15-registro-decisioni-swift-piano-4b.md`. I blocchi di codice dei task riportano i file finali; qui ciò che è cambiato rispetto al testo approvato e ciò che non sta nei blocchi.
+
+- **Task 2** (fix round): grep delle diagnostiche `(^|: )(warning|error): `, firma verificata con `codesign --verify --strict` e `Sealed Resources version=2`, `SWIFT_VERSION = 6.0`, pannello delle cartelle come foglio della finestra attiva (nel piano dal commit ec65a83).
+- **Task 3** (fix round): lo script rifiuta le pagine sconosciute e controlla la demo nel binario (nel piano dal commit e2caea2).
+- **Task 9** (fix round): larghezze massime di Data, Spazio ed Elementi e colonne numeriche allineate a destra, così Categorie prende lo spazio rimasto.
+- **Task 10** (fix round): la frase introduttiva del C# sotto il titolo, titolo `.isHeader`; due test solo Swift in `SettingsViewModelTests` (`removingWithoutSelectionKeepsBothLists`, `removeLargeFileRootIsDisabledWithoutSelection`) e la riga del registro (non sono blocchi di questo piano).
+- **Fix wave della revisione finale:**
+  - guardie nei modelli, perché nessuna garanzia viva solo nella vista: `ConfirmStepModel.restart()` rifiuta durante l'eliminazione, `DockerModel.retry()` e `XcodeModel.retry()` rispettano `canRetry`; test solo Swift `restartWhileDeletingStaysOnTheStep`, `retryWhileLoadingDoesNothing`, `retryIsIgnoredWhileDeleting`, `onlySelectableGroupsHaveRowCheckBoxes`, `rowsKeepTheSessionStartForSorting` e l'attesa su `canPreview` senza selezione (non sono blocchi di questo piano); `PageKind.wizardStep` con uno switch esaustivo (blocco del Task 1);
+  - demo: con `-MJMDemo` e una pagina sconosciuta l'app mostra la vista d'errore e non legge le impostazioni vere (blocchi del Task 3); lo script non cattura una finestra che non è in primo piano, chiude l'app anche con Ctrl-C e apre la finestra alla misura predefinita;
+  - accessibilità: il pulsante «Impostazioni…» senza «⌘,», i nomi dei campi numerici del C#, il nome della categoria letto una volta al passo 1, icone decorative nascoste;
+  - `.disabled` durante l'eliminazione sul contenuto e non sullo scorrimento; sfondo alle fasce in basso del passo 4 e del resoconto Docker; parametro generico `Title` in `CollapsibleCard`; celle dello Storico senza `frame` ridondante;
+  - registro di parità: conteggi dei test solo Swift, riga «Riselezione…» corretta, nove differenze e due candidati nuovi.
+- **CleanerFeatures:** il vincolo «cambiano solo le due funzioni pure e i test del Task 1» non vale più dopo il Task 10 e la fix wave; il Core resta intatto.
+- **Task 11:** suite, build e vincoli verificati prima della fix wave e di nuovo dopo; la cattura dei 26 screenshot si fa dopo la fix wave con il Mac fermo (con un'altra app in primo piano le finestre restano inattive e i tasti dell'utente finiscono nella demo); conteggi finali 172 + 496.
+
 ---
 
 ## Dopo il piano 4b
 
 - **Piano APFS** (deciso dall'utente il 2026-10-14): il buco del ripiegamento U+212A/ſ nella deny-list, con spike sul nome canonico, emendamento della spec §12 e correzione in `PathGuard` e nella giuntura `FileSystem`.
-- **Piano 5**: collaudo fianco a fianco con l'app C# e confronto con gli screenshot del redesign (§9.4, base: `docs/superpowers/verification/<data>-swift-4b/`), workflow di release (§10.2: `swift test` + `xcodebuild`, build Release universale, firma ad hoc, zip), rimozione del C# (§10.3).
+- **Piano 5**: collaudo fianco a fianco con l'app C# e confronto con gli screenshot del redesign (§9.4, base: `docs/superpowers/verification/<data>-swift-4b/`), workflow di release (§10.2: `swift test` + `xcodebuild`, build Release universale, firma ad hoc, zip), rimozione del C# (§10.3). Da decidere lì: un bundle id distinto per il Debug (oggi la demo usa `com.mjm.cleaner` come l'app C#, scrive nel suo dominio defaults e LaunchServices registra il bundle di prova), il nome del bundle (`MjmCleaner.app` contro `mjm.cleaner.app`) e `ONLY_ACTIVE_ARCH`.
 - Dal registro: l'avvio legge `settings.json` due volte (per l'aspetto prima della finestra e nell'ambiente); i candidati a miglioramento del 4a restano non applicati (spec §12).

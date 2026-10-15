@@ -13,14 +13,16 @@ struct HistoryView: View {
                 Text(row.when)
                     .monospacedDigit()
             }
-            .width(min: 150, ideal: 190)
+            .width(min: 150, ideal: 190, max: 220)
             TableColumn("Spazio", value: \.bytesFreed) { row in
                 Text(row.freed)
                     .fontWeight(.semibold)
                     .monospacedDigit()
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .width(min: 80, ideal: 100)
+            .width(min: 80, ideal: 100, max: 120)
+            .alignment(.trailing)
+            // Categorie prende lo spazio che le altre colonne, a larghezza limitata, lasciano libero.
             TableColumn("Categorie") { row in
                 CategoryChips(names: row.categoryNames)
             }
@@ -30,7 +32,8 @@ struct HistoryView: View {
                     .monospacedDigit()
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .width(min: 70, ideal: 100)
+            .width(min: 70, ideal: 90, max: 120)
+            .alignment(.trailing)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .navigationTitle("Storico delle pulizie")

@@ -5,22 +5,6 @@ import SwiftUI
 // il Task 10 cancella il file.
 
 
-struct DockerView: View {
-    let model: DockerModel
-
-    var body: some View {
-        Text(verbatim: "Docker")
-    }
-}
-
-struct DockerReportView: View {
-    let model: DockerReportModel
-
-    var body: some View {
-        Text(verbatim: "Resoconto Docker")
-    }
-}
-
 struct XcodeView: View {
     let model: XcodeModel
 

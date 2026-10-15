@@ -1,0 +1,7 @@
+#include "Base.xcconfig"
+
+// Una sola build universale arm64 + x86_64 (spec §10.2).
+SWIFT_COMPILATION_MODE = wholemodule
+SWIFT_OPTIMIZATION_LEVEL = -O
+ONLY_ACTIVE_ARCH = NO
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym

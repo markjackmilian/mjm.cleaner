@@ -1,0 +1,224 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		4B0000000000000000000033 /* CleanerCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4B0000000000000000000031 /* CleanerCore */; };
+		4B0000000000000000000034 /* CleanerFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = 4B0000000000000000000032 /* CleanerFeatures */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		4B0000000000000000000006 /* MjmCleaner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MjmCleaner.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4B0000000000000000000007 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		4B0000000000000000000008 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		4B0000000000000000000009 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		4B000000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		4B0000000000000000000035 /* MjmCleanerKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = MjmCleanerKit; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		4B0000000000000000000005 /* MjmCleaner */ = {isa = PBXFileSystemSynchronizedRootGroup; path = MjmCleaner; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4B0000000000000000000012 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4B0000000000000000000033 /* CleanerCore in Frameworks */,
+				4B0000000000000000000034 /* CleanerFeatures in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4B0000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				4B0000000000000000000005 /* MjmCleaner */,
+				4B0000000000000000000004 /* Config */,
+				4B0000000000000000000035 /* MjmCleanerKit */,
+				4B0000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4B0000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4B0000000000000000000006 /* MjmCleaner.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4B0000000000000000000004 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				4B0000000000000000000007 /* Base.xcconfig */,
+				4B0000000000000000000008 /* Debug.xcconfig */,
+				4B0000000000000000000009 /* Release.xcconfig */,
+				4B000000000000000000000A /* Info.plist */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4B0000000000000000000010 /* MjmCleaner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4B0000000000000000000023 /* Build configuration list for PBXNativeTarget "MjmCleaner" */;
+			buildPhases = (
+				4B0000000000000000000011 /* Sources */,
+				4B0000000000000000000012 /* Frameworks */,
+				4B0000000000000000000013 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4B0000000000000000000005 /* MjmCleaner */,
+			);
+			name = MjmCleaner;
+			packageProductDependencies = (
+				4B0000000000000000000031 /* CleanerCore */,
+				4B0000000000000000000032 /* CleanerFeatures */,
+			);
+			productName = MjmCleaner;
+			productReference = 4B0000000000000000000006 /* MjmCleaner.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4B0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					4B0000000000000000000010 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+				};
+			};
+			buildConfigurationList = 4B0000000000000000000020 /* Build configuration list for PBXProject "MjmCleaner" */;
+			developmentRegion = it;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				it,
+				Base,
+			);
+			mainGroup = 4B0000000000000000000002;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4B0000000000000000000030 /* XCLocalSwiftPackageReference "MjmCleanerKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4B0000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4B0000000000000000000010 /* MjmCleaner */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4B0000000000000000000013 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4B0000000000000000000011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		4B0000000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		4B0000000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		4B0000000000000000000024 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4B0000000000000000000008 /* Debug.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		4B0000000000000000000025 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4B0000000000000000000009 /* Release.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4B0000000000000000000020 /* Build configuration list for PBXProject "MjmCleaner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4B0000000000000000000021 /* Debug */,
+				4B0000000000000000000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4B0000000000000000000023 /* Build configuration list for PBXNativeTarget "MjmCleaner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4B0000000000000000000024 /* Debug */,
+				4B0000000000000000000025 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4B0000000000000000000030 /* XCLocalSwiftPackageReference "MjmCleanerKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = MjmCleanerKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4B0000000000000000000031 /* CleanerCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4B0000000000000000000030 /* XCLocalSwiftPackageReference "MjmCleanerKit" */;
+			productName = CleanerCore;
+		};
+		4B0000000000000000000032 /* CleanerFeatures */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4B0000000000000000000030 /* XCLocalSwiftPackageReference "MjmCleanerKit" */;
+			productName = CleanerFeatures;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 4B0000000000000000000001 /* Project object */;
+}

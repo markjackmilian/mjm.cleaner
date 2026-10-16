@@ -5,8 +5,11 @@ import CleanerFeatures
 import Foundation
 
 /// Avvio dimostrativo per gli screenshot (spec §9.4), solo in Debug: `-MJMDemo <pagina>` apre la
-/// pagina con servizi finti e dati fissi, `-MJMAppearance light|dark` sceglie l'aspetto. Nessun
-/// servizio finto tocca il disco: un clic su «Elimina» restituisce un resoconto inventato.
+/// pagina con servizi finti e dati fissi, `-MJMAppearance light|dark` sceglie l'aspetto,
+/// `-MJMWindowSize <L>x<A>` (interi positivi, per esempio `900x600`) porta il contenuto della
+/// finestra principale a quella misura in punti; un valore assente o malformato lascia la misura
+/// predefinita. Nessun servizio finto tocca il disco: un clic su «Elimina» restituisce un resoconto
+/// inventato.
 struct DemoLaunch: Sendable {
     enum Page: String, CaseIterable, Sendable {
         case choose
@@ -26,6 +29,8 @@ struct DemoLaunch: Sendable {
 
     let page: Page
     let appearance: AppearancePreference
+    /// La misura del contenuto della finestra principale, in punti; `nil` lascia la predefinita.
+    let windowSize: CGSize?
 
     static let current = parse(ProcessInfo.processInfo.arguments)
 
@@ -46,7 +51,18 @@ struct DemoLaunch: Sendable {
         case "dark": .dark
         default: .auto
         }
-        return DemoLaunch(page: page, appearance: appearance)
+        return DemoLaunch(
+            page: page, appearance: appearance,
+            windowSize: parseWindowSize(value(after: "-MJMWindowSize", in: arguments)))
+    }
+
+    /// `<L>x<A>` con due interi positivi fatti di sole cifre; qualunque altra forma non dà misura.
+    static func parseWindowSize(_ text: String?) -> CGSize? {
+        guard let parts = text?.split(separator: "x", omittingEmptySubsequences: false), parts.count == 2,
+              parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isWholeNumber) }),
+              let width = Int(parts[0]), let height = Int(parts[1]), width > 0, height > 0
+        else { return nil }
+        return CGSize(width: width, height: height)
     }
 
     private static func value(after flag: String, in arguments: [String]) -> String? {
@@ -54,11 +70,43 @@ struct DemoLaunch: Sendable {
         return arguments[index + 1]
     }
 
+    /// La finestra principale, quella di `Window(id: "main")` in `MjmCleanerApp`. Si riconosce dall'id
+    /// della scena; se SwiftUI lo scrive in un'altra forma resta l'unica finestra con barra del titolo
+    /// che può diventare principale e non è uno sheet. Con più candidati e nessun id riconosciuto non
+    /// indovina: nessuna finestra, quindi la misura non cambia.
+    @MainActor
+    private static func mainWindow() -> NSWindow? {
+        let candidates = NSApp.windows.filter { $0.styleMask.contains(.titled) && $0.canBecomeMain && $0.sheetParent == nil }
+        let bySceneId = candidates.first {
+            guard let id = $0.identifier?.rawValue else { return false }
+            return id == "main" || id.hasPrefix("main-")
+        }
+        return bySceneId ?? (candidates.count == 1 ? candidates.first : nil)
+    }
+
+    /// Imposta la misura del contenuto, la stessa grandezza di `defaultSize` (1120×700): le catture a
+    /// misura predefinita escono 1120×700, quindi con `setContentSize` escono della misura chiesta.
+    /// Riprova per circa due secondi se la finestra non è ancora fra quelle dell'app. Il minimo
+    /// della vista (900×600) resta in vigore: sotto quella misura la finestra non scende.
+    @MainActor
+    private static func resizeMainWindow(to size: CGSize) async {
+        for _ in 0..<20 {
+            if let window = mainWindow() {
+                window.setContentSize(size)
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
     /// Apre la pagina chiesta passando dai metodi di `MainModel`, come farebbe l'utente.
     @MainActor
     func open(into startup: AppStartup) {
         // In primo piano, così gli screenshot mostrano la finestra attiva.
         NSApp.activate()
+        if let windowSize {
+            Task { await Self.resizeMainWindow(to: windowSize) }
+        }
         guard page != .startupFailure else {
             let denied = FileSystemError(code: EACCES, path: DemoServices.paths.databaseFile)
             startup.fail(StartupFailure.message(paths: DemoServices.paths, error: denied))

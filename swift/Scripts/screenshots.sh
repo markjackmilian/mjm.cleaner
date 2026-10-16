@@ -1,16 +1,32 @@
 #!/bin/zsh
 # Screenshot delle pagine dell'avvio dimostrativo (solo Debug), in chiaro e in scuro (spec §9.4).
-# Uso: swift/Scripts/screenshots.sh <cartella di uscita> [pagina…]
-# Senza pagine le cattura tutte. Durante la cattura si aprono e si chiudono finestre dell'app: non
-# usare il Mac finché lo script non finisce (con Claude in primo piano), perché ogni finestra prende il
-# primo piano e i tasti premuti finirebbero nella demo.
+# Uso: swift/Scripts/screenshots.sh [--size <L>x<A>] <cartella di uscita> [pagina…]
+# Senza pagine le cattura tutte. Con `--size 900x600` la finestra principale si apre con il contenuto
+# a quella misura in punti (`-MJMWindowSize`, senza input sintetico) e dopo ogni cattura si stampano
+# le dimensioni in pixel del PNG, per vedere se la misura è stata applicata.
+# Durante la cattura si aprono e si chiudono finestre dell'app: non usare il Mac finché lo script
+# non finisce (con Claude in primo piano), perché ogni finestra prende il primo piano e i tasti
+# premuti finirebbero nella demo.
 # Esce con 1 se una cattura non riesce (schermo bloccato o spento, oppure Mac in uso: una finestra
 # che non arriva in primo piano non si cattura).
 set -euo pipefail
 
 here=${0:A:h}
 project=${here:h}/MjmCleaner.xcodeproj
-out=${1:?"uso: screenshots.sh <cartella di uscita> [pagina…]"}
+usage="uso: screenshots.sh [--size <L>x<A>] <cartella di uscita> [pagina…]"
+
+# La misura si valida prima di costruire o avviare qualunque cosa.
+size=""
+if [[ ${1:-} == --size ]]; then
+    size=${2:-}
+    if [[ ! $size =~ '^[1-9][0-9]*x[1-9][0-9]*$' ]]; then
+        print -u2 "misura non valida: ${size:-(mancante)}: atteso <L>x<A>, per esempio 900x600"
+        print -u2 "$usage"
+        exit 2
+    fi
+    shift 2
+fi
+out=${1:?$usage}
 shift
 
 # Le pagine di `DemoLaunch.Page`. Con una pagina sconosciuta l'app partirebbe senza la demo, cioè
@@ -63,13 +79,19 @@ pid=""
 trap 'pkill -f "$binary" 2>/dev/null; true' EXIT
 trap 'exit 130' INT TERM
 
+# Con `--size` l'app apre la finestra a quella misura (`DemoLaunch`, `-MJMWindowSize`).
+size_args=()
+if [[ -n $size ]]; then
+    size_args=(-MJMWindowSize "$size")
+fi
+
 failed=0
 for page in $pages; do
     for appearance in light dark; do
         # `open` avvia l'app da LaunchServices, come il Finder: un processo figlio di questa shell
         # potrebbe non ricevere finestre.
         # `-ApplePersistenceIgnoreState`: la finestra si apre alla misura predefinita, non a quella salvata.
-        open -n "$bundle" --args -MJMDemo "$page" -MJMAppearance "$appearance" -ApplePersistenceIgnoreState YES
+        open -n "$bundle" --args -MJMDemo "$page" -MJMAppearance "$appearance" $size_args -ApplePersistenceIgnoreState YES
         # Il tempo per caricare la pagina e, per le Impostazioni, aprire lo sheet.
         sleep 3
         pid=$(pgrep -n -f "$binary" || true)
@@ -81,6 +103,10 @@ for page in $pages; do
                 failed=1
             elif screencapture -x -o -l"$id" "$out/$page-$appearance.png"; then
                 print "$out/$page-$appearance.png"
+                if [[ -n $size ]]; then
+                    sips -g pixelWidth -g pixelHeight "$out/$page-$appearance.png" \
+                        | awk '/pixelWidth/ {w = $2} /pixelHeight/ {h = $2} END {print "  " w "x" h " pixel"}' || true
+                fi
             else
                 print -u2 "cattura non riuscita per $page ($appearance): lo schermo è bloccato o spento?"
                 failed=1

@@ -23,7 +23,7 @@ for args in \
     fail "invalid arguments unexpectedly accepted: $args"
   fi
 done
-"$PACKAGE_SCRIPT" --tag v1.2.3 --build-number 1 --validate-only >/dev/null
+"$PACKAGE_SCRIPT" --tag v1.2.3 --build-number 1 --validate-only --output-dir "$TMP_ROOT/validate-output" >/dev/null
 [[ ! -e "$TMP_ROOT/validate-output" ]] || fail "validate-only created output directory"
 
 printf 'PASS: input validation\n'
@@ -35,6 +35,11 @@ cat > "$SHIMS/xcodebuild" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 [[ "${FAIL_STAGE:-}" != build ]] || exit 31
+[[ -z "${RACE_SECOND_BUILD:-}" ]] || : > "$RACE_SECOND_BUILD"
+if [[ -n "${RACE_STARTED:-}" ]]; then
+  : > "$RACE_STARTED"
+  while [[ ! -e "$RACE_RELEASE" ]]; do sleep 0.05; done
+fi
 while (($#)); do
   if [[ "$1" == -derivedDataPath ]]; then DERIVED=$2; break; fi
   shift
@@ -72,14 +77,25 @@ if [[ "$1" == -c ]]; then
   [[ "${FAIL_STAGE:-}" != compress ]] || exit 34
   while (($# > 2)); do shift; done
   src=$1; dst=$2
-  mkdir -p "$(dirname "$dst")"
-  cp -R "$src" "$dst"
-else
-  [[ "$1" == -x && "${FAIL_STAGE:-}" != extract ]] || exit 35
-  src=$3; dst=$4
   mkdir -p "$dst"
   cp -R "$src" "$dst/"
+elif [[ "$1" == -x ]]; then
+  [[ "${FAIL_STAGE:-}" != extract ]] || exit 35
+  src=$3; dst=$4
+  mkdir -p "$dst"
+  cp -R "$src/." "$dst/"
+else
+  [[ "${FAIL_STAGE:-}" != transfer_bundle ]] || exit 36
+  cp -R "$1/." "$2/"
 fi
+SH
+cat > "$SHIMS/cat" <<'SH'
+#!/usr/bin/env bash
+if [[ "${FAIL_STAGE:-}" == transfer_zip ]]; then
+  printf 'partial zip'
+  exit 37
+fi
+if [[ -d "$1" ]]; then printf 'mock archive\n'; else exec /bin/cat "$@"; fi
 SH
 chmod +x "$SHIMS"/*
 
@@ -109,8 +125,31 @@ cp "$ZIP_COLLISION/mjm.cleaner-v0.1.0-macos-universal.zip" "$TMP_ROOT/zip.sentin
 if "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$ZIP_COLLISION" >/dev/null 2>&1; then fail "existing ZIP was overwritten"; fi
 cmp -s "$ZIP_COLLISION/mjm.cleaner-v0.1.0-macos-universal.zip" "$TMP_ROOT/zip.sentinel" || fail "ZIP collision changed sentinel"
 
-for stage in build verify compress; do
+for stage in build verify compress transfer_bundle transfer_zip; do
   make_env "$stage" "$TMP_ROOT/$stage-output"
 done
+
+# A second package process must fail while the first owns its output names.
+RACE_OUT="$TMP_ROOT/race-output"
+RACE_STARTED="$TMP_ROOT/race-started"
+RACE_RELEASE="$TMP_ROOT/race-release"
+RACE_LOG="$TMP_ROOT/race-first.log"
+RACE_STARTED="$RACE_STARTED" RACE_RELEASE="$RACE_RELEASE" PATH="$SHIMS:$PATH" \
+  "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$RACE_OUT" >"$RACE_LOG" 2>&1 &
+RACE_PID=$!
+for _ in {1..200}; do [[ -e "$RACE_STARTED" ]] && break; sleep 0.05; done
+[[ -e "$RACE_STARTED" ]] || fail "first packaging process did not reach build gate"
+if RACE_SECOND_BUILD="$TMP_ROOT/race-second-build" PATH="$SHIMS:$PATH" \
+  "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$RACE_OUT" >"$TMP_ROOT/race-second.log" 2>&1; then
+  : > "$RACE_RELEASE"
+  wait "$RACE_PID" || true
+  fail "concurrent packaging process acquired already-reserved outputs"
+fi
+grep -q 'Refusing to overwrite or claim' "$TMP_ROOT/race-second.log" || fail "concurrent process did not fail at output reservation"
+[[ ! -e "$TMP_ROOT/race-second-build" ]] || fail "concurrent process started xcodebuild"
+[[ ! -e "$RACE_OUT/mjm.cleaner.app/Contents/MacOS/MjmCleaner" ]] || fail "concurrent invocation created an app inside the reservation"
+: > "$RACE_RELEASE"
+wait "$RACE_PID" || { cat "$RACE_LOG" >&2; fail "reservation owner failed after releasing build gate"; }
+[[ -x "$RACE_OUT/mjm.cleaner.app/Contents/MacOS/MjmCleaner" ]] || fail "reservation owner did not complete app"
 
 printf 'PASS: collision refusal and failure cleanup\n'

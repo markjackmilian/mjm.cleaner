@@ -48,22 +48,39 @@ bundle_name='mjm.cleaner.app'
 zip_name="mjm.cleaner-${tag}-macos-universal.zip"
 bundle_dest="$output_dir/$bundle_name"
 zip_dest="$output_dir/$zip_name"
-[[ ! -e "$bundle_dest" && ! -L "$bundle_dest" ]] || { printf 'Refusing to overwrite %s\n' "$bundle_dest" >&2; exit 1; }
-[[ ! -e "$zip_dest" && ! -L "$zip_dest" ]] || { printf 'Refusing to overwrite %s\n' "$zip_dest" >&2; exit 1; }
-
 work=$(mktemp -d "${TMPDIR:-/private/tmp}/mjm-cleaner-release.XXXXXX")
-created_bundle=0
-created_zip=0
+bundle_identity=''
+zip_identity=''
+object_identity() {
+  stat -f '%d:%i' "$1" 2>/dev/null
+}
 cleanup() {
   status=$?
   if ((status != 0)); then
-    ((created_zip == 0)) || rm -f -- "$zip_dest"
-    ((created_bundle == 0)) || rm -rf -- "$bundle_dest"
+    if [[ -n "$zip_identity" && -e "$zip_dest" && "$(object_identity "$zip_dest")" == "$zip_identity" ]]; then
+      rm -f -- "$zip_dest"
+    fi
+    if [[ -n "$bundle_identity" && -d "$bundle_dest" && "$(object_identity "$bundle_dest")" == "$bundle_identity" ]]; then
+      rm -rf -- "$bundle_dest"
+    fi
   fi
   rm -rf -- "$work"
   exit "$status"
 }
 trap cleanup EXIT
+
+# Claim each final name atomically before building. Competing package runs fail
+# on mkdir or noclobber, and cleanup removes only the inodes claimed here.
+if ! mkdir -- "$bundle_dest"; then
+  printf 'Refusing to overwrite or claim %s\n' "$bundle_dest" >&2
+  exit 1
+fi
+bundle_identity=$(object_identity "$bundle_dest")
+if ! (set -o noclobber; : > "$zip_dest"); then
+  printf 'Refusing to overwrite or claim %s\n' "$zip_dest" >&2
+  exit 1
+fi
+zip_identity=$(object_identity "$zip_dest")
 
 xcodebuild -project "$PROJECT_ROOT/MjmCleaner.xcodeproj" -scheme MjmCleaner -configuration Release \
   -destination 'generic/platform=macOS' -derivedDataPath "$work/DerivedData" \
@@ -96,18 +113,13 @@ check_bundle() {
 }
 
 check_bundle "$built_app"
-cp -R -- "$built_app" "$work/$bundle_name"
-check_bundle "$work/$bundle_name"
-ditto -c -k --sequesterRsrc --keepParent "$work/$bundle_name" "$work/$zip_name"
+ditto "$built_app" "$bundle_dest"
+check_bundle "$bundle_dest"
+ditto -c -k --sequesterRsrc --keepParent "$bundle_dest" "$work/$zip_name"
 mkdir "$work/extracted"
 ditto -x -k "$work/$zip_name" "$work/extracted"
 check_bundle "$work/extracted/$bundle_name"
-
-# Refuse a destination race as well as collisions found before the build.
-[[ ! -e "$bundle_dest" && ! -L "$bundle_dest" ]] || { printf 'Refusing to overwrite %s\n' "$bundle_dest" >&2; exit 1; }
-[[ ! -e "$zip_dest" && ! -L "$zip_dest" ]] || { printf 'Refusing to overwrite %s\n' "$zip_dest" >&2; exit 1; }
-mv -- "$work/$bundle_name" "$bundle_dest"
-created_bundle=1
-mv -- "$work/$zip_name" "$zip_dest"
-created_zip=1
+[[ "$(object_identity "$bundle_dest")" == "$bundle_identity" ]] || { printf 'Reserved bundle path changed during packaging\n' >&2; exit 1; }
+[[ "$(object_identity "$zip_dest")" == "$zip_identity" ]] || { printf 'Reserved ZIP path changed during packaging\n' >&2; exit 1; }
+cat "$work/$zip_name" > "$zip_dest"
 printf 'Packaged %s and %s\n' "$bundle_dest" "$zip_dest"

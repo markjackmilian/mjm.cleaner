@@ -84,6 +84,18 @@ struct AppEnvironmentTests {
         #expect(report.itemsDeleted == 1)
     }
 
+    @Test func defaultPathsIsolatesDebugDataFromRelease() {
+        let debug = AppEnvironment.defaultPaths(bundleIdentifier: "com.mjm.cleaner.debug")
+        let release = AppEnvironment.defaultPaths(bundleIdentifier: "com.mjm.cleaner")
+
+        #expect(debug.supportDirectory.hasSuffix("/com.mjm.cleaner.debug"))
+        #expect(debug.databaseFile == PathText.join(debug.supportDirectory, "history.db"))
+        #expect(debug.settingsFile == PathText.join(debug.supportDirectory, "settings.json"))
+        #expect(debug.logsDirectory == PathText.join(debug.supportDirectory, "logs"))
+        #expect(debug.supportDirectory != release.supportDirectory)
+        #expect(release.supportDirectory.hasSuffix("/com.mjm.cleaner"))
+    }
+
     @Test func defaultPathsUseTheBundleIdentifierOrTheProvisionalOne() {
         #expect(AppEnvironment.defaultPaths(bundleIdentifier: "com.esempio.app") == AppPaths.forBundleIdentifier("com.esempio.app"))
         #expect(AppEnvironment.defaultPaths(bundleIdentifier: nil) == AppPaths.forBundleIdentifier("com.mjm.cleaner"))

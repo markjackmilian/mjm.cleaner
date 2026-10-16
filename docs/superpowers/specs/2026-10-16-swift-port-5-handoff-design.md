@@ -30,7 +30,7 @@ La scelta 1 ha due gate. Preparazione, build e confronto non autorizzano una pub
 
 ## Gate di consegna
 
-Prima del commit di rimozione: registro di parità completo; 536 test Core + 172 Features verdi o conteggi aggiornati per test aggiunti; build Debug e Release senza diagnostica; ZIP verificato; screenshot e VoiceOver registrati; confronto reale superato o differenze giudicate e corrette. Un difetto Critical/Important aperto ferma la consegna.
+Prima del commit di rimozione: registro di parità completo; 536 test Core + 172 Features verdi o conteggi aggiornati per test aggiunti; build Debug e Release senza diagnostica; ZIP verificato e ricostruito dopo ogni correzione, con SHA dell'albero `swift/` uguale al codice collaudato e SHA-256 registrato; screenshot e VoiceOver registrati; confronto reale superato o differenze giudicate e corrette. Un difetto Critical/Important aperto ferma la consegna.
 
 Superato il gate, in un commit esplicito sul branch di lavoro:
 

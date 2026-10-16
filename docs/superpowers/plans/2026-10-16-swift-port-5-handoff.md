@@ -34,7 +34,8 @@
 
 **Files:**
 - Modify: `swift/Config/Debug.xcconfig`
-- Test: comandi di build settings e plist, nessun nuovo test unitario.
+- Modify: `swift/MjmCleanerKit/Tests/CleanerFeaturesTests/AppEnvironmentTests.swift` per il test dei percorsi Debug.
+- Test: comandi di build settings, plist e composizione dei percorsi.
 
 **Interfaces:**
 - Consumes: `AppStartup.paths` passa `Bundle.main.bundleIdentifier` a `AppEnvironment.defaultPaths`, che usa `AppPaths.forBundleIdentifier`.
@@ -42,8 +43,8 @@
 
 - [ ] **Step 1: Verificare il RED.** Da `swift/`, eseguire `xcodebuild -project MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Debug -showBuildSettings | grep 'PRODUCT_BUNDLE_IDENTIFIER ='`. Atteso prima della modifica: `com.mjm.cleaner`, quindi diverso dal valore richiesto.
 - [ ] **Step 2: Implementare.** In `swift/Config/Debug.xcconfig`, dopo l'include di Base, aggiungere `PRODUCT_BUNDLE_IDENTIFIER = com.mjm.cleaner.debug`. Non cambiare Base o Release.
-- [ ] **Step 3: Verificare GREEN.** Ripetere build settings Debug e Release; costruire Debug in una nuova DerivedData sotto `/private/tmp`; leggere `CFBundleIdentifier` dal plist con `PlistBuddy`. Attesi Debug `com.mjm.cleaner.debug`, Release `com.mjm.cleaner`; `rg -n 'Bundle.main.bundleIdentifier' swift/MjmCleaner/App/AppStartup.swift` trova la sorgente della cartella dati. Eseguire `swift test -Xswiftc -warnings-as-errors` nel package: 536 Core + 172 Features verdi.
-- [ ] **Step 4: Commit.** Stage solo `swift/Config/Debug.xcconfig` e committare `fix(swift): isolate the debug app identity`.
+- [ ] **Step 3: Verificare GREEN.** Ripetere build settings Debug e Release; costruire Debug in una nuova DerivedData sotto `/private/tmp`; leggere `CFBundleIdentifier` dal plist con `PlistBuddy`. Attesi Debug `com.mjm.cleaner.debug`, Release `com.mjm.cleaner`; estendere `AppEnvironmentTests` per verificare che `AppEnvironment.defaultPaths(bundleIdentifier: "com.mjm.cleaner.debug")` risolva support directory, database, impostazioni e log sotto il dominio Debug, distinto da Release; registrare il percorso risolto e verificare il suffisso `com.mjm.cleaner.debug` nel verbale. Eseguire `swift test -Xswiftc -warnings-as-errors` nel package: 536 Core + 172 Features verdi.
+- [ ] **Step 4: Commit.** Stage solo `swift/Config/Debug.xcconfig` e `swift/MjmCleanerKit/Tests/CleanerFeaturesTests/AppEnvironmentTests.swift` e committare `fix(swift): isolate the debug app identity`.
 
 ### Task 2: Creare e provare il pacchetto Release
 
@@ -57,9 +58,10 @@
 
 - [ ] **Step 1: Test RED degli input.** In `package-release.test.sh` invocare `--validate-only` con `v0.1.0`, build `1` (successo, stampa `0.1.0`), e con tag `v1`, `v1.2.3-rc1`, build `0` e build non numerica (exit non zero, nessuna build avviata). Prima dell'implementazione lo script manca: il test fallisce.
 - [ ] **Step 2: Implementare validazione e prova GREEN.** Lo script usa `set -euo pipefail`, accetta solo il formato `v[0-9]+.[0-9]+.[0-9]+` e build number `[1-9][0-9]*`; rifiuta opzioni sconosciute e valori mancanti; la directory di output è obbligatoria per il packaging e non serve a `--validate-only`. `--validate-only` termina prima di creare file. Eseguire `bash swift/Scripts/package-release.test.sh`, atteso exit 0.
-- [ ] **Step 3: Implementare il packaging.** Con una directory temporanea esclusiva: `xcodebuild` Release, destinazione `generic/platform=macOS`, `ARCHS='arm64 x86_64'`, `ONLY_ACTIVE_ARCH=NO`, versione/build da input e firma ad hoc già configurata. Verificare `lipo -archs` = `arm64 x86_64` senza dipendere dall'ordine; `PlistBuddy` per ID, nome, versione, build e macOS minimo 15; `codesign --verify --deep --strict` e `codesign -dv` per `Signature=adhoc`; nessun `MJMDemo` o «Pagina demo» nei binari Release. Copiare il bundle come `mjm.cleaner.app`, riverificare, comprimere con `ditto -c -k --sequesterRsrc --keepParent`, estrarre con `ditto -x -k` in un'altra directory e ripetere i controlli. Se bundle o ZIP di destinazione esistono già, rifiutare senza sovrascriverli. Un errore rimuove solo gli output parziali di questa invocazione, mai una directory preesistente dell'utente.
-- [ ] **Step 4: Prova reale.** Eseguire `bash swift/Scripts/package-release.sh --tag v0.1.0 --build-number 1 --output-dir /private/tmp/mjm-swift-port5-candidate` e ispezionare ZIP estratto: due architetture, plist e firma validi. Non avviare l'app e non pubblicare il pacchetto.
+- [ ] **Step 3: Test RED di conservazione degli output.** Con file sentinella preesistenti nella directory di destinazione, testare bundle e ZIP omonimi: il comando fallisce e i contenuti restano identici. Simulare fallimenti distinti di build, verifica e compressione tramite comandi sostitutivi controllati dal test; dopo ciascuno confrontare i sentinella e verificare che spariscano solo gli output parziali creati da quella invocazione. Il test fallisce finché il packaging non gestisce questi casi.
+- [ ] **Step 4: Implementare il packaging e verificare GREEN.** Con una directory temporanea esclusiva: `xcodebuild` Release, destinazione `generic/platform=macOS`, `ARCHS='arm64 x86_64'`, `ONLY_ACTIVE_ARCH=NO`, versione/build da input e firma ad hoc già configurata. Verificare `lipo -archs` = `arm64 x86_64` senza dipendere dall'ordine; `PlistBuddy` per ID, nome, versione, build e macOS minimo 15; `codesign --verify --deep --strict` e `codesign -dv` per `Signature=adhoc`; nessun `MJMDemo` o «Pagina demo» nei binari Release. Copiare il bundle come `mjm.cleaner.app`, riverificare, comprimere con `ditto -c -k --sequesterRsrc --keepParent`, estrarre con `ditto -x -k` in un'altra directory e ripetere i controlli. Se bundle o ZIP di destinazione esistono già, rifiutare senza sovrascriverli. Un errore rimuove solo gli output parziali di questa invocazione, mai una directory preesistente dell'utente. Eseguire l’intera suite `package-release.test.sh`: tutti i casi RED diventano verdi.
 - [ ] **Step 5: Commit.** Stage solo i due script e committare `feat(swift): package a verified universal macOS release`.
+- [ ] **Step 6: Prova reale sul codice committato.** Con `swift/` pulito e senza modifiche non committate, eseguire `bash swift/Scripts/package-release.sh --tag v0.1.0 --build-number 1 --output-dir /private/tmp/mjm-swift-port5-candidate` e ispezionare ZIP estratto: due architetture, plist e firma validi. Registrare l'identità dell'albero di codice (`git rev-parse HEAD:swift`) e SHA-256 dello ZIP; i commit successivi solo documentali non cambiano l'identità del codice. Non avviare l'app e non pubblicare il pacchetto.
 
 ### Task 3: Confrontare schermate e VoiceOver
 
@@ -104,8 +106,8 @@
 - Consumes: report dei Task 2–4 e suite corrente.
 - Produces: decisione GO/NO-GO verificabile prima di rimuovere C#.
 
-- [ ] **Step 1: Rileggere prove.** Controllare registro di parità completo, 536 + 172 test o nuovi conteggi giustificati, build Debug/Release senza avvisi, ZIP estratto con due slice e firma, screenshot e VoiceOver, confronto reale e differenze giudicate. Un test non eseguito o un difetto Critical/Important aperto produce NO-GO.
-- [ ] **Step 2: Registrare esito.** Scrivere la tabella dei gate con link ai report, SHA e output essenziali, più eventuali minor rinviati e costo. Se NO-GO, continuare a correggere o fermarsi sul dato esterno mancante; non iniziare Task 6.
+- [ ] **Step 1: Rileggere prove.** Controllare registro di parità completo, 536 + 172 test o nuovi conteggi giustificati, build Debug/Release senza avvisi, ZIP estratto con due slice e firma, screenshot e VoiceOver, confronto reale e differenze giudicate. Dopo ogni correzione dei Task 3–4, committare il codice, verificare che `swift/` sia pulito, quindi ricostruire e riverificare il pacchetto; il gate accetta solo uno ZIP costruito dallo stesso SHA dell'albero `swift/` collaudato, con SHA-256 registrato. Uno ZIP di un albero di codice precedente produce NO-GO. Un test non eseguito o un difetto Critical/Important aperto produce NO-GO.
+- [ ] **Step 2: Registrare esito.** Scrivere la tabella dei gate con link ai report, SHA del commit collaudato, SHA dell'albero `swift/` del pacchetto e del collaudo, SHA-256 dello ZIP e output essenziali, più eventuali minor rinviati e costo. Se NO-GO, continuare a correggere o fermarsi sul dato esterno mancante; non iniziare Task 6.
 - [ ] **Step 3: Commit.** Stage solo il gate e l'eventuale riga aggiornata del registro di parità; committare `docs(swift): record phase-five handoff gate`.
 
 ### Task 6: Rimuovere C# e ricollocare Swift

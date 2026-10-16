@@ -34,8 +34,14 @@ mkdir -p "$SHIMS"
 cat > "$SHIMS/xcodebuild" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "${FAIL_STAGE:-}" != build ]] || exit 31
 [[ -z "${RACE_SECOND_BUILD:-}" ]] || : > "$RACE_SECOND_BUILD"
+if [[ "${FAIL_STAGE:-}" == build ]]; then
+  case "${RACE_CREATE_ZIP_KIND:-}" in
+    symlink) ln -s /dev/null "$RACE_ZIP_PATH" ;;
+    fifo) mkfifo "$RACE_ZIP_PATH" ;;
+  esac
+  exit 31
+fi
 if [[ -n "${RACE_STARTED:-}" ]]; then
   : > "$RACE_STARTED"
   while [[ ! -e "$RACE_RELEASE" ]]; do sleep 0.05; done
@@ -129,6 +135,58 @@ for stage in build verify compress transfer_bundle transfer_zip; do
   make_env "$stage" "$TMP_ROOT/$stage-output"
 done
 
+# A symlink or FIFO at the final ZIP name is an existing object. Reject it
+# promptly before xcodebuild; never follow, truncate, or unlink it.
+check_special_zip_collision() {
+  local kind=$1 out="$TMP_ROOT/special-$1" zip="$TMP_ROOT/special-$1/mjm.cleaner-v0.1.0-macos-universal.zip"
+  local marker="$TMP_ROOT/special-$1-build-started" pid status=124
+  mkdir -p "$out"
+  if [[ "$kind" == symlink ]]; then ln -s /dev/null "$zip"; else mkfifo "$zip"; fi
+  FAIL_STAGE=build RACE_SECOND_BUILD="$marker" PATH="$SHIMS:$PATH" \
+    "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/special-$kind.log" 2>&1 &
+  pid=$!
+  for _ in {1..40}; do
+    if ! kill -0 "$pid" 2>/dev/null; then wait "$pid" || status=$?; break; fi
+    sleep 0.05
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fail "$kind ZIP collision blocked instead of rejecting promptly"
+  fi
+  [[ "$status" -ne 0 ]] || fail "$kind ZIP collision unexpectedly succeeded"
+  [[ ! -e "$marker" ]] || fail "$kind ZIP collision reached xcodebuild"
+  if [[ "$kind" == symlink ]]; then
+    [[ -L "$zip" && "$(readlink "$zip")" == /dev/null ]] || fail "preexisting ZIP symlink was changed or removed"
+  else
+    [[ -p "$zip" ]] || fail "preexisting ZIP FIFO was changed or removed"
+  fi
+  [[ ! -e "$out/mjm.cleaner.app" ]] || fail "$kind ZIP collision left a reserved bundle"
+}
+check_special_zip_collision symlink
+check_special_zip_collision fifo
+
+# If another process claims the ZIP pathname after our build has started, a
+# failed build must preserve that object while cleaning our reserved bundle.
+check_build_failure_preserves_special_zip() {
+  local kind=$1 out="$TMP_ROOT/build-failure-$1" zip="$TMP_ROOT/build-failure-$1/mjm.cleaner-v0.1.0-macos-universal.zip"
+  local marker="$TMP_ROOT/build-failure-$1-started"
+  mkdir -p "$out"
+  if FAIL_STAGE=build RACE_SECOND_BUILD="$marker" RACE_CREATE_ZIP_KIND="$kind" RACE_ZIP_PATH="$zip" PATH="$SHIMS:$PATH" \
+    "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/build-failure-$kind.log" 2>&1; then
+    fail "$kind ZIP object injected during failed build unexpectedly succeeded"
+  fi
+  [[ -e "$marker" ]] || fail "build failure injection did not reach xcodebuild"
+  if [[ "$kind" == symlink ]]; then
+    [[ -L "$zip" && "$(readlink "$zip")" == /dev/null ]] || fail "build cleanup removed or changed racing ZIP symlink"
+  else
+    [[ -p "$zip" ]] || fail "build cleanup removed or changed racing ZIP FIFO"
+  fi
+  [[ ! -e "$out/mjm.cleaner.app" ]] || fail "build failure left reserved bundle"
+}
+check_build_failure_preserves_special_zip symlink
+check_build_failure_preserves_special_zip fifo
+
 # A second package process must fail while the first owns its output names.
 RACE_OUT="$TMP_ROOT/race-output"
 RACE_STARTED="$TMP_ROOT/race-started"
@@ -145,7 +203,7 @@ if RACE_SECOND_BUILD="$TMP_ROOT/race-second-build" PATH="$SHIMS:$PATH" \
   wait "$RACE_PID" || true
   fail "concurrent packaging process acquired already-reserved outputs"
 fi
-grep -q 'Refusing to overwrite or claim' "$TMP_ROOT/race-second.log" || fail "concurrent process did not fail at output reservation"
+grep -E -q 'Refusing to (overwrite|reserve)' "$TMP_ROOT/race-second.log" || fail "concurrent process did not fail at output reservation"
 [[ ! -e "$TMP_ROOT/race-second-build" ]] || fail "concurrent process started xcodebuild"
 [[ ! -e "$RACE_OUT/mjm.cleaner.app/Contents/MacOS/MjmCleaner" ]] || fail "concurrent invocation created an app inside the reservation"
 : > "$RACE_RELEASE"

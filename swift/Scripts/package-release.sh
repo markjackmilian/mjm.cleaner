@@ -48,8 +48,14 @@ bundle_name='mjm.cleaner.app'
 zip_name="mjm.cleaner-${tag}-macos-universal.zip"
 bundle_dest="$output_dir/$bundle_name"
 zip_dest="$output_dir/$zip_name"
+zip_lock="$output_dir/.${zip_name}.lock"
+[[ ! -e "$bundle_dest" && ! -L "$bundle_dest" ]] || { printf 'Refusing to overwrite %s\n' "$bundle_dest" >&2; exit 1; }
+[[ ! -e "$zip_dest" && ! -L "$zip_dest" ]] || { printf 'Refusing to overwrite %s\n' "$zip_dest" >&2; exit 1; }
 work=$(mktemp -d "${TMPDIR:-/private/tmp}/mjm-cleaner-release.XXXXXX")
 bundle_identity=''
+zip_lock_identity=''
+zip_stage=''
+zip_stage_identity=''
 zip_identity=''
 object_identity() {
   stat -f '%d:%i' "$1" 2>/dev/null
@@ -57,30 +63,38 @@ object_identity() {
 cleanup() {
   status=$?
   if ((status != 0)); then
-    if [[ -n "$zip_identity" && -e "$zip_dest" && "$(object_identity "$zip_dest")" == "$zip_identity" ]]; then
+    if [[ -n "$zip_identity" && -f "$zip_dest" && ! -L "$zip_dest" && "$(object_identity "$zip_dest")" == "$zip_identity" ]]; then
       rm -f -- "$zip_dest"
     fi
-    if [[ -n "$bundle_identity" && -d "$bundle_dest" && "$(object_identity "$bundle_dest")" == "$bundle_identity" ]]; then
+    if [[ -n "$bundle_identity" && -d "$bundle_dest" && ! -L "$bundle_dest" && "$(object_identity "$bundle_dest")" == "$bundle_identity" ]]; then
       rm -rf -- "$bundle_dest"
     fi
+  fi
+  if [[ -n "$zip_stage_identity" && -e "$zip_stage" && "$(object_identity "$zip_stage")" == "$zip_stage_identity" ]]; then
+    rm -f -- "$zip_stage"
+  fi
+  if [[ -n "$zip_lock_identity" && -d "$zip_lock" && "$(object_identity "$zip_lock")" == "$zip_lock_identity" ]]; then
+    rm -rf -- "$zip_lock"
   fi
   rm -rf -- "$work"
   exit "$status"
 }
 trap cleanup EXIT
 
-# Claim each final name atomically before building. Competing package runs fail
-# on mkdir or noclobber, and cleanup removes only the inodes claimed here.
+# Reserve the bundle name and a private ZIP lock before building. The ZIP itself
+# is published later with ln, which atomically refuses every existing object.
 if ! mkdir -- "$bundle_dest"; then
   printf 'Refusing to overwrite or claim %s\n' "$bundle_dest" >&2
   exit 1
 fi
 bundle_identity=$(object_identity "$bundle_dest")
-if ! (set -o noclobber; : > "$zip_dest"); then
-  printf 'Refusing to overwrite or claim %s\n' "$zip_dest" >&2
+if ! mkdir -- "$zip_lock"; then
+  printf 'Refusing to reserve %s\n' "$zip_dest" >&2
   exit 1
 fi
-zip_identity=$(object_identity "$zip_dest")
+zip_lock_identity=$(object_identity "$zip_lock")
+zip_stage=$(mktemp "$output_dir/.${zip_name}.stage.XXXXXX")
+zip_stage_identity=$(object_identity "$zip_stage")
 
 xcodebuild -project "$PROJECT_ROOT/MjmCleaner.xcodeproj" -scheme MjmCleaner -configuration Release \
   -destination 'generic/platform=macOS' -derivedDataPath "$work/DerivedData" \
@@ -120,6 +134,9 @@ mkdir "$work/extracted"
 ditto -x -k "$work/$zip_name" "$work/extracted"
 check_bundle "$work/extracted/$bundle_name"
 [[ "$(object_identity "$bundle_dest")" == "$bundle_identity" ]] || { printf 'Reserved bundle path changed during packaging\n' >&2; exit 1; }
-[[ "$(object_identity "$zip_dest")" == "$zip_identity" ]] || { printf 'Reserved ZIP path changed during packaging\n' >&2; exit 1; }
-cat "$work/$zip_name" > "$zip_dest"
+[[ "$(object_identity "$zip_lock")" == "$zip_lock_identity" ]] || { printf 'ZIP reservation changed during packaging\n' >&2; exit 1; }
+[[ "$(object_identity "$zip_stage")" == "$zip_stage_identity" ]] || { printf 'ZIP staging file changed during packaging\n' >&2; exit 1; }
+cat "$work/$zip_name" > "$zip_stage"
+ln -- "$zip_stage" "$zip_dest"
+zip_identity=$zip_stage_identity
 printf 'Packaged %s and %s\n' "$bundle_dest" "$zip_dest"

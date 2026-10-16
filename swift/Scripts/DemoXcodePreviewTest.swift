@@ -33,5 +33,8 @@ struct DemoXcodePreviewTest {
         precondition(
             Set(demoPreview.selectedCandidates.map(\.key)) == previewedKeys,
             "l'anteprima della pagina xcode-preview deve contenere tutte le chiavi scelte dalla demo")
+        precondition(
+            demoPreview.selectedCandidates.contains { $0.kind == .derivedData },
+            "la pagina xcode-preview deve mostrare anche una cartella DerivedData, il caso del difetto V-01")
     }
 }

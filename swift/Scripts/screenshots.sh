@@ -1,9 +1,10 @@
 #!/bin/zsh
 # Screenshot delle pagine dell'avvio dimostrativo (solo Debug), in chiaro e in scuro (spec §9.4).
 # Uso: swift/Scripts/screenshots.sh [--size <L>x<A>] <cartella di uscita> [pagina…]
-# Senza pagine le cattura tutte. Con `--size 900x600` la finestra principale si apre con il contenuto
-# a quella misura in punti (`-MJMWindowSize`, senza input sintetico) e dopo ogni cattura si stampano
-# le dimensioni in pixel del PNG, per vedere se la misura è stata applicata.
+# Senza pagine le cattura tutte. Con `--size <L>x<A>` la finestra principale si apre a quella misura
+# in punti, barra degli strumenti compresa (`-MJMWindowSize`, senza input sintetico); sotto il minimo
+# si ferma a 900x652 (i 900x600 della vista più i 52 della barra), quindi `--size 900x600` cattura la
+# finestra minima. Dopo ogni cattura si stampano le dimensioni in pixel del PNG.
 # Durante la cattura si aprono e si chiudono finestre dell'app: non usare il Mac finché lo script
 # non finisce (con Claude in primo piano), perché ogni finestra prende il primo piano e i tasti
 # premuti finirebbero nella demo.
@@ -19,14 +20,18 @@ usage="uso: screenshots.sh [--size <L>x<A>] <cartella di uscita> [pagina…]"
 size=""
 if [[ ${1:-} == --size ]]; then
     size=${2:-}
-    if [[ ! $size =~ '^[1-9][0-9]*x[1-9][0-9]*$' ]]; then
+    if [[ ! $size =~ '^[1-9][0-9]{0,3}x[1-9][0-9]{0,3}$' ]]; then
         print -u2 "misura non valida: ${size:-(mancante)}: atteso <L>x<A>, per esempio 900x600"
         print -u2 "$usage"
         exit 2
     fi
     shift 2
 fi
-out=${1:?$usage}
+if (( ! $# )); then
+    print -u2 "$usage"
+    exit 2
+fi
+out=$1
 shift
 
 # Le pagine di `DemoLaunch.Page`. Con una pagina sconosciuta l'app partirebbe senza la demo, cioè

@@ -6,10 +6,11 @@ import Foundation
 
 /// Avvio dimostrativo per gli screenshot (spec §9.4), solo in Debug: `-MJMDemo <pagina>` apre la
 /// pagina con servizi finti e dati fissi, `-MJMAppearance light|dark` sceglie l'aspetto,
-/// `-MJMWindowSize <L>x<A>` (interi positivi, per esempio `900x600`) porta il contenuto della
-/// finestra principale a quella misura in punti; un valore assente o malformato lascia la misura
-/// predefinita. Nessun servizio finto tocca il disco: un clic su «Elimina» restituisce un resoconto
-/// inventato.
+/// `-MJMWindowSize <L>x<A>` (interi positivi, per esempio `900x600`) porta la finestra principale a
+/// quella misura in punti, barra degli strumenti compresa; una misura sotto il minimo dà il minimo
+/// (900×652: i 900×600 della vista più i 52 della barra), un valore assente o malformato lascia la
+/// misura predefinita. Nessun servizio finto tocca il disco: un clic su «Elimina» restituisce un
+/// resoconto inventato.
 struct DemoLaunch: Sendable {
     enum Page: String, CaseIterable, Sendable {
         case choose
@@ -84,10 +85,11 @@ struct DemoLaunch: Sendable {
         return bySceneId ?? (candidates.count == 1 ? candidates.first : nil)
     }
 
-    /// Imposta la misura del contenuto, la stessa grandezza di `defaultSize` (1120×700): le catture a
-    /// misura predefinita escono 1120×700, quindi con `setContentSize` escono della misura chiesta.
-    /// Riprova per circa due secondi se la finestra non è ancora fra quelle dell'app. Il minimo
-    /// della vista (900×600) resta in vigore: sotto quella misura la finestra non scende.
+    /// Imposta la misura del contenuto, la stessa grandezza di `defaultSize` (1120×700): il contenuto
+    /// arriva fino al bordo alto (`fullSizeContentView`), quindi la cattura esce della misura chiesta.
+    /// Il minimo della vista (900×600) vale sotto la barra degli strumenti: la finestra non scende
+    /// sotto 900×652 e una misura più piccola si ferma lì. Riprova per circa due secondi se la
+    /// finestra non è ancora fra quelle dell'app, poi lo scrive nel log e lascia la misura com'è.
     @MainActor
     private static func resizeMainWindow(to size: CGSize) async {
         for _ in 0..<20 {
@@ -97,6 +99,7 @@ struct DemoLaunch: Sendable {
             }
             try? await Task.sleep(for: .milliseconds(100))
         }
+        NSLog("MJMWindowSize: finestra principale non trovata, misura invariata")
     }
 
     /// Apre la pagina chiesta passando dai metodi di `MainModel`, come farebbe l'utente.

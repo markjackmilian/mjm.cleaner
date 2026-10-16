@@ -44,9 +44,9 @@ public struct RuleScanner: Sendable {
         case .clearContents:
             try scanContents(rule, &accumulator)
         case .matchingFiles:
-            try scanFiles(rule, rule.root, depth: 0, &accumulator)
+            try scanFiles(rule, &accumulator)
         case .matchingDirs:
-            try scanDirectories(rule, rule.root, depth: 0, &accumulator)
+            try scanDirectories(rule, &accumulator)
         }
 
         return accumulator.outcome
@@ -129,10 +129,11 @@ public struct RuleScanner: Sendable {
         }
     }
 
-    private func scanFiles(_ rule: CleanupRule, _ directory: String, depth: Int, _ accumulator: inout Accumulator) throws {
-        guard depth <= rule.maxDepth else { return }
+    private func scanFiles(_ rule: CleanupRule, _ accumulator: inout Accumulator) throws {
+        var open = OpenDirectories()
+        enter(rule.root, depth: 0, rule, &open, &accumulator.errors)
 
-        for entry in enumerate(directory, &accumulator.errors) {
+        while let (entry, _, depth) = open.next() {
             try Task.checkCancellation()
 
             if links.isSymbolicLink(entry) { continue }
@@ -154,7 +155,7 @@ public struct RuleScanner: Sendable {
                     continue
                 }
 
-                try scanFiles(rule, entry, depth: depth + 1, &accumulator)
+                enter(entry, depth: depth + 1, rule, &open, &accumulator.errors)
                 continue
             }
 
@@ -172,12 +173,13 @@ public struct RuleScanner: Sendable {
         }
     }
 
-    /// Cerca ricorsivamente cartelle il cui nome corrisponde ai pattern (bin/obj, pacchetti NuGet).
+    /// Cerca in profondità cartelle il cui nome corrisponde ai pattern (bin/obj, pacchetti NuGet).
     /// Una cartella trovata non viene mai attraversata oltre: sarà eliminata per intero.
-    private func scanDirectories(_ rule: CleanupRule, _ directory: String, depth: Int, _ accumulator: inout Accumulator) throws {
-        guard depth <= rule.maxDepth else { return }
+    private func scanDirectories(_ rule: CleanupRule, _ accumulator: inout Accumulator) throws {
+        var open = OpenDirectories()
+        enter(rule.root, depth: 0, rule, &open, &accumulator.errors)
 
-        for entry in enumerate(directory, &accumulator.errors) {
+        while let (entry, directory, depth) = open.next() {
             try Task.checkCancellation()
 
             if links.isSymbolicLink(entry) || !fileSystem.directoryExists(entry) { continue }
@@ -222,7 +224,7 @@ public struct RuleScanner: Sendable {
                 continue
             }
 
-            try scanDirectories(rule, entry, depth: depth + 1, &accumulator)
+            enter(entry, depth: depth + 1, rule, &open, &accumulator.errors)
         }
     }
 
@@ -234,6 +236,37 @@ public struct RuleScanner: Sendable {
         var exclusions: [GuardExclusion] = []
 
         var outcome: RuleScanOutcome { RuleScanOutcome(items: items, errors: errors, exclusions: exclusions) }
+    }
+
+    /// Le cartelle aperte di una visita in profondità, dalla più esterna: per ognuna la profondità
+    /// e le voci ancora da visitare. Prende il posto della ricorsione, che scendeva di una chiamata
+    /// per livello e con qualche centinaio di livelli esauriva lo stack del thread (crash del
+    /// 2026-10-15): le voci escono nello stesso ordine, in profondità e nell'ordine di elenco, e
+    /// una sottocartella si visita per intero prima delle voci che la seguono.
+    private struct OpenDirectories {
+        private var stack: [(path: String, depth: Int, entries: IndexingIterator<[String]>)] = []
+
+        mutating func push(_ path: String, depth: Int, _ entries: [String]) {
+            stack.append((path, depth, entries.makeIterator()))
+        }
+
+        /// La prossima voce da visitare, con la cartella che la contiene e la profondità di questa.
+        mutating func next() -> (entry: String, directory: String, depth: Int)? {
+            while let top = stack.indices.last {
+                if let entry = stack[top].entries.next() {
+                    return (entry, stack[top].path, stack[top].depth)
+                }
+                stack.removeLast()
+            }
+            return nil
+        }
+    }
+
+    /// Elenca `directory` e la apre nella visita, se non supera la profondità massima: è la
+    /// guardia che la versione ricorsiva aveva in testa, quindi oltre `maxDepth` non si elenca.
+    private func enter(_ directory: String, depth: Int, _ rule: CleanupRule, _ open: inout OpenDirectories, _ errors: inout [ScanError]) {
+        guard depth <= rule.maxDepth else { return }
+        open.push(directory, depth: depth, enumerate(directory, &errors))
     }
 
     private static var vcsExclusionReason: String {
@@ -300,20 +333,30 @@ public struct RuleScanner: Sendable {
     /// Dimensione totale, timestamp più recente e determinabilità di una cartella in un solo
     /// attraversamento, saltando i collegamenti. La determinabilità riguarda solo il timestamp
     /// della cartella passata: una sottocartella scomparsa contribuisce 0 e non invalida il totale.
+    ///
+    /// Iterativa, con una pila esplicita, come `CleanEngine.sumOfFiles`: la versione ricorsiva
+    /// scendeva di una chiamata per livello e una cartella di qualche centinaio di livelli
+    /// esauriva lo stack del thread già in analisi. Visita in profondità nello stesso ordine della
+    /// ricorsione, quindi registra gli stessi errori nello stesso ordine.
     private func directoryStats(_ directory: String, _ errors: inout [ScanError]) throws -> (size: Int64, newest: Date, determinable: Bool) {
         var total: Int64 = 0
         let ownStamp = readDirectoryStamp(directory, &errors)
         var newest = ownStamp ?? .distantPast
+        // Per ogni cartella aperta, le voci ancora da visitare; in cima la più profonda.
+        var open = [enumerate(directory, &errors).makeIterator()]
 
-        for entry in enumerate(directory, &errors) {
+        while var entries = open.popLast() {
+            guard let entry = entries.next() else { continue }
+            open.append(entries)
             try Task.checkCancellation()
 
             if links.isSymbolicLink(entry) { continue }
 
             if fileSystem.directoryExists(entry) {
-                let child = try directoryStats(entry, &errors)
-                total += child.size
-                if child.newest > newest { newest = child.newest }
+                // Come la ricorsione: prima il timestamp della sottocartella, poi il suo elenco.
+                // Senza timestamp determinabile contribuisce solo con il contenuto.
+                if let stamp = readDirectoryStamp(entry, &errors), stamp > newest { newest = stamp }
+                open.append(enumerate(entry, &errors).makeIterator())
             } else {
                 let file = fileSizeAndStamp(entry, &errors)
                 total += file.size

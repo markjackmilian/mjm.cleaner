@@ -122,6 +122,34 @@ struct RuleScannerTests {
         #expect(try single(outcome).path == "\(downloads)/grande.dmg")
     }
 
+    // Solo Swift (visite iterative del 2026-10-16): `maxDepth` conta i livelli sotto la root come la
+    // ricorsione, che elencava una cartella solo se la sua profondità non lo superava.
+    @Test func matchingFilesHonoursMaxDepth() throws {
+        let fs = InMemoryFileSystem()
+        let downloads = "\(Self.home)/Downloads"
+        addFile(fs, "\(downloads)/a/b/profondo.bin", 10)
+        addFile(fs, "\(downloads)/a/medio.bin", 10)
+        addFile(fs, "\(downloads)/vicino.bin", 10)
+
+        let outcome = try create(fs).scan(CleanupRule(downloads, .matchingFiles, include: Self.all, exclude: [], maxDepth: 1))
+
+        #expect(outcome.items.map(\.path) == ["\(downloads)/a/medio.bin", "\(downloads)/vicino.bin"])
+    }
+
+    // Solo Swift (visite iterative del 2026-10-16): l'annullamento interrompe anche la misura di una
+    // cartella, voce per voce, come nella ricorsione.
+    @Test func cancellationStopsTheMeasureOfAFolder() async throws {
+        let mock = InMemoryFileSystem()
+        let app = "\(Self.cacheRoot)/app"
+        addFile(mock, "\(app)/sotto/dati.bin", 10)
+        let scanner = try create(CancellingFileSystem(mock, cancellingPath: "\(app)/sotto"))
+        let rule = CleanupRule(Self.cacheRoot, .clearContents, include: Self.all, exclude: [])
+
+        let task = Task { try scanner.scan(rule) }
+
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
     @Test func cancellationStopsTheScan() async throws {
         let fs = InMemoryFileSystem()
         addFile(fs, "\(Self.cacheRoot)/a.tmp", 10)
@@ -336,5 +364,85 @@ struct RuleScannerTests {
 
         #expect(outcome.items.contains { $0.path == "\(projects)/grosso.bin" })
         #expect(outcome.errors.contains { $0.path == broken })
+    }
+
+    // Solo Swift (visite iterative del 2026-10-16): la ricorsione visitava in profondità, ogni
+    // cartella nell'ordine di elenco e ogni sottocartella prima delle voci che la seguono. La
+    // visita con la pila esplicita restituisce elementi, errori ed esclusioni nello stesso ordine.
+    @Test func matchingFilesVisitsDepthFirstInListingOrder() throws {
+        let mock = InMemoryFileSystem()
+        let project = "\(Self.cacheRoot)/p"
+        addFile(mock, "\(project)/.git/HEAD", 1)
+        mock.addDirectory("\(project)/chiusa")
+        addFile(mock, "\(project)/q.bin", 1)
+        addFile(mock, "\(Self.home)/Library/Keychains/login.keychain", 1)
+        mock.addDirectory("\(Self.home)/m/b/chiusa")
+        addFile(mock, "\(Self.home)/m/b/z.bin", 1)
+        addFile(mock, "\(Self.home)/m/c.bin", 1)
+        let fs = UnreadableDirectoryFileSystem(
+            UnreadableDirectoryFileSystem(mock, unreadablePath: "\(project)/chiusa"), unreadablePath: "\(Self.home)/m/b/chiusa")
+
+        let outcome = try create(fs).scan(CleanupRule(Self.home, .matchingFiles, include: Self.all, exclude: []))
+
+        #expect(outcome.items.map(\.path) == ["\(project)/q.bin", "\(Self.home)/m/b/z.bin", "\(Self.home)/m/c.bin"])
+        #expect(outcome.errors.map(\.path) == ["\(project)/chiusa", "\(Self.home)/m/b/chiusa"])
+        #expect(outcome.exclusions.map(\.path) == ["\(project)/.git", "\(Self.home)/Library/Keychains"])
+    }
+
+    // Solo Swift (visite iterative del 2026-10-16): la misura di una cartella registra gli errori
+    // nell'ordine della ricorsione, una sottocartella per intero prima delle voci che la seguono.
+    @Test func clearContentsMeasuresAFolderDepthFirstInListingOrder() throws {
+        let mock = InMemoryFileSystem()
+        let app = "\(Self.cacheRoot)/app"
+        mock.addDirectory("\(app)/a/chiusa")
+        addFile(mock, "\(app)/a/sparito.bin", 7)
+        addFile(mock, "\(app)/a/z.bin", 100)
+        mock.addDirectory("\(app)/b/chiusa")
+        addFile(mock, "\(app)/b/y.bin", 50)
+        addFile(mock, "\(app)/c.bin", 3)
+        let vanishing = VanishingFileSystem(VanishingFileSystem(mock, vanishedPath: "\(app)/a/sparito.bin"), vanishedPath: "\(app)/c.bin")
+        let fs = UnreadableDirectoryFileSystem(
+            UnreadableDirectoryFileSystem(vanishing, unreadablePath: "\(app)/a/chiusa"), unreadablePath: "\(app)/b/chiusa")
+
+        let outcome = try create(fs).scan(CleanupRule(Self.cacheRoot, .clearContents, include: Self.all, exclude: []))
+
+        #expect(try single(outcome).sizeBytes == 150)
+        #expect(outcome.errors.map(\.path) == ["\(app)/a/chiusa", "\(app)/a/sparito.bin", "\(app)/b/chiusa", "\(app)/c.bin"])
+    }
+
+    // Solo Swift (visite iterative del 2026-10-16): conta anche il timestamp di una sottocartella,
+    // come nella ricorsione, dove la misura di ogni livello partiva dal proprio. Una cartella
+    // vecchia con una sottocartella toccata ieri non va proposta; una vecchia per intero sì.
+    @Test func clearContentsDirectoryAgeReflectsNewestSubfolder() throws {
+        let fs = InMemoryFileSystem()
+        let old = Self.now.addingTimeInterval(-days(200))
+        let recent = Self.now.addingTimeInterval(-days(1))
+        for (dir, subfolderStamp) in [("\(Self.cacheRoot)/toccata", recent), ("\(Self.cacheRoot)/vecchia", old)] {
+            addFile(fs, "\(dir)/sotto/dati.bin", 10, written: old)
+            fs.setTimes(dir, lastWrite: old, lastAccess: old)
+            fs.setTimes("\(dir)/sotto", lastWrite: subfolderStamp, lastAccess: subfolderStamp)
+        }
+
+        let outcome = try create(fs).scan(CleanupRule(Self.cacheRoot, .clearContents, include: Self.all, exclude: [], minAge: days(30)))
+
+        #expect(try single(outcome).path == "\(Self.cacheRoot)/vecchia")
+    }
+
+    // Solo Swift (visite iterative del 2026-10-16): come nella ricorsione, il timestamp di una
+    // sottocartella si legge prima del suo elenco, quindi i due errori restano in quest'ordine.
+    @Test func clearContentsReadsASubfolderStampBeforeListingIt() throws {
+        let mock = InMemoryFileSystem()
+        let app = "\(Self.cacheRoot)/app"
+        addFile(mock, "\(app)/sotto/dati.bin", 10)
+        addFile(mock, "\(app)/z.bin", 100)
+        let fs = UnreadableInfoFileSystem(
+            UnreadableDirectoryFileSystem(mock, unreadablePath: "\(app)/sotto", error: FileSystemError(code: EIO, path: "\(app)/sotto")),
+            unreadablePath: "\(app)/sotto")
+
+        let outcome = try create(fs).scan(CleanupRule(Self.cacheRoot, .clearContents, include: Self.all, exclude: []))
+
+        #expect(try single(outcome).sizeBytes == 100)
+        #expect(outcome.errors.map(\.path) == ["\(app)/sotto", "\(app)/sotto"])
+        #expect(outcome.errors.map(\.kind) == [.accessDenied, .inUse])
     }
 }

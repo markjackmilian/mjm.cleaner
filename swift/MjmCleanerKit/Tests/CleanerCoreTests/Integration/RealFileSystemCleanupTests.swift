@@ -27,6 +27,24 @@ struct RealFileSystemCleanupTests {
         func cleanAll(_ outcome: RuleScanOutcome, journal: (any DeletionRecording)? = nil) async -> CleanReport {
             await engine.clean([CategorySelection(categoryId: "caches", items: outcome.items)], progress: nil, journal: journal)
         }
+
+        /// Come nell'app: `ScanEngine` scansiona ogni categoria in un task del pool cooperativo.
+        func scanOnTheCooperativePool(_ rule: CleanupRule) async throws -> RuleScanOutcome {
+            let category = CleanupCategory(
+                id: "caches", displayName: "caches", description: "", risk: .low, selectedByDefault: true, parentId: nil, rules: [rule])
+            let result = try #require(try await ScanEngine(scanner: scanner).scan([category], progress: nil).first)
+            return RuleScanOutcome(items: result.items, errors: result.errors, exclusions: result.exclusions)
+        }
+
+        /// Un albero profondo sotto le cache, con una cartella "bin" e un file in fondo: per
+        /// `matchingDirs` la cartella da trovare è all'ultimo livello.
+        func deepTreeWithABinAtTheBottom() throws -> (root: String, middle: String, bottom: String, bytes: Int64) {
+            let deep = try tmp.deepTree("home/Library/Caches/deep")
+            try #require(deep.depth >= 300)
+            let bottom = deep.root + String(repeating: "/a", count: deep.depth)
+            try tmp.file("home/Library/Caches/deep" + String(repeating: "/a", count: deep.depth) + "/bin/x", contents: "x")
+            return (deep.root, deep.root + String(repeating: "/a", count: deep.depth / 2), bottom, deep.bytes + 1)
+        }
     }
 
     @Test func linkToAFileIsRemovedButItsTargetSurvives() async throws {
@@ -144,5 +162,58 @@ struct RealFileSystemCleanupTests {
         #expect(report.itemsFailed == 0)
         #expect(report.bytesFreed == deep.bytes)
         #expect(!FileManager.default.fileExists(atPath: deep.root))
+    }
+
+    // Solo Swift (crash del 2026-10-15 nell'app): anche lo scanner scendeva di una chiamata per
+    // livello di cartella, nella misura delle cartelle e nelle visite di matchingFiles e
+    // matchingDirs; un albero di qualche centinaio di livelli esauriva lo stack già in analisi.
+    // Le tre visite su un thread da 64 KB; sul pool cooperativo, come nell'app, matchingDirs, il
+    // cui frame esauriva i 512 KB già a circa 450 livelli in Debug.
+    @Test func aFolderDeeperThanTheStackIsMeasuredByTheScannerOnASmallStack() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let tree = try fixture.deepTreeWithABinAtTheBottom()
+        let scanner = fixture.scanner
+        let rule = CleanupRule(fixture.caches, .clearContents, include: ["*"], exclude: [])
+
+        let outcome = try await onSmallStack { try scanner.scan(rule) }
+
+        #expect(outcome == RuleScanOutcome(
+            items: [ScanItem(path: tree.root, sizeBytes: tree.bytes, isDirectory: true, declaredRoot: fixture.caches)], errors: [], exclusions: []))
+    }
+
+    @Test func filesDeeperThanTheStackAreFoundOnASmallStack() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let tree = try fixture.deepTreeWithABinAtTheBottom()
+        let scanner = fixture.scanner
+        let rule = CleanupRule(fixture.caches, .matchingFiles, include: ["*"], exclude: [])
+
+        let outcome = try await onSmallStack { try scanner.scan(rule) }
+
+        // In profondità e in ordine di elenco, come la ricorsione: "bin" prima di "f", "a" prima di "m".
+        #expect(outcome.items.map(\.path) == [tree.bottom + "/bin/x", tree.bottom + "/f", tree.middle + "/m"])
+        #expect(outcome.items.reduce(0) { $0 + $1.sizeBytes } == tree.bytes)
+        #expect(outcome.errors.isEmpty && outcome.exclusions.isEmpty)
+    }
+
+    @Test func aFolderMatchedDeeperThanTheStackIsFoundOnASmallStack() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let tree = try fixture.deepTreeWithABinAtTheBottom()
+        let scanner = fixture.scanner
+        let rule = CleanupRule(fixture.caches, .matchingDirs, include: ["bin"], exclude: [])
+
+        let outcome = try await onSmallStack { try scanner.scan(rule) }
+
+        #expect(outcome == RuleScanOutcome(
+            items: [ScanItem(path: tree.bottom + "/bin", sizeBytes: 1, isDirectory: true, declaredRoot: fixture.caches)], errors: [], exclusions: []))
+    }
+
+    @Test func aFolderMatchedDeeperThanTheStackIsFoundOnTheCooperativePool() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let tree = try fixture.deepTreeWithABinAtTheBottom()
+
+        let outcome = try await fixture.scanOnTheCooperativePool(CleanupRule(fixture.caches, .matchingDirs, include: ["bin"], exclude: []))
+
+        #expect(outcome == RuleScanOutcome(
+            items: [ScanItem(path: tree.bottom + "/bin", sizeBytes: 1, isDirectory: true, declaredRoot: fixture.caches)], errors: [], exclusions: []))
     }
 }

@@ -91,6 +91,18 @@ struct MatchingDirsTests {
         #expect(try create(fs, "\(Self.projects)/collegamento").scan(binObjRule()).items.isEmpty)
     }
 
+    // Solo Swift (visite iterative del 2026-10-16): oltre `maxDepth` non si scende nemmeno nelle
+    // cartelle che non corrispondono, come nella ricorsione.
+    @Test func maxDepthLimitsTheDescentThroughFoldersThatDoNotMatch() throws {
+        let fs = InMemoryFileSystem()
+        fs.addFile("\(Self.projects)/x/bin/a.dll", size: 10)
+        fs.addFile("\(Self.projects)/y/z/bin/b.dll", size: 10)
+
+        let outcome = try create(fs).scan(CleanupRule(Self.projects, .matchingDirs, include: ["bin"], exclude: [], maxDepth: 1))
+
+        #expect(try single(outcome).path == "\(Self.projects)/x/bin")
+    }
+
     // IMPORTANT 1 della revisione del Task 9: un nome che corrisponde a ExcludeGlobs veniva
     // trattato come un semplice mancato match ("continua a cercare più in basso") invece che
     // come un rifiuto esplicito, e la ricorsione scendeva dentro il ramo escluso — proponendo la
@@ -245,5 +257,37 @@ struct MatchingDirsTests {
         fs.addFile("\(Self.projects)/app/bin/output.dll", size: 10)
 
         #expect(try create(fs).scan(binObjRule()).items.isEmpty)
+    }
+
+    // Solo Swift (visite iterative del 2026-10-16): come la ricorsione, in profondità e
+    // nell'ordine di elenco; gli errori della misura di una cartella trovata stanno fra quelli
+    // della visita, al punto in cui la cartella si incontra.
+    @Test func visitsDepthFirstInListingOrder() throws {
+        let mock = InMemoryFileSystem()
+        let sub = "\(Self.projects)/a/sub"
+        mock.addFile("\(sub)/app.csproj", text: "x")
+        mock.addFile("\(sub)/.git/HEAD", size: 1)
+        mock.addFile("\(sub)/bin/x.dll", size: 10)
+        mock.addDirectory("\(sub)/chiusa")
+        mock.addFile("\(Self.projects)/b/app.csproj", text: "x")
+        mock.addFile("\(Self.projects)/b/bin/y.dll", size: 20)
+        mock.addDirectory("\(Self.projects)/b/bin/chiusa")
+        mock.addFile("\(Self.projects)/b/obj/z.bin", size: 5)
+        mock.addDirectory("\(Self.projects)/c")
+        mock.addFile("\(Self.projects)/d/.git/HEAD", size: 1)
+        let fs = UnreadableDirectoryFileSystem(
+            UnreadableDirectoryFileSystem(
+                UnreadableDirectoryFileSystem(mock, unreadablePath: "\(sub)/chiusa"), unreadablePath: "\(Self.projects)/b/bin/chiusa"),
+            unreadablePath: "\(Self.projects)/c")
+
+        let outcome = try create(fs).scan(binObjRule())
+
+        #expect(outcome.items == [
+            ScanItem(path: "\(sub)/bin", sizeBytes: 10, isDirectory: true, declaredRoot: Self.projects),
+            ScanItem(path: "\(Self.projects)/b/bin", sizeBytes: 20, isDirectory: true, declaredRoot: Self.projects),
+            ScanItem(path: "\(Self.projects)/b/obj", sizeBytes: 5, isDirectory: true, declaredRoot: Self.projects),
+        ])
+        #expect(outcome.errors.map(\.path) == ["\(sub)/chiusa", "\(Self.projects)/b/bin/chiusa", "\(Self.projects)/c"])
+        #expect(outcome.exclusions.map(\.path) == ["\(sub)/.git", "\(Self.projects)/d/.git"])
     }
 }

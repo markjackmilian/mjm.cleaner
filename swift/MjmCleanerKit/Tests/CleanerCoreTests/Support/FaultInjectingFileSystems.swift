@@ -72,6 +72,39 @@ final class UnreadableDirectoryFileSystem: ForwardingFileSystem, @unchecked Send
     }
 }
 
+/// Solo Swift: una voce di cui non si leggono le informazioni (`itemInfo` lancia `EACCES`) mentre
+/// `directoryExists` continua a rispondere, per separare la lettura del timestamp di una cartella
+/// dal suo elenco.
+final class UnreadableInfoFileSystem: ForwardingFileSystem, @unchecked Sendable {
+    private let unreadablePath: String
+
+    init(_ inner: any FileSystem, unreadablePath: String) {
+        self.unreadablePath = unreadablePath
+        super.init(inner)
+    }
+
+    override func itemInfo(_ path: String) throws -> FileItemInfo {
+        if path == unreadablePath { throw FileSystemError(code: EACCES, path: path) }
+        return try super.itemInfo(path)
+    }
+}
+
+/// Solo Swift: annulla il task corrente quando si elenca una certa cartella, per un annullamento
+/// che arriva a metà di un attraversamento.
+final class CancellingFileSystem: ForwardingFileSystem, @unchecked Sendable {
+    private let cancellingPath: String
+
+    init(_ inner: any FileSystem, cancellingPath: String) {
+        self.cancellingPath = cancellingPath
+        super.init(inner)
+    }
+
+    override func contentsOfDirectory(_ path: String) throws -> [String] {
+        if path == cancellingPath { cancelCurrentTask() }
+        return try super.contentsOfDirectory(path)
+    }
+}
+
 /// Porting di `ThrowingOnDeleteFileSystem.cs`: un errore fuori contratto durante la cancellazione
 /// di un file specifico.
 final class ThrowingOnDeleteFileSystem: ForwardingFileSystem, @unchecked Sendable {

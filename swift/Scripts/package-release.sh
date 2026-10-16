@@ -82,7 +82,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Reserve the bundle name and a private ZIP lock before building. The ZIP itself
-# is published later with ln, which atomically refuses every existing object.
+# is published later with link(2), which atomically refuses every existing object.
 if ! mkdir -- "$bundle_dest"; then
   printf 'Refusing to overwrite or claim %s\n' "$bundle_dest" >&2
   exit 1
@@ -137,6 +137,6 @@ check_bundle "$work/extracted/$bundle_name"
 [[ "$(object_identity "$zip_lock")" == "$zip_lock_identity" ]] || { printf 'ZIP reservation changed during packaging\n' >&2; exit 1; }
 [[ "$(object_identity "$zip_stage")" == "$zip_stage_identity" ]] || { printf 'ZIP staging file changed during packaging\n' >&2; exit 1; }
 cat "$work/$zip_name" > "$zip_stage"
-ln -- "$zip_stage" "$zip_dest"
+/bin/link "$zip_stage" "$zip_dest"
 zip_identity=$zip_stage_identity
 printf 'Packaged %s and %s\n' "$bundle_dest" "$zip_dest"

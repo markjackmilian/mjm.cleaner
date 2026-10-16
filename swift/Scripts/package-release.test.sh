@@ -35,13 +35,17 @@ cat > "$SHIMS/xcodebuild" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 [[ -z "${RACE_SECOND_BUILD:-}" ]] || : > "$RACE_SECOND_BUILD"
-if [[ "${FAIL_STAGE:-}" == build ]]; then
-  case "${RACE_CREATE_ZIP_KIND:-}" in
-    symlink) ln -s /dev/null "$RACE_ZIP_PATH" ;;
-    fifo) mkfifo "$RACE_ZIP_PATH" ;;
-  esac
-  exit 31
-fi
+case "${RACE_CREATE_ZIP_KIND:-}" in
+  symlink) ln -s /dev/null "$RACE_ZIP_PATH" ;;
+  fifo) mkfifo "$RACE_ZIP_PATH" ;;
+  directory) mkdir "$RACE_ZIP_PATH"; printf 'preserve me\n' > "$RACE_ZIP_PATH/sentinel" ;;
+  symlink_directory)
+    mkdir "$RACE_ZIP_TARGET"
+    printf 'preserve me\n' > "$RACE_ZIP_TARGET/sentinel"
+    ln -s "$RACE_ZIP_TARGET" "$RACE_ZIP_PATH"
+    ;;
+esac
+if [[ "${FAIL_STAGE:-}" == build ]]; then exit 31; fi
 if [[ -n "${RACE_STARTED:-}" ]]; then
   : > "$RACE_STARTED"
   while [[ ! -e "$RACE_RELEASE" ]]; do sleep 0.05; done
@@ -186,6 +190,31 @@ check_build_failure_preserves_special_zip() {
 }
 check_build_failure_preserves_special_zip symlink
 check_build_failure_preserves_special_zip fifo
+
+# A directory or symlink to a directory that appears during build must not be
+# treated by ln as a container for the ZIP hard link.
+check_build_success_rejects_directory_claim() {
+  local kind=$1 out="$TMP_ROOT/build-success-$1" zip="$TMP_ROOT/build-success-$1/mjm.cleaner-v0.1.0-macos-universal.zip"
+  local target="$TMP_ROOT/build-success-$1-target" marker="$TMP_ROOT/build-success-$1-started"
+  mkdir -p "$out"
+  if RACE_SECOND_BUILD="$marker" RACE_CREATE_ZIP_KIND="$kind" RACE_ZIP_PATH="$zip" RACE_ZIP_TARGET="$target" PATH="$SHIMS:$PATH" \
+    "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/build-success-$kind.log" 2>&1; then
+    fail "$kind created during build was accepted as ZIP output"
+  fi
+  [[ -e "$marker" ]] || fail "directory race test did not reach xcodebuild"
+  if [[ "$kind" == directory ]]; then
+    [[ -d "$zip" && ! -L "$zip" ]] || fail "racing ZIP directory changed"
+    [[ "$(/bin/cat "$zip/sentinel")" == 'preserve me' ]] || fail "racing ZIP directory sentinel changed"
+    [[ "$(find "$zip" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" == 1 ]] || fail "ZIP link was created inside racing directory"
+  else
+    [[ -L "$zip" && "$(readlink "$zip")" == "$target" ]] || fail "racing directory symlink changed"
+    [[ "$(/bin/cat "$target/sentinel")" == 'preserve me' ]] || fail "racing symlink target sentinel changed"
+    [[ "$(find "$target" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" == 1 ]] || fail "ZIP link was created inside racing symlink target"
+  fi
+  [[ ! -e "$out/mjm.cleaner.app" ]] || fail "failed directory race left reserved bundle"
+}
+check_build_success_rejects_directory_claim directory
+check_build_success_rejects_directory_claim symlink_directory
 
 # A second package process must fail while the first owns its output names.
 RACE_OUT="$TMP_ROOT/race-output"

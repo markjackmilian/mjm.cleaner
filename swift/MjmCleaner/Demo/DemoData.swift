@@ -107,9 +107,9 @@ enum DemoData {
 
     // MARK: Xcode
 
-    /// Il runtime usato da un dispositivo che resta: l'anteprima mostra la presa d'atto. Le cartelle
-    /// (DerivedData, Device Support) non entrano nell'anteprima demo, che non ha l'inventario dei file.
-    static let previewedXcodeKeys = [runtime.key]
+    /// La cartella DerivedData di ShopApp, con la sua voce nell'inventario dei file, e il runtime usato
+    /// da un dispositivo che resta: l'anteprima mostra sia la cartella da eliminare sia la presa d'atto.
+    static let previewedXcodeKeys = [shopDerivedData.key, runtime.key]
 
     private static let shopDerivedData = XcodeCandidate(
         key: "DerivedData/ShopApp", kind: .derivedData, name: "ShopApp-abcdefgh",
@@ -134,7 +134,12 @@ enum DemoData {
 
     static let xcodeSnapshot = XcodeSnapshot(
         candidates: [shopDerivedData, widgetsDerivedData, deviceSupport, iPhone, iPad, runtime],
-        warnings: [])
+        warnings: [],
+        fileInventory: XcodeFileInventory([
+            xcodeFileEntry(shopDerivedData, declaredRoot: "/Users/demo/Library/Developer/Xcode/DerivedData"),
+            xcodeFileEntry(widgetsDerivedData, declaredRoot: "/Users/demo/Library/Developer/Xcode/DerivedData"),
+            xcodeFileEntry(deviceSupport, declaredRoot: "/Users/demo/Library/Developer/Xcode/iOS DeviceSupport"),
+        ]))
 
     static let xcodeResult = XcodeCleanResult(
         historyReport: CleanReport(
@@ -159,6 +164,20 @@ enum DemoData {
         CategoryScanResult(
             categoryId: categoryId, items: items, totalBytes: items.reduce(0) { $0 + $1.sizeBytes },
             errors: [], exclusions: [])
+    }
+
+    private static func xcodeFileEntry(_ candidate: XcodeCandidate, declaredRoot: String) -> (key: String, entry: XcodeFileEntry) {
+        guard let path = candidate.path, let sizeBytes = candidate.sizeBytes else {
+            preconditionFailure("La fixture Xcode deve avere percorso e dimensione per ogni cartella selezionabile.")
+        }
+        let item = ScanItem(path: path, sizeBytes: sizeBytes, isDirectory: true, declaredRoot: declaredRoot)
+        let identity = XcodeFileIdentity(
+            canonicalPath: path,
+            isDirectory: true,
+            creationTime: startedAt,
+            lastWriteTime: startedAt,
+            logicalSizeBytes: sizeBytes)
+        return (candidate.key, XcodeFileEntry(item: item, identity: identity))
     }
 
     private static func docker(

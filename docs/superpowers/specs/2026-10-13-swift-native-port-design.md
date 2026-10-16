@@ -108,6 +108,7 @@ Ogni tipo C# ha una controparte Swift con lo stesso nome (senza il prefisso `I` 
 - lettura e scrittura atomica di testo; aggiunta in coda a un file (§8.2)
 - creazione di una cartella
 - spazio libero del volume
+- percorso come lo registra il filesystem (`storedPath`: `getattrlist` con `ATTR_CMN_FULLPATH` e `FSOPT_NOFOLLOW`), usato dal `PathGuard` (§12)
 
 Gli errori arrivano come `FileSystemError(code: errno, path:)`. L'implementazione reale usa POSIX (`lstat`, `opendir`/`readdir`, `realpath`, `removefile`) e non segue mai i collegamenti simbolici.
 
@@ -143,6 +144,8 @@ Per i test: un `InMemoryFileSystem`, più i decoratori di guasto esistenti in C#
 `PathGuard`, `DenyList` e `CanonicalPath` si portano per primi, in TDD, con tutte le regole della spec originale (`2026-09-15-mjm-cleaner-design.md` §8): rifiuto dei percorsi non canonici, contenimento, deny-list con uguaglianza esatta e ricorsiva ed eccezioni, profondità minima, collegamenti simbolici con validazione separata della root che risolve e giudica la destinazione, coerenza della configurazione, confronto case-insensitive.
 
 `validate` e `validateRoot` **non sono `throws` per firma**: la regola «nessuna validazione solleva eccezioni» diventa un vincolo del compilatore.
+
+Unica regola che si allontana dal C#, per decisione dell'utente (§12): la deny-list e la profondità minima si applicano anche al percorso come lo registra il filesystem.
 
 ### 5.5 Persistenza
 
@@ -323,4 +326,12 @@ L'esito può ridurre il perimetro della versione App Store, per esempio con Dock
 - Sandbox, entitlement, security-scoped bookmark, firma con Apple Developer Program, notarizzazione, App Store Connect.
 - Migrazione dei dati dell'app C#.
 - Modifiche a flussi, regole o testi. I miglioramenti notati durante il porting si annotano nel registro di parità come candidati e non si applicano.
+
+  **Eccezione: il ripiegamento di APFS** (decisa dall'utente il 2026-10-14; piano `docs/superpowers/plans/2026-10-16-swift-port-apfs.md`, spike `docs/superpowers/spikes/2026-10-16-apfs-nome-canonico.md`). APFS case-insensitive equipara più nomi di `OrdinalIgnoreCase`: U+212A KELVIN SIGN e «k», «ſ» e «s», «ß» e «ss», NFC e NFD. Così un elemento manipolato `~/Des\u{212A}top/x`, con la stessa root, supera la deny-list testuale e il kernel lo risolve in `~/Desktop/x`. Il C# ha lo stesso buco, che in fase 1 si corregge così:
+
+  - `FileSystem.storedPath` restituisce il percorso come lo registra il filesystem (`getattrlist`, `ATTR_CMN_FULLPATH`, `FSOPT_NOFOLLOW`): antenati risolti, ultimo componente non seguito, nomi nella grafia del disco;
+  - `PathGuard` ripete la deny-list su quel percorso in `validate`, `validateRoot` e `pruneReason`, e la profondità minima in `validate`, dopo tutti i controlli testuali. Cambiano solo verdetti che prima permettevano; gli altri rifiuti conservano il motivo del C#;
+  - per un percorso che non esiste del tutto vale l'antenato più profondo che esiste, seguito dai componenti mancanti presi dal testo. Si risale solo con `ENOENT`, `ENOTDIR`, `EACCES` ed `EPERM`. Ogni altro errore nega con «percorso non verificabile sul filesystem: …» o «root non verificabile sul filesystem: …», gli unici testi nuovi;
+  - il confronto usa una deny-list costruita sulla home come la registra il filesystem. Così vale anche per una home sotto un collegamento (chiude il candidato «Home che contiene un collegamento simbolico» del registro di parità);
+  - si elimina sempre il percorso testuale validato, come prima.
 - Recupero automatico nello storico di una pulizia interrotta da un crash (§8.2).

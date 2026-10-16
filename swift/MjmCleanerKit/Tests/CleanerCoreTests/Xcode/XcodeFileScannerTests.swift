@@ -48,7 +48,7 @@ struct XcodeFileScannerTests {
     }
 
     private func create(_ fs: any FileSystem, _ sizes: FakeSizeProbe, links: FakeLinkInspector = FakeLinkInspector()) throws -> XcodeFileScanner {
-        let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: Self.home), links: links, homeDirectory: Self.home)
+        let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: Self.home), fileSystem: fs, links: links, homeDirectory: Self.home)
         let rules = RuleScanner(fileSystem: fs, pathGuard: pathGuard, links: links, clock: SystemWallClock())
         return XcodeFileScanner(fileSystem: fs, ruleScanner: rules, pathGuard: pathGuard, links: links, sizeProbe: sizes, homeDirectory: Self.home)
     }
@@ -151,7 +151,7 @@ struct XcodeFileScannerTests {
         links: any LinkInspecting = FakeLinkInspector(),
         verdicts: [String: GuardVerdict] = [:]
     ) throws -> XcodeFileScanner {
-        let real = try PathGuard(denyList: DenyList(homeDirectory: Self.home), links: links, homeDirectory: Self.home)
+        let real = try PathGuard(denyList: DenyList(homeDirectory: Self.home), fileSystem: fs, links: links, homeDirectory: Self.home)
         let rules = RuleScanner(fileSystem: fs, pathGuard: real, links: links, clock: SystemWallClock())
         return XcodeFileScanner(
             fileSystem: fs,

@@ -509,7 +509,7 @@ struct XcodeCleanExecutorTests {
         let fs = InMemoryFileSystem()
         fs.addFile(Self.appPath + "/Build/Products/app", size: 64)
         let links = FakeLinkInspector()
-        let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), links: links, homeDirectory: home)
+        let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), fileSystem: fs, links: links, homeDirectory: home)
         let scanner = XcodeFileScanner(
             fileSystem: fs, ruleScanner: RuleScanner(fileSystem: fs, pathGuard: pathGuard, links: links, clock: SystemWallClock()),
             pathGuard: pathGuard, links: links, sizeProbe: FakeSizeProbe(), homeDirectory: home)

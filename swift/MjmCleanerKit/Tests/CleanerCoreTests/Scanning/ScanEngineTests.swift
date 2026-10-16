@@ -10,7 +10,7 @@ struct ScanEngineTests {
         let links = FakeLinkInspector()
         let scanner = RuleScanner(
             fileSystem: fs,
-            pathGuard: try PathGuard(denyList: DenyList(homeDirectory: Self.home), links: links, homeDirectory: Self.home),
+            pathGuard: try PathGuard(denyList: DenyList(homeDirectory: Self.home), fileSystem: fs, links: links, homeDirectory: Self.home),
             links: links,
             clock: FixedWallClock(now: Self.now))
         return ScanEngine(scanner: scanner)

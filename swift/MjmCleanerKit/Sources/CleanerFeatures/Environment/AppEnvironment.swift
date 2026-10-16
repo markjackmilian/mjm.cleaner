@@ -70,7 +70,7 @@ public struct AppEnvironment: Sendable {
         let fileSystem = LocalFileSystem()
         let clock = SystemWallClock()
         let links = FileSystemLinkInspector()
-        let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), links: links, homeDirectory: home)
+        let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), fileSystem: fileSystem, links: links, homeDirectory: home)
         let scanner = RuleScanner(fileSystem: fileSystem, pathGuard: pathGuard, links: links, clock: clock)
 
         // Docker passa solo dalla CLI: nessun file sotto la cartella di Docker Desktop viene mai

@@ -37,7 +37,7 @@ struct XcodeRealFileSystemTests {
             derivedData = try tmp.directory("home/Library/Developer/Xcode/DerivedData")
             let fs = LocalFileSystem()
             let links = FileSystemLinkInspector()
-            let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), links: links, homeDirectory: home)
+            let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), fileSystem: fs, links: links, homeDirectory: home)
             let sizes = XcodeSizeProbe(fileSystem: fs, runner: ProcessRunner(), links: links, homeDirectory: home)
             let scanner = XcodeFileScanner(
                 fileSystem: fs, ruleScanner: RuleScanner(fileSystem: fs, pathGuard: pathGuard, links: links, clock: SystemWallClock()),

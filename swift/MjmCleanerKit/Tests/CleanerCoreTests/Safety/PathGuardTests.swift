@@ -6,11 +6,14 @@ struct PathGuardTests {
     private static let cacheRoot = "/Users/tester/Library/Caches"
 
     private func create(_ symlinks: String...) throws -> PathGuard {
-        try PathGuard(denyList: DenyList(homeDirectory: Self.home), links: FakeLinkInspector(symlinks), homeDirectory: Self.home)
+        try PathGuard(
+            denyList: DenyList(homeDirectory: Self.home), fileSystem: InMemoryFileSystem(), links: FakeLinkInspector(symlinks), homeDirectory: Self.home)
     }
 
     private func create(targets: [String: String?]) throws -> PathGuard {
-        try PathGuard(denyList: DenyList(homeDirectory: Self.home), links: FakeLinkInspector(targets: targets), homeDirectory: Self.home)
+        try PathGuard(
+            denyList: DenyList(homeDirectory: Self.home), fileSystem: InMemoryFileSystem(), links: FakeLinkInspector(targets: targets),
+            homeDirectory: Self.home)
     }
 
     @Test func allowsItemInsideDeclaredRoot() throws {
@@ -178,13 +181,17 @@ struct PathGuardTests {
     @Test(arguments: [nil, "", "   ", "relative/path", "/", "//"] as [String?])
     func constructorRejectsInvalidHomeDirectory(homeDirectory: String?) {
         #expect(throws: InvalidConfiguration.self) {
-            try PathGuard(denyList: DenyList(homeDirectory: Self.home), links: FakeLinkInspector(), homeDirectory: homeDirectory)
+            try PathGuard(
+                denyList: DenyList(homeDirectory: Self.home), fileSystem: InMemoryFileSystem(), links: FakeLinkInspector(),
+                homeDirectory: homeDirectory)
         }
     }
 
     @Test func constructorRejectsHomeThatDiffersFromDenyListHome() {
         #expect(throws: InvalidConfiguration.self) {
-            try PathGuard(denyList: DenyList(homeDirectory: "/Users/altro"), links: FakeLinkInspector(), homeDirectory: Self.home)
+            try PathGuard(
+                denyList: DenyList(homeDirectory: "/Users/altro"), fileSystem: InMemoryFileSystem(), links: FakeLinkInspector(),
+                homeDirectory: Self.home)
         }
     }
 
@@ -292,6 +299,7 @@ struct PathGuardTests {
         let home = "/Users/alessandro.rossi"
         let guardrail = try PathGuard(
             denyList: DenyList(homeDirectory: home),
+            fileSystem: InMemoryFileSystem(),
             links: FakeLinkInspector("/Users/aleßandro.roßi/Library/Caches/l"),
             homeDirectory: home)
 
@@ -317,7 +325,8 @@ struct PathGuardTests {
 
     @Test func dotlessIDoesNotBypassTheOtherUsersRule() throws {
         let home = "/Users/marco.milani"
-        let guardrail = try PathGuard(denyList: DenyList(homeDirectory: home), links: FakeLinkInspector(), homeDirectory: home)
+        let guardrail = try PathGuard(
+            denyList: DenyList(homeDirectory: home), fileSystem: InMemoryFileSystem(), links: FakeLinkInspector(), homeDirectory: home)
         #expect(!guardrail.validate("/Users/marco.mılanı/Library/Caches/x", declaredRoot: "\(home)/Library/Caches").isAllowed)
         #expect(guardrail.pruneReason("/Users/marco.mılanı/Documents") != nil)
     }

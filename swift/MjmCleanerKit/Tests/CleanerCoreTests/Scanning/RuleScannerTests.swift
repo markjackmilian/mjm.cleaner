@@ -12,7 +12,7 @@ struct RuleScannerTests {
         let links = FakeLinkInspector(symlinks)
         return RuleScanner(
             fileSystem: fs,
-            pathGuard: try PathGuard(denyList: DenyList(homeDirectory: Self.home), links: links, homeDirectory: Self.home),
+            pathGuard: try PathGuard(denyList: DenyList(homeDirectory: Self.home), fileSystem: fs, links: links, homeDirectory: Self.home),
             links: links,
             clock: FixedWallClock(now: Self.now))
     }

@@ -18,10 +18,11 @@ struct RealFileSystemCleanupTests {
             tmp = try TemporaryDirectory()
             home = try tmp.directory("home")
             caches = try tmp.directory("home/Library/Caches")
+            let fs = LocalFileSystem()
             let links = FileSystemLinkInspector()
-            let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), links: links, homeDirectory: home)
-            scanner = RuleScanner(fileSystem: LocalFileSystem(), pathGuard: pathGuard, links: links, clock: SystemWallClock())
-            engine = CleanEngine(fileSystem: LocalFileSystem(), pathGuard: pathGuard, clock: SystemWallClock())
+            let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), fileSystem: fs, links: links, homeDirectory: home)
+            scanner = RuleScanner(fileSystem: fs, pathGuard: pathGuard, links: links, clock: SystemWallClock())
+            engine = CleanEngine(fileSystem: fs, pathGuard: pathGuard, clock: SystemWallClock())
         }
 
         func cleanAll(_ outcome: RuleScanOutcome, journal: (any DeletionRecording)? = nil) async -> CleanReport {

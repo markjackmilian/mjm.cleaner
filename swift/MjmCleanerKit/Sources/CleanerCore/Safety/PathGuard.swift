@@ -55,10 +55,11 @@ public struct PathGuard: PathGuarding {
     private static let maxSymlinkResolutions = 32
 
     private let denyList: DenyList
+    private let fileSystem: any FileSystem
     private let links: any LinkInspecting
     private let home: String
 
-    public init(denyList: DenyList, links: any LinkInspecting, homeDirectory: String?) throws {
+    public init(denyList: DenyList, fileSystem: any FileSystem, links: any LinkInspecting, homeDirectory: String?) throws {
         guard let home = CanonicalPath.canonical(homeDirectory), home != "/" else {
             throw InvalidConfiguration("La home directory deve essere un percorso assoluto canonico diverso dalla radice.")
         }
@@ -70,6 +71,7 @@ public struct PathGuard: PathGuarding {
         }
 
         self.denyList = denyList
+        self.fileSystem = fileSystem
         self.links = links
         self.home = home
     }

@@ -2,6 +2,22 @@ import Darwin
 import Testing
 @testable import CleanerCore
 
+private struct UnexpectedStoredPathError: Error {}
+
+private final class NonFileSystemErrorStoredPathFileSystem: ForwardingFileSystem, @unchecked Sendable {
+    private let paths: Set<String>
+
+    init(paths: [String]) {
+        self.paths = Set(paths)
+        super.init(InMemoryFileSystem())
+    }
+
+    override func storedPath(_ path: String) throws -> String {
+        if paths.contains(path) { throw UnexpectedStoredPathError() }
+        return try super.storedPath(path)
+    }
+}
+
 struct PathGuardTests {
     private static let home = "/Users/tester"
     private static let cacheRoot = "/Users/tester/Library/Caches"
@@ -334,7 +350,7 @@ struct PathGuardTests {
 
     // MARK: - Percorso registrato dal filesystem (solo Swift, piano APFS, spec §12)
 
-    private func create(storing fileSystem: AliasingFileSystem, home: String = Self.home, targets: [String: String?] = [:]) throws -> PathGuard {
+    private func create(storing fileSystem: any FileSystem, home: String = Self.home, targets: [String: String?] = [:]) throws -> PathGuard {
         try PathGuard(denyList: DenyList(homeDirectory: home), fileSystem: fileSystem, links: FakeLinkInspector(targets: targets), homeDirectory: home)
     }
 
@@ -435,6 +451,16 @@ struct PathGuardTests {
         #expect(!rootVerdict.isAllowed)
         #expect(rootVerdict.reason.contains("non verificabile"))
         #expect(try #require(guardrail.pruneReason(branch)).contains("non verificabile"))
+
+        let unexpected = try create(storing: NonFileSystemErrorStoredPathFileSystem(paths: [item, branch, root]))
+        let unexpectedItem = unexpected.validate(item, declaredRoot: Self.cacheRoot)
+        let unexpectedRoot = unexpected.validateRoot(root)
+
+        #expect(!unexpectedItem.isAllowed)
+        #expect(unexpectedItem.reason.contains("non verificabile"))
+        #expect(!unexpectedRoot.isAllowed)
+        #expect(unexpectedRoot.reason.contains("non verificabile"))
+        #expect(try #require(unexpected.pruneReason(branch)).contains("non verificabile"))
     }
 
     // Un elemento sparito o dietro una cartella che non si attraversa resta verificabile: si
@@ -484,11 +510,16 @@ struct PathGuardTests {
         #expect(!child.isAllowed)
         #expect(child.reason.contains("profondità"))
         #expect(guardrail.validate("\(stored)/Library/Caches/x", declaredRoot: "\(stored)/Library/Caches").isAllowed)
+        #expect(guardrail.pruneReason("\(stored)/Documents") != nil)
+        #expect(guardrail.pruneReason("\(stored)/Library/Caches") == nil)
     }
 
     @Test func constructorRejectsAHomeThatTheFilesystemCannotVerify() {
         #expect(throws: InvalidConfiguration.self) {
             try create(storing: AliasingFileSystem(failures: [(Self.home, EIO)]))
+        }
+        #expect(throws: InvalidConfiguration.self) {
+            try create(storing: NonFileSystemErrorStoredPathFileSystem(paths: [Self.home]))
         }
     }
 

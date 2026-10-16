@@ -85,6 +85,12 @@ public protocol FileSystem: Sendable {
     /// processo senza privilegi (`statfs`: `f_bavail × f_bsize`), senza lo spazio eliminabile
     /// che macOS libererebbe su richiesta.
     func availableFreeSpace(forVolumeContaining path: String) throws -> Int64
+    /// Il percorso assoluto con cui il filesystem registra l'oggetto, senza equivalente .NET
+    /// (spec §12): i collegamenti fra gli antenati sono risolti, l'ultimo componente non viene
+    /// seguito e ogni nome è scritto come sta sul disco. Su APFS case-insensitive
+    /// "Des\u{212A}top", "De\u{017F}ktop" e "DESKTOP" danno "Desktop". Un percorso inesistente
+    /// lancia `ENOENT`; ogni altro errore lancia il suo errno.
+    func storedPath(_ path: String) throws -> String
 }
 
 extension FileSystem {

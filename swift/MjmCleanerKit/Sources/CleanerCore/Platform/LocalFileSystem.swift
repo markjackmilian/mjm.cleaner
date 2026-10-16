@@ -143,6 +143,36 @@ public struct LocalFileSystem: FileSystem {
         return bytes
     }
 
+    /// `getattrlist` con `ATTR_CMN_FULLPATH` e `FSOPT_NOFOLLOW` (spike del 2026-10-16): senza
+    /// `open()`, quindi vale anche per i file illeggibili, per i collegamenti e per le FIFO;
+    /// `realpath` seguirebbe l'ultimo collegamento, `F_GETPATH` richiede un descrittore e
+    /// `F_GETPATH_NOFIRMLINK` scrive "/System/Volumes/Data/…" invece di "/Users/…". Il percorso
+    /// registrato non supera MAXPATHLEN: oltre, il kernel risponde `ENAMETOOLONG`.
+    public func storedPath(_ path: String) throws -> String {
+        var request = attrlist()
+        request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
+        request.commonattr = attrgroup_t(ATTR_CMN_FULLPATH)
+
+        // La risposta: la lunghezza totale (u_int32_t), un attrreference_t (posizione del testo
+        // rispetto all'attrreference stesso e lunghezza con il terminatore), poi il testo.
+        let headerSize = MemoryLayout<UInt32>.size
+        let referenceSize = MemoryLayout<attrreference_t>.size
+        var buffer = [UInt8](repeating: 0, count: headerSize + referenceSize + Int(MAXPATHLEN))
+        let result = buffer.withUnsafeMutableBytes { bytes in
+            getattrlist(path, &request, bytes.baseAddress, bytes.count, UInt32(FSOPT_NOFOLLOW))
+        }
+        guard result == 0 else { throw FileSystemError(code: errno, path: path) }
+
+        let reference = buffer.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: headerSize, as: attrreference_t.self) }
+        let start = headerSize + Int(reference.attr_dataoffset)
+        let length = Int(reference.attr_length)
+        // Un riferimento fuori dal buffer o senza terminatore è una risposta inattesa, non un percorso.
+        guard length > 1, start >= headerSize + referenceSize, start + length <= buffer.count, buffer[start + length - 1] == 0 else {
+            throw FileSystemError(code: EIO, path: path)
+        }
+        return String(decoding: buffer[start..<(start + length - 1)], as: UTF8.self)
+    }
+
     // MARK: - Privati
 
     /// Elimina tutto ciò che può sotto `root`, poi `root` stesso; ricorda solo il primo errore,

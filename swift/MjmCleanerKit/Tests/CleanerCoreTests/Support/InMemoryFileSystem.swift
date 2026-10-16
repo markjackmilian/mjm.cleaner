@@ -145,6 +145,13 @@ final class InMemoryFileSystem: FileSystem {
         return freeSpace.withLock { $0 }
     }
 
+    /// Senza collegamenti e con le maiuscole distinte, il percorso registrato è la chiave del nodo.
+    func storedPath(_ path: String) throws -> String {
+        let key = Self.key(path)
+        guard nodes.withLock({ $0[key] != nil }) else { throw FileSystemError(code: ENOENT, path: path) }
+        return key
+    }
+
     // MARK: - Privati
 
     private func store(_ path: String, _ node: Node) {

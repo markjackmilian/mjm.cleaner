@@ -55,7 +55,7 @@ Per `<dir>/Des\u{212A}top/x`, con `Desktop/x` memorizzato, con la cache dei nomi
 
 ### 3.4 Errori
 
-Componente mancante: ENOENT. Sotto un file: ENOTDIR. Dentro una cartella senza permesso di attraversamento: EACCES (la cartella stessa si legge). Attraverso un collegamento interrotto: ENOENT (il collegamento stesso si legge). Ciclo di collegamenti: ELOOP. Risoluzione oltre MAXPATHLEN: ENAMETOOLONG. Un percorso di mille byte si legge per intero. Un percorso relativo si risolve rispetto alla cartella corrente.
+Componente mancante: ENOENT. Sotto un file: ENOTDIR. Dentro una cartella senza permesso di attraversamento: EACCES (la cartella stessa si legge). Attraverso un collegamento interrotto: ENOENT (il collegamento stesso si legge). Ciclo di collegamenti: ELOOP. Risoluzione oltre MAXPATHLEN: ENAMETOOLONG. Per il percorso costruito di almeno 1000 byte, la sonda controlla che il risultato di `ATTR_CMN_FULLPATH` inizi con `<base>/lungo/a/a`; il controllo col prefisso riesce, ma non confronta l'intero percorso. Un percorso relativo si risolve rispetto alla cartella corrente.
 
 ### 3.5 Firmlink e collegamenti di sistema
 

@@ -145,7 +145,7 @@ Per i test: un `InMemoryFileSystem`, più i decoratori di guasto esistenti in C#
 
 `validate` e `validateRoot` **non sono `throws` per firma**: la regola «nessuna validazione solleva eccezioni» diventa un vincolo del compilatore.
 
-Unica regola che si allontana dal C#, per decisione dell'utente (§12): la deny-list e la profondità minima si applicano anche al percorso come lo registra il filesystem.
+Unica regola del `PathGuard` che si allontana dal C#, per decisione dell'utente (§12): la deny-list e la profondità minima si applicano anche al percorso come lo registra il filesystem.
 
 ### 5.5 Persistenza
 
@@ -264,7 +264,7 @@ Le prove di layout e tema specifiche di Avalonia (barra azioni nel viewport, diz
 ### 9.4 Verifica e collaudo
 
 - **Screenshot** di ogni schermata in chiaro e in scuro (Scegli, Analizza, Conferma, Fatto, Docker, Xcode, Storico, Impostazioni), confrontati con quelli di `docs/superpowers/verification/2026-10-02-macos-redesign/`.
-- **Collaudo fianco a fianco:** su questo Mac, app C# e app Swift eseguono uno dopo l'altro l'analisi in sola lettura (passi 1–3, senza confermare) con la stessa selezione e le stesse impostazioni. Si confrontano numero di elementi e totale per categoria, esclusioni del `PathGuard`, inventario Docker con gli esiti KEEP/DELETE/PROPOSE/ASK e inventario Xcode. Le differenze spiegabili con la variazione naturale delle cache fra le due esecuzioni vanno annotate; le altre sono difetti.
+- **Collaudo fianco a fianco:** su questo Mac, app C# e app Swift eseguono uno dopo l'altro l'analisi in sola lettura (passi 1–3, senza confermare) con la stessa selezione e le stesse impostazioni. Si confrontano numero di elementi e totale per categoria, esclusioni del `PathGuard`, inventario Docker con gli esiti KEEP/DELETE/PROPOSE/ASK e inventario Xcode. Le differenze spiegabili con la variazione naturale delle cache fra le due esecuzioni e la differenza APFS documentata in §12 vanno annotate; tutte le altre sono difetti.
 
 ## 10. Build, distribuzione e passaggio di consegne
 
@@ -330,8 +330,8 @@ L'esito può ridurre il perimetro della versione App Store, per esempio con Dock
   **Eccezione: il ripiegamento di APFS** (decisa dall'utente il 2026-10-14; piano `docs/superpowers/plans/2026-10-16-swift-port-apfs.md`, spike `docs/superpowers/spikes/2026-10-16-apfs-nome-canonico.md`). APFS case-insensitive equipara più nomi di `OrdinalIgnoreCase`: U+212A KELVIN SIGN e «k», «ſ» e «s», «ß» e «ss», NFC e NFD. Così un elemento manipolato `~/Des\u{212A}top/x`, con la stessa root, supera la deny-list testuale e il kernel lo risolve in `~/Desktop/x`. Il C# ha lo stesso buco, che in fase 1 si corregge così:
 
   - `FileSystem.storedPath` restituisce il percorso come lo registra il filesystem (`getattrlist`, `ATTR_CMN_FULLPATH`, `FSOPT_NOFOLLOW`): antenati risolti, ultimo componente non seguito, nomi nella grafia del disco;
-  - `PathGuard` ripete la deny-list su quel percorso in `validate`, `validateRoot` e `pruneReason`, e la profondità minima in `validate`, dopo tutti i controlli testuali. Cambiano solo verdetti che prima permettevano; gli altri rifiuti conservano il motivo del C#;
-  - per un percorso che non esiste del tutto vale l'antenato più profondo che esiste, seguito dai componenti mancanti presi dal testo. Si risale solo con `ENOENT`, `ENOTDIR`, `EACCES` ed `EPERM`. Ogni altro errore nega con «percorso non verificabile sul filesystem: …» o «root non verificabile sul filesystem: …», gli unici testi nuovi;
+  - `PathGuard` ripete la deny-list sul percorso registrato dopo i controlli testuali: in `validate` e `pruneReason` applica tutte le voci; in `validateRoot` applica solo le voci ricorsive, dopo il controllo testuale ricorsivo, e controlla separatamente se il percorso registrato è `/`. La profondità minima si ripete in `validate`. Cambiano solo verdetti che prima permettevano; gli altri rifiuti conservano il motivo del C#;
+  - per un percorso che non esiste del tutto vale l'antenato più profondo che esiste, seguito dai componenti mancanti presi dal testo. Si risale solo con `ENOENT`, `ENOTDIR`, `EACCES` ed `EPERM`. Ogni altro errore nega con il testo `"percorso non verificabile sul filesystem: \(error.description)"` in `validate` e `pruneReason`, oppure `"root non verificabile sul filesystem: \(error.description)"` in `validateRoot`. `PathGuard.init` lancia `InvalidConfiguration("La home directory non è verificabile sul filesystem: \(error.description)")` se non può verificare la home; rifiuta una home registrata non assoluta o non canonica, o uguale a `/`, con `InvalidConfiguration("La home directory registrata dal filesystem deve essere un percorso assoluto canonico diverso dalla radice.")`;
   - il confronto usa una deny-list costruita sulla home come la registra il filesystem. Così vale anche per una home sotto un collegamento (chiude il candidato «Home che contiene un collegamento simbolico» del registro di parità);
   - si elimina sempre il percorso testuale validato, come prima.
 - Recupero automatico nello storico di una pulizia interrotta da un crash (§8.2).

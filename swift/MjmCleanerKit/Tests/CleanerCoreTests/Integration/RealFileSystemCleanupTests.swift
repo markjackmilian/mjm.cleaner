@@ -217,4 +217,38 @@ struct RealFileSystemCleanupTests {
         #expect(outcome == RuleScanOutcome(
             items: [ScanItem(path: tree.bottom + "/bin", sizeBytes: 1, isDirectory: true, declaredRoot: fixture.caches)], errors: [], exclusions: []))
     }
+
+    // Solo Swift (piano APFS, spec §12): un elenco manipolato con root ed elemento scritti
+    // "Des\u{212A}top" superava la deny-list testuale, e APFS li risolveva nella Scrivania.
+    @Test(.enabled(if: TemporaryDirectory.volumeIsCaseInsensitive))
+    func anItemSpelledWithAnApfsAliasOfAProtectedFolderIsNeverDeleted() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let thesis = try fixture.tmp.file("home/Desktop/tesi.docx", contents: "dati preziosi")
+        let root = fixture.home + "/Des\u{212A}top"
+        let item = ScanItem(path: root + "/tesi.docx", sizeBytes: 0, isDirectory: false, declaredRoot: root)
+
+        let report = await fixture.engine.clean([CategorySelection(categoryId: "caches", items: [item])], progress: nil, journal: nil)
+
+        #expect(report.itemsDeleted == 0)
+        #expect(report.itemsFailed == 1)
+        #expect(report.errors.first?.message.contains("/Desktop") == true)
+        #expect(FileManager.default.fileExists(atPath: thesis))
+    }
+
+    // Solo Swift (piano APFS): la home di prova sta sotto /var, collegamento a /private/var.
+    // validateRoot risolve la root in /private/var e la deny-list testuale, costruita sulla home
+    // in /var, non la riconosceva: ~/Documents non era protetta (candidato «Home che contiene un
+    // collegamento simbolico»). La deny-list sulla grafia del disco la riconosce.
+    @Test func aHomeUnderALinkStillProtectsItsDocuments() async throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        let thesis = try fixture.tmp.file("home/Documents/tesi.docx", contents: "dati preziosi")
+        let item = ScanItem(path: thesis, sizeBytes: 0, isDirectory: false, declaredRoot: fixture.home + "/Documents")
+
+        let report = await fixture.engine.clean([CategorySelection(categoryId: "caches", items: [item])], progress: nil, journal: nil)
+
+        #expect(report.itemsDeleted == 0)
+        #expect(report.itemsFailed == 1)
+        #expect(report.errors.first?.message.contains("/Documents") == true)
+        #expect(FileManager.default.fileExists(atPath: thesis))
+    }
 }

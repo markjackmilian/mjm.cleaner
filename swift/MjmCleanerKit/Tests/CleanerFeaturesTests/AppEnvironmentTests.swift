@@ -45,8 +45,9 @@ struct AppEnvironmentTests {
     }
 
     // Solo Swift (review del Task 2): la home passata a `live` arriva alla deny-list del `clean` e
-    // all'espansore. La home passa da `realpath`: sotto /var, collegamento a /private/var, la
-    // deny-list non riconoscerebbe la home (registro, «Candidati a miglioramento»).
+    // all'espansore. La home passa da `realpath` perché il test riguarda il passaggio della home,
+    // non la sua grafia: dal piano APFS la deny-list riconosce anche una home sotto un collegamento
+    // (/var → /private/var), confrontandola nella grafia del disco (spec §12).
     @Test func liveCompositionUsesTheGivenHomeForTheGuardAndTheExpander() async throws {
         let directory = try TemporaryDirectory()
         defer { directory.remove() }

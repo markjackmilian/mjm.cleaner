@@ -48,16 +48,33 @@ public protocol PathGuarding: Sendable {
 /// definiscono le regole. Non lancia mai: un input malformato produce un rifiuto motivato, mai un
 /// errore che un `catch` a monte potrebbe trasformare in un salto silenzioso. In Swift la regola
 /// è imposta dalla firma: `validate` e `validateRoot` non sono `throws`.
+///
+/// Solo Swift (piano APFS, spec §12): la deny-list e la profondità minima si applicano anche al
+/// percorso come lo registra il filesystem (`FileSystem.storedPath`), dopo ogni controllo
+/// testuale. APFS case-insensitive ripiega più di OrdinalIgnoreCase (U+212A per "k", "ſ" per
+/// "s", "ß" per "ss", NFC e NFD): un elemento scritto "~/Des\u{212A}top/x" supera i confronti
+/// testuali e il kernel lo risolve in "~/Desktop/x".
 public struct PathGuard: PathGuarding {
     /// Limite di sostituzioni successive durante la risoluzione dei collegamenti di una root:
     /// una catena più lunga è quasi certamente un ciclo nel doppio di test, non uno scenario
     /// reale — nega invece di girare all'infinito.
     private static let maxSymlinkResolutions = 32
 
+    /// Gli errori di `storedPath` per cui si risale all'antenato: il componente non esiste
+    /// (ENOENT, ENOTDIR) o il suo genitore non si attraversa (EACCES, EPERM). In entrambi i casi
+    /// nemmeno l'eliminazione raggiunge l'oggetto, perché la ricerca del kernel è la stessa. Ogni
+    /// altro errore rende il percorso non verificabile, e il percorso viene negato.
+    private static let climbableErrors: Set<Int32> = [ENOENT, ENOTDIR, EACCES, EPERM]
+
     private let denyList: DenyList
     private let fileSystem: any FileSystem
     private let links: any LinkInspecting
     private let home: String
+    /// Home e deny-list nella grafia del disco: il percorso registrato di un elemento si confronta
+    /// con queste, non con quelle testuali. Una home sotto un collegamento (/var → /private/var)
+    /// o scritta in un'altra normalizzazione ha sul disco un'altra grafia.
+    private let storedHome: String
+    private let storedDenyList: DenyList
 
     public init(denyList: DenyList, fileSystem: any FileSystem, links: any LinkInspecting, homeDirectory: String?) throws {
         guard let home = CanonicalPath.canonical(homeDirectory), home != "/" else {
@@ -70,10 +87,22 @@ public struct PathGuard: PathGuarding {
             throw InvalidConfiguration("La home del PathGuard deve coincidere con quella della DenyList.")
         }
 
+        let stored: String
+        switch Self.storedForm(home, in: fileSystem) {
+        case .success(let path): stored = path
+        case .failure(let error):
+            throw InvalidConfiguration("La home directory non è verificabile sul filesystem: \(error.description)")
+        }
+        guard let storedHome = CanonicalPath.canonical(stored), storedHome != "/" else {
+            throw InvalidConfiguration("La home directory registrata dal filesystem deve essere un percorso assoluto canonico diverso dalla radice.")
+        }
+
         self.denyList = denyList
         self.fileSystem = fileSystem
         self.links = links
         self.home = home
+        self.storedHome = storedHome
+        storedDenyList = try DenyList(homeDirectory: storedHome)
     }
 
     public func validateRoot(_ declaredRoot: String) -> GuardVerdict {
@@ -103,6 +132,20 @@ public struct PathGuard: PathGuarding {
         // solo se stesse, non il permesso di guardarci dentro.
         if let reason = denyList.recursiveDeniedReason(canonicalResolved) {
             return .deny(reason, canonicalResolved)
+        }
+
+        // Come il punto 7 di validate: la root risolta si confronta anche nella grafia del disco,
+        // con le sole voci ricorsive.
+        switch storedForm(canonicalResolved) {
+        case .failure(let error):
+            return .deny(String(localized: "root non verificabile sul filesystem: \(error.description)", bundle: .module), canonicalResolved)
+        case .success(let stored):
+            if stored == "/" {
+                return .deny(String(localized: "root risolta degenere: coincide con la radice del filesystem", bundle: .module), canonicalResolved)
+            }
+            if let reason = storedDenyList.recursiveDeniedReason(stored) {
+                return .deny(reason, canonicalResolved)
+            }
         }
 
         return .allow(canonicalResolved)
@@ -135,7 +178,7 @@ public struct PathGuard: PathGuarding {
         }
 
         // 4. Profondità minima: mai la home, mai un suo figlio diretto.
-        if isHomeOrDirectChild(path) {
+        if Self.isHomeOrDirectChild(path, of: home) {
             return .deny(String(localized: "profondità insufficiente: figlio diretto della home", bundle: .module), path)
         }
 
@@ -166,6 +209,22 @@ public struct PathGuard: PathGuarding {
             return .deny(String(localized: "l'elemento coincide con la root della regola: \(root)", bundle: .module), path)
         }
 
+        // 7. Il percorso come lo registra il filesystem (spec §12): deny-list e profondità minima
+        //    si ripetono sulla grafia del disco. Sono gli ultimi controlli, così i motivi dei
+        //    rifiuti testuali restano quelli di prima. Si elimina comunque il percorso testuale:
+        //    il kernel lo risolve nello stesso oggetto appena verificato.
+        switch storedForm(path) {
+        case .failure(let error):
+            return .deny(String(localized: "percorso non verificabile sul filesystem: \(error.description)", bundle: .module), path)
+        case .success(let stored):
+            if let reason = storedDenyList.deniedReason(stored) {
+                return .deny(reason, path)
+            }
+            if Self.isHomeOrDirectChild(stored, of: storedHome) {
+                return .deny(String(localized: "profondità insufficiente: figlio diretto della home", bundle: .module), path)
+            }
+        }
+
         return .allow(path)
     }
 
@@ -173,7 +232,16 @@ public struct PathGuard: PathGuarding {
         guard let path = CanonicalPath.canonical(candidatePath) else {
             return String(localized: "percorso non canonico", bundle: .module)
         }
-        return denyList.deniedReason(path)
+        if let reason = denyList.deniedReason(path) {
+            return reason
+        }
+        // Come il punto 7 di validate.
+        switch storedForm(path) {
+        case .failure(let error):
+            return String(localized: "percorso non verificabile sul filesystem: \(error.description)", bundle: .module)
+        case .success(let stored):
+            return storedDenyList.deniedReason(stored)
+        }
     }
 
     // MARK: - Privati
@@ -225,7 +293,34 @@ public struct PathGuard: PathGuarding {
         return .failure(.deny(String(localized: "troppi collegamenti simbolici annidati mentre si risolveva la root: \(root)", bundle: .module)))
     }
 
-    private func isHomeOrDirectChild(_ path: String) -> Bool {
+    private func storedForm(_ path: String) -> Result<String, FileSystemError> {
+        Self.storedForm(path, in: fileSystem)
+    }
+
+    /// Il percorso come lo registra il filesystem: quello dell'antenato più profondo che esiste,
+    /// `path` compreso, seguito dai componenti che mancano, presi dal testo. Un elemento sparito
+    /// dopo la scansione resta verificabile, e la cancellazione che segue lo segnala «non
+    /// trovato» come prima. Si risale solo con `climbableErrors`. `path` è canonico.
+    private static func storedForm(_ path: String, in fileSystem: any FileSystem) -> Result<String, FileSystemError> {
+        var existing = path
+        var missing: [String] = []
+        while true {
+            do {
+                let stored = try fileSystem.storedPath(existing)
+                return .success(missing.reversed().reduce(stored) { PathText.join($0, $1) })
+            } catch let error as FileSystemError {
+                guard climbableErrors.contains(error.code), let parent = PathText.parent(existing), !parent.isEmpty else {
+                    return .failure(error)
+                }
+                missing.append(PathText.fileName(existing))
+                existing = parent
+            } catch {
+                return .failure(FileSystemError(code: EIO, path: existing))
+            }
+        }
+    }
+
+    private static func isHomeOrDirectChild(_ path: String, of home: String) -> Bool {
         if PathText.equalsIgnoringCase(path, home) { return true }
         guard PathText.hasPrefixIgnoringCase(path, home + "/") else { return false }
         // hasPrefixIgnoringCase garantisce che il prefisso riconosciuto abbia lo stesso numero di scalari di home + "/".

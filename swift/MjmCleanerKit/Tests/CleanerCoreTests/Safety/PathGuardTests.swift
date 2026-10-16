@@ -1,3 +1,4 @@
+import Darwin
 import Testing
 @testable import CleanerCore
 
@@ -329,5 +330,188 @@ struct PathGuardTests {
             denyList: DenyList(homeDirectory: home), fileSystem: InMemoryFileSystem(), links: FakeLinkInspector(), homeDirectory: home)
         #expect(!guardrail.validate("/Users/marco.mılanı/Library/Caches/x", declaredRoot: "\(home)/Library/Caches").isAllowed)
         #expect(guardrail.pruneReason("/Users/marco.mılanı/Documents") != nil)
+    }
+
+    // MARK: - Percorso registrato dal filesystem (solo Swift, piano APFS, spec §12)
+
+    private func create(storing fileSystem: AliasingFileSystem, home: String = Self.home, targets: [String: String?] = [:]) throws -> PathGuard {
+        try PathGuard(denyList: DenyList(homeDirectory: home), fileSystem: fileSystem, links: FakeLinkInspector(targets: targets), homeDirectory: home)
+    }
+
+    // Il buco: root ed elemento scritti con un nome che APFS equipara a quello di una cartella
+    // protetta superano i confronti OrdinalIgnoreCase, e il kernel li risolve nella cartella
+    // protetta. Equivalenze misurate nello spike del 2026-10-16.
+    @Test(arguments: [
+        ("Des\u{212A}top", "Desktop"),
+        ("De\u{017F}ktop", "Desktop"),
+        ("Library/Me\u{00DF}ages", "Library/Messages"),
+        (".\u{017F}sh", ".ssh"),
+    ])
+    func deniesAnItemWhoseStoredPathIsProtected(alias: String, stored: String) throws {
+        let root = "\(Self.home)/\(alias)"
+        let protected = "\(Self.home)/\(stored)"
+        let guardrail = try create(storing: AliasingFileSystem(aliases: [(root, protected)]))
+
+        let rootVerdict = guardrail.validateRoot(root)
+        let verdict = guardrail.validate("\(root)/x", declaredRoot: root)
+
+        #expect(!rootVerdict.isAllowed)
+        #expect(rootVerdict.reason.contains(protected))
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains(protected))
+        #expect(verdict.canonicalPathValidated == "\(root)/x")
+    }
+
+    // La profondità minima si ripete sulla grafia del disco: "/U\u{017F}ers" sfugge sia alla regola
+    // "/Users" sia alla home testuale.
+    @Test func deniesADirectChildOfTheHomeReachedThroughAnAlias() throws {
+        let alias = "/U\u{017F}ers/tester"
+        let guardrail = try create(storing: AliasingFileSystem(aliases: [(alias, Self.home)]))
+
+        let verdict = guardrail.validate("\(alias)/Downloads", declaredRoot: alias)
+
+        #expect(guardrail.validateRoot(alias).isAllowed)
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("profondità"))
+        #expect(guardrail.validate("\(alias)/Downloads/vecchio.dmg", declaredRoot: alias).isAllowed)
+    }
+
+    // Anche le voci a uguaglianza esatta valgono sulla grafia del disco.
+    @Test func deniesAnItemWhoseStoredPathIsTheHome() throws {
+        let guardrail = try create(storing: AliasingFileSystem(aliases: [("/U\u{017F}ers/tester", Self.home)]))
+
+        let verdict = guardrail.validate("/U\u{017F}ers/tester", declaredRoot: "/U\u{017F}ers")
+
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("percorso protetto: \(Self.home)"))
+    }
+
+    // La destinazione di un collegamento si legge come testo (readlink): una cache spostata su
+    // "~/Des\u{212A}top" con un collegamento passava la deny-list testuale.
+    @Test func validateRootDeniesALinkTargetSpelledWithAnAlias() throws {
+        let alias = "\(Self.home)/Des\u{212A}top"
+        let guardrail = try create(
+            storing: AliasingFileSystem(aliases: [(alias, "\(Self.home)/Desktop")]), targets: [Self.cacheRoot: alias])
+
+        let verdict = guardrail.validateRoot(Self.cacheRoot)
+
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("\(Self.home)/Desktop"))
+        #expect(verdict.canonicalPathValidated == alias)
+    }
+
+    @Test func validateRootDeniesARootStoredAsTheFilesystemRoot() throws {
+        let root = "\(Self.home)/radice"
+        let verdict = try create(storing: AliasingFileSystem(aliases: [(root, "/")])).validateRoot(root)
+
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("degenere"))
+    }
+
+    @Test func pruneReasonPrunesABranchWhoseStoredPathIsProtected() throws {
+        let alias = "\(Self.home)/progetti/Des\u{212A}top"
+        let guardrail = try create(storing: AliasingFileSystem(aliases: [(alias, "\(Self.home)/Desktop")]))
+
+        let reason = try #require(guardrail.pruneReason(alias))
+
+        #expect(reason.contains("\(Self.home)/Desktop"))
+        #expect(guardrail.pruneReason("\(Self.home)/progetti/app") == nil)
+    }
+
+    // Fail-closed: un errore che non dice «non esiste» né «non si attraversa» lascia il percorso
+    // non verificabile, e la cancellazione non si tenta.
+    @Test(arguments: [EIO, ELOOP, ENAMETOOLONG])
+    func anUnverifiableStoredPathIsDenied(code: Int32) throws {
+        let item = "\(Self.cacheRoot)/x"
+        let branch = "\(Self.cacheRoot)/sub"
+        let root = "\(Self.home)/Library/Logs"
+        let guardrail = try create(storing: AliasingFileSystem(failures: [(item, code), (branch, code), (root, code)]))
+
+        let verdict = guardrail.validate(item, declaredRoot: Self.cacheRoot)
+        let rootVerdict = guardrail.validateRoot(root)
+
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("non verificabile"))
+        #expect(!rootVerdict.isAllowed)
+        #expect(rootVerdict.reason.contains("non verificabile"))
+        #expect(try #require(guardrail.pruneReason(branch)).contains("non verificabile"))
+    }
+
+    // Un elemento sparito o dietro una cartella che non si attraversa resta verificabile: si
+    // risale all'antenato, e la cancellazione che segue riporta il proprio errore come prima.
+    @Test(arguments: [ENOENT, ENOTDIR, EACCES, EPERM])
+    func missingOrHiddenComponentsClimbToTheirAncestor(code: Int32) throws {
+        let item = "\(Self.cacheRoot)/x"
+        let guardrail = try create(storing: AliasingFileSystem(failures: [(item, code), (Self.cacheRoot, code)]))
+
+        #expect(guardrail.validateRoot(Self.cacheRoot).isAllowed)
+        #expect(guardrail.validate(item, declaredRoot: Self.cacheRoot).isAllowed)
+        #expect(guardrail.pruneReason(item) == nil)
+    }
+
+    // I componenti che mancano si giudicano dopo l'antenato nella sua grafia del disco, nel loro
+    // ordine: qui mancano sia "Xcode" sia "UserData".
+    @Test func missingComponentsAreJudgedAfterTheStoredSpellingOfTheirAncestor() throws {
+        let alias = "/U\u{017F}ers/tester/Library/Developer"
+        let root = "\(alias)/Xcode"
+        let item = "\(root)/UserData"
+        let guardrail = try create(storing: AliasingFileSystem(
+            aliases: [(alias, "\(Self.home)/Library/Developer")], failures: [(item, ENOENT), (root, ENOENT)]))
+
+        let verdict = guardrail.validate(item, declaredRoot: root)
+
+        #expect(guardrail.validateRoot(root).isAllowed)
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("\(Self.home)/Library/Developer/Xcode/UserData"))
+    }
+
+    // La deny-list registrata si costruisce sulla home come la scrive il disco: con una home
+    // sotto un collegamento (/var → /private/var) i percorsi già risolti da validateRoot non
+    // somigliano più alla home testuale.
+    @Test func theStoredHomeProtectsAHomeUnderALink() throws {
+        let home = "/var/h/tester"
+        let stored = "/private/var/h/tester"
+        let guardrail = try create(storing: AliasingFileSystem(aliases: [(home, stored)]), home: home)
+
+        let rootVerdict = guardrail.validateRoot("\(stored)/Documents")
+        let item = guardrail.validate("\(stored)/Documents/x", declaredRoot: stored)
+        let child = guardrail.validate("\(stored)/Downloads", declaredRoot: stored)
+
+        #expect(!rootVerdict.isAllowed)
+        #expect(rootVerdict.reason.contains("\(stored)/Documents"))
+        #expect(!item.isAllowed)
+        #expect(item.reason.contains("\(stored)/Documents"))
+        #expect(!child.isAllowed)
+        #expect(child.reason.contains("profondità"))
+        #expect(guardrail.validate("\(stored)/Library/Caches/x", declaredRoot: "\(stored)/Library/Caches").isAllowed)
+    }
+
+    @Test func constructorRejectsAHomeThatTheFilesystemCannotVerify() {
+        #expect(throws: InvalidConfiguration.self) {
+            try create(storing: AliasingFileSystem(failures: [(Self.home, EIO)]))
+        }
+    }
+
+    @Test(arguments: ["/", "/Users", "Users/tester", "", "/Users/tester/../altro"])
+    func constructorRejectsADegenerateStoredHome(stored: String) {
+        #expect(throws: InvalidConfiguration.self) {
+            try create(storing: AliasingFileSystem(aliases: [(Self.home, stored)]))
+        }
+    }
+
+    // I controlli sulla grafia del disco vengono dopo quelli testuali: un rifiuto che il C#
+    // emetteva conserva il proprio motivo.
+    @Test func textualRefusalsKeepTheirReason() throws {
+        let link = "\(Self.cacheRoot)/collegamento"
+        let guardrail = try PathGuard(
+            denyList: DenyList(homeDirectory: Self.home),
+            fileSystem: AliasingFileSystem(aliases: [(link, "\(Self.home)/Documents")]),
+            links: FakeLinkInspector(link),
+            homeDirectory: Self.home)
+
+        let verdict = guardrail.validate("\(link)/x", declaredRoot: Self.cacheRoot)
+
+        #expect(!verdict.isAllowed)
+        #expect(verdict.reason.contains("antenato è un collegamento simbolico"))
     }
 }

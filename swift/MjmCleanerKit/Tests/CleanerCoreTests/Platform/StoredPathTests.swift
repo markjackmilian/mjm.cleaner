@@ -85,10 +85,10 @@ struct StoredPathTests {
             try LocalFileSystem.parseStoredPathResponse(response(offset: Int32(referenceSize), bytes: [0]), path: "synthetic")
         }
         #expect(throws: FileSystemError(code: EIO, path: "synthetic")) {
-            try LocalFileSystem.parseStoredPathResponse(response(offset: 0, bytes: [65, 0]), path: "synthetic")
+            try LocalFileSystem.parseStoredPathResponse(response(offset: -Int32(headerSize), bytes: [65, 0]), path: "synthetic")
         }
         #expect(throws: FileSystemError(code: EIO, path: "synthetic")) {
-            try LocalFileSystem.parseStoredPathResponse(response(offset: Int32(referenceSize), bytes: [65]), path: "synthetic")
+            try LocalFileSystem.parseStoredPathResponse(response(offset: Int32(referenceSize), bytes: [65, 66]), path: "synthetic")
         }
 
         let tmp = try TemporaryDirectory(); defer { tmp.remove() }

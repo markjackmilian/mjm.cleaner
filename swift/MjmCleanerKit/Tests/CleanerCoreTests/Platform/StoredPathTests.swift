@@ -64,6 +64,33 @@ struct StoredPathTests {
     }
 
     @Test func storedPathReportsTheErrnoOfTheLookup() throws {
+        let headerSize = MemoryLayout<UInt32>.size
+        let referenceSize = MemoryLayout<attrreference_t>.size
+        func response(offset: Int32, bytes: [UInt8]) -> [UInt8] {
+            var buffer = [UInt8](repeating: 0, count: headerSize + referenceSize + bytes.count)
+            var reference = attrreference_t()
+            reference.attr_dataoffset = offset
+            reference.attr_length = UInt32(bytes.count)
+            withUnsafeBytes(of: &reference) { raw in
+                buffer.replaceSubrange(headerSize..<(headerSize + referenceSize), with: raw)
+            }
+            let start = headerSize + Int(offset)
+            if start >= 0, start + bytes.count <= buffer.count {
+                buffer.replaceSubrange(start..<(start + bytes.count), with: bytes)
+            }
+            return buffer
+        }
+
+        #expect(throws: FileSystemError(code: EIO, path: "synthetic")) {
+            try LocalFileSystem.parseStoredPathResponse(response(offset: Int32(referenceSize), bytes: [0]), path: "synthetic")
+        }
+        #expect(throws: FileSystemError(code: EIO, path: "synthetic")) {
+            try LocalFileSystem.parseStoredPathResponse(response(offset: 0, bytes: [65, 0]), path: "synthetic")
+        }
+        #expect(throws: FileSystemError(code: EIO, path: "synthetic")) {
+            try LocalFileSystem.parseStoredPathResponse(response(offset: Int32(referenceSize), bytes: [65]), path: "synthetic")
+        }
+
         let tmp = try TemporaryDirectory(); defer { tmp.remove() }
         let file = try tmp.file("file")
         let locked = try tmp.directory("chiusa/dentro")

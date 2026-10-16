@@ -163,14 +163,25 @@ public struct LocalFileSystem: FileSystem {
         }
         guard result == 0 else { throw FileSystemError(code: errno, path: path) }
 
+        return try Self.parseStoredPathResponse(buffer, path: path)
+    }
+
+    static func parseStoredPathResponse(_ buffer: [UInt8], path: String) throws -> String {
+        let headerSize = MemoryLayout<UInt32>.size
+        let referenceSize = MemoryLayout<attrreference_t>.size
+        guard buffer.count >= headerSize + referenceSize else { throw FileSystemError(code: EIO, path: path) }
+
         let reference = buffer.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: headerSize, as: attrreference_t.self) }
-        let start = headerSize + Int(reference.attr_dataoffset)
+        let offset = Int(reference.attr_dataoffset)
         let length = Int(reference.attr_length)
+        let (start, startOverflow) = headerSize.addingReportingOverflow(offset)
+        let (end, endOverflow) = start.addingReportingOverflow(length)
         // Un riferimento fuori dal buffer o senza terminatore è una risposta inattesa, non un percorso.
-        guard length > 1, start >= headerSize + referenceSize, start + length <= buffer.count, buffer[start + length - 1] == 0 else {
+        guard !startOverflow, !endOverflow, length > 1, start >= headerSize + referenceSize,
+              end <= buffer.count, buffer[end - 1] == 0 else {
             throw FileSystemError(code: EIO, path: path)
         }
-        return String(decoding: buffer[start..<(start + length - 1)], as: UTF8.self)
+        return String(decoding: buffer[start..<(end - 1)], as: UTF8.self)
     }
 
     // MARK: - Privati

@@ -4,7 +4,7 @@
 
 **Goal:** Collaudare la versione Swift contro il C#, confezionare una Release universale verificata e, solo dopo il gate di parità, consegnare un repository Swift senza il C#.
 
-**Architecture:** Il C# rimane nel branch finché il confronto reale, le schermate e VoiceOver non sono registrati. Un pacchetto Release Swift viene costruito e verificato prima del passaggio; uno script che risolve i percorsi rispetto alla propria posizione si sposta con `swift/` alla radice. La rimozione e lo spostamento sono un commit dedicato, seguito da prove su un checkout pulito.
+**Architecture:** Il C# rimane nel branch finché il confronto reale e le schermate non sono registrati. Un pacchetto Release Swift viene costruito e verificato prima del passaggio; uno script che risolve i percorsi rispetto alla propria posizione si sposta con `swift/` alla radice. La rimozione e lo spostamento sono un commit dedicato, seguito da prove su un checkout pulito.
 
 **Tech Stack:** macOS 15+, Swift 6 language mode, Xcode 27, Swift Testing, `xcodebuild`, `lipo`, `codesign`, `ditto`, GitHub Actions; .NET 10 solo per il confronto prima della rimozione.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Operare nel worktree isolato `codex/swift-port-5`; il checkout `main` contiene tre `Localizable.xcstrings` modificati e `.zed/`, `mjm-cleaner-ui-handoff.md` non tracciati. Non includerli nei commit e non usare `git add -A`, stash, reset o clean nel checkout principale.
-- Il C# resta eseguibile fino a parità, screenshot e VoiceOver registrati. Nel collaudo non premere azioni di cancellazione; le prove reali si fermano all'anteprima.
+- Il C# resta eseguibile fino a parità e screenshot registrati. Nel collaudo non premere azioni di cancellazione; le prove reali si fermano all'anteprima.
 - Nessuna app, cattura o input UI si avvia mentre l'utente usa il Mac. Concordare una finestra dedicata prima dei Task 3–4; se indisponibile, completare i Task 1–2 e fermarsi al gate, senza fingere che test automatici equivalgano al collaudo.
 - Debug Swift usa `com.mjm.cleaner.debug`; Release conserva `com.mjm.cleaner`. Nome esterno di distribuzione `mjm.cleaner.app`; eseguibile e scheme `MjmCleaner`.
 - Release: una build `arm64` + `x86_64`, firma ad hoc, un solo ZIP. Nessuna identità Developer Program, notarizzazione o pubblicazione senza decisione separata.
@@ -63,7 +63,7 @@
 - [ ] **Step 5: Commit.** Stage solo i due script e committare `feat(swift): package a verified universal macOS release`.
 - [ ] **Step 6: Prova reale sul codice committato.** Con `swift/` pulito e senza modifiche non committate, eseguire `bash swift/Scripts/package-release.sh --tag v0.1.0 --build-number 1 --output-dir /private/tmp/mjm-swift-port5-candidate` e ispezionare ZIP estratto: due architetture, plist e firma validi. Registrare l'identità dell'albero di codice (`git rev-parse HEAD:swift`) e SHA-256 dello ZIP; i commit successivi solo documentali non cambiano l'identità del codice. Non avviare l'app e non pubblicare il pacchetto.
 
-### Task 3: Confrontare schermate e VoiceOver
+### Task 3: Confrontare le schermate
 
 **Files:**
 - Create: `docs/superpowers/verification/2026-10-16-swift-port-5-visual.md`
@@ -71,14 +71,14 @@
 
 **Interfaces:**
 - Consumes: le 26 immagini `docs/superpowers/verification/2026-10-15-swift-4b/` e le schermate di `docs/superpowers/verification/2026-10-02-macos-redesign/`.
-- Produces: verbale con mappatura chiaro/scuro, esito di layout e VoiceOver, difetti e prove.
+- Produces: verbale con mappatura chiaro/scuro, esito di layout, difetti e prove.
 
 - [ ] **Step 1: Confronto offline.** Mappare le 13 pagine × 2 temi del 4b alle schermate del redesign; annotare differenze intenzionali SwiftUI e difetti da verificare sul Mac. Non aprire app.
 - [ ] **Step 2: Concordare finestra UI.** Presentare all'utente i bundle e la lista di prove; aspettare una finestra in cui possa lasciare il Mac libero. La conferma della spec non equivale alla disponibilità del Mac.
 - [ ] **Step 3: Schermate attive.** Solo durante quella finestra, usare la demo Debug nota (`swift/Scripts/screenshots.sh`) o controllo UI diretto per verificare viewport 900×600, contenuti lunghi, gruppi Docker sotto la piega, azioni inferiori e sheet. Script e app non devono passare alla modalità dati veri in caso di pagina sconosciuta. Salvare solo le nuove immagini necessarie a mostrare un difetto o una correzione.
-- [ ] **Step 4: VoiceOver.** Con l'utente disponibile, registrare la navigazione effettiva di sidebar, passi, selezioni, campi/stepper, disclosure Docker/Xcode, tabella Storico, sheet Impostazioni e ritorno del fuoco. Ogni voce ha esito pass/fail e osservazione. Non usare l'ispezione del codice come sostituto della prova parlata.
-- [ ] **Step 5: Correggere eventuali difetti.** Per ogni difetto reale, aggiungere la prova più mirata disponibile, mostrare RED/GREEN quando automatizzabile, rifare lo screenshot o il percorso VoiceOver interessato, review Sol e commit dedicato. Se la prova non è eseguibile, registrare il blocco e non dichiarare superato il gate.
-- [ ] **Step 6: Commit del verbale.** Stage solo il verbale e le nuove immagini nominate; committare `docs(swift): record visual and VoiceOver acceptance`.
+- [x] **Step 4: VoiceOver rimosso dallo scope.** L’utente ha chiesto il 2026-10-16 «ferma voice over, non mi interessa». Non eseguire altre prove VoiceOver e non usarne l’esito nel gate; registrare la revoca nel verbale.
+- [ ] **Step 5: Correggere eventuali difetti.** Per ogni difetto reale, aggiungere la prova più mirata disponibile, mostrare RED/GREEN quando automatizzabile, rifare lo screenshot o il percorso UI interessato, review Sol e commit dedicato. Se la prova non è eseguibile, registrare il blocco e non dichiarare superato il gate.
+- [ ] **Step 6: Commit del verbale.** Stage solo il verbale e le nuove immagini nominate; committare `docs(swift): record visual acceptance`.
 
 ### Task 4: Collaudo C# / Swift in sola lettura
 
@@ -106,7 +106,7 @@
 - Consumes: report dei Task 2–4 e suite corrente.
 - Produces: decisione GO/NO-GO verificabile prima di rimuovere C#.
 
-- [ ] **Step 1: Rileggere prove.** Controllare registro di parità completo, 536 + 172 test o nuovi conteggi giustificati, build Debug/Release senza avvisi, ZIP estratto con due slice e firma, screenshot e VoiceOver, confronto reale e differenze giudicate. Dopo ogni correzione dei Task 3–4, committare il codice, verificare che `swift/` sia pulito, quindi ricostruire e riverificare il pacchetto; il gate accetta solo uno ZIP costruito dallo stesso SHA dell'albero `swift/` collaudato, con SHA-256 registrato. Uno ZIP di un albero di codice precedente produce NO-GO. Un test non eseguito o un difetto Critical/Important aperto produce NO-GO.
+- [ ] **Step 1: Rileggere prove.** Controllare registro di parità completo, 536 + 172 test o nuovi conteggi giustificati, build Debug/Release senza avvisi, ZIP estratto con due slice e firma, screenshot e prove UI visive, confronto reale e differenze giudicate. Dopo ogni correzione dei Task 3–4, committare il codice, verificare che `swift/` sia pulito, quindi ricostruire e riverificare il pacchetto; il gate accetta solo uno ZIP costruito dallo stesso SHA dell'albero `swift/` collaudato, con SHA-256 registrato. Uno ZIP di un albero di codice precedente produce NO-GO. Un test non eseguito o un difetto Critical/Important aperto produce NO-GO.
 - [ ] **Step 2: Registrare esito.** Scrivere la tabella dei gate con link ai report, SHA del commit collaudato, SHA dell'albero `swift/` del pacchetto e del collaudo, SHA-256 dello ZIP e output essenziali, più eventuali minor rinviati e costo. Se NO-GO, continuare a correggere o fermarsi sul dato esterno mancante; non iniziare Task 6.
 - [ ] **Step 3: Commit.** Stage solo il gate e l'eventuale riga aggiornata del registro di parità; committare `docs(swift): record phase-five handoff gate`.
 

@@ -105,16 +105,21 @@ private struct XcodeConfirmationPanel: View {
                         ForEach(Array(confirmation.retainedDependentDevices.enumerated()), id: \.offset) { _, candidate in
                             CandidateLines(candidate: candidate, showsPath: false)
                         }
-                        Toggle(
-                            "Ho capito che i dispositivi elencati potrebbero non essere più disponibili finché non reinstallo il runtime.",
-                            isOn: $model.acknowledgeDependencies)
-                            .toggleStyle(.checkbox)
-                            .disabled(model.isDeleting)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxHeight: 220)
+            // Fuori dallo scorrimento, sopra i pulsanti: dentro, con poche voci, la presa d'atto
+            // finiva sotto la piega e «Conferma ed elimina» restava disabilitato senza motivo
+            // visibile. Scostamento voluto dal C#, che la tiene nello `ScrollViewer` (difetto D-2).
+            if model.hasRetainedDependencies {
+                Toggle(
+                    "Ho capito che i dispositivi elencati potrebbero non essere più disponibili finché non reinstallo il runtime.",
+                    isOn: $model.acknowledgeDependencies)
+                    .toggleStyle(.checkbox)
+                    .disabled(model.isDeleting)
+            }
             HStack {
                 Spacer()
                 Button("Torna alla selezione", action: model.backToSelection)

@@ -124,6 +124,24 @@ check_bundle() {
   if grep -R -a -E -q 'MJMDemo|Pagina demo' "$app/Contents/MacOS"; then
     printf 'Release binary contains demo content\n' >&2; return 1
   fi
+  check_no_local_paths "$app"
+}
+
+# Il pacchetto non deve nominare la macchina che lo ha costruito. Senza strip, il binario porta la
+# mappa di debug (voci SO/OSO di `nm -ap`) con la cartella temporanea di questo script, la
+# DerivedData e il checkout: percorsi diversi a ogni build. Config/Release.xcconfig li toglie con
+# `strip -S`; qui si verifica il risultato su ogni copia del bundle, ZIP estratto compreso.
+# L'app nomina «/Users» di proposito (PathGuard): si cerca il percorso di una home,
+# `/Users/<nome>/`, non il prefisso da solo.
+check_no_local_paths() {
+  local app=$1 hit status=0
+  # grep esce con 0 se trova una corrispondenza, 1 se non ne trova, altro se la scansione fallisce.
+  hit=$(LC_ALL=C grep -R -a -l -E '/var/folders/|mjm-cleaner-release|/Users/[A-Za-z0-9._-]+/' "$app/Contents") || status=$?
+  case $status in
+    0) printf 'Release bundle contains a local build path: %s\n' "${hit%%$'\n'*}" >&2; return 1 ;;
+    1) ;;
+    *) printf 'Cannot scan %s for local build paths\n' "$app" >&2; return 1 ;;
+  esac
 }
 
 check_bundle "$built_app"

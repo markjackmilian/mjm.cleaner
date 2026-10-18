@@ -30,8 +30,9 @@ open artifacts/mjm.cleaner.app
 > The script builds a universal Release (arm64 + x86_64), creates
 > `artifacts/mjm.cleaner.app` and a single ZIP,
 > `artifacts/mjm.cleaner-vX.Y.Z-macos-universal.zip`, applies the ad hoc
-> signature, and verifies architectures and signature, including on the copy
-> extracted from the ZIP. It refuses to overwrite an existing bundle or ZIP.
+> signature, and verifies architectures, signature and the absence of local build
+> paths in the binary, including on the copy extracted from the ZIP. It refuses
+> to overwrite an existing bundle or ZIP.
 
 Debug builds use the bundle id `com.mjm.cleaner.debug`, so their data is kept
 apart from the release app's. A Debug build can also start with fake demo data,
@@ -168,8 +169,10 @@ Swift application starts from zero.
   adding `artifacts/mjm.cleaner.app` (or wherever you install it) with the
   **+** button (<kbd>⌘⇧G</kbd> lets you paste the path). Because the bundle
   uses an ad hoc signature, the grant is tied to that exact build: **grant it
-  again after every new build**, even from unchanged source (each
-  `Scripts/package-release.sh` run produces a different signature).
+  again after every new build**, even from unchanged source: a rebuild is not
+  guaranteed to reproduce the same signature, because Apple's asset compiler
+  can emit different bytes from the same asset catalog and the signature covers
+  them.
 - **No privilege elevation:** the application never uses `sudo` or asks for a
   password. Items owned by `root` fail with an access-denied error and appear in
   the final summary in step 4.

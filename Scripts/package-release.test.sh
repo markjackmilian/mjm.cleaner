@@ -56,8 +56,18 @@ while (($#)); do
 done
 APP="$DERIVED/Build/Products/Release/MjmCleaner.app"
 mkdir -p "$APP/Contents/MacOS"
-printf '#!/bin/sh\nexit 0\n' > "$APP/Contents/MacOS/MjmCleaner"
+if [[ -n "${SHIM_BINARY:-}" ]]; then
+  cp "$SHIM_BINARY" "$APP/Contents/MacOS/MjmCleaner"
+else
+  printf '#!/bin/sh\nexit 0\n' > "$APP/Contents/MacOS/MjmCleaner"
+fi
 chmod +x "$APP/Contents/MacOS/MjmCleaner"
+if [[ -n "${BUNDLE_TEXT:-}" ]]; then
+  leak_file="$APP/Contents/${BUNDLE_TEXT_FILE:-MacOS/MjmCleaner}"
+  mkdir -p "$(dirname "$leak_file")"
+  printf '%s\n' "$BUNDLE_TEXT" >> "$leak_file"
+  [[ -z "${BUNDLE_TEXT_MODE:-}" ]] || chmod "$BUNDLE_TEXT_MODE" "$leak_file"
+fi
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -94,6 +104,7 @@ elif [[ "$1" == -x ]]; then
   src=$3; dst=$4
   mkdir -p "$dst"
   cp -R "$src/." "$dst/"
+  [[ -z "${EXTRACT_TEXT:-}" ]] || printf '%s\n' "$EXTRACT_TEXT" >> "$dst/mjm.cleaner.app/Contents/MacOS/MjmCleaner"
 else
   [[ "${FAIL_STAGE:-}" != transfer_bundle ]] || exit 36
   cp -R "$1/." "$2/"
@@ -240,3 +251,57 @@ wait "$RACE_PID" || { cat "$RACE_LOG" >&2; fail "reservation owner failed after 
 [[ -x "$RACE_OUT/mjm.cleaner.app/Contents/MacOS/MjmCleaner" ]] || fail "reservation owner did not complete app"
 
 printf 'PASS: collision refusal and failure cleanup\n'
+
+# Il pacchetto non deve nominare la macchina che lo ha costruito: la mappa di debug del binario
+# (voci SO/OSO di `nm -ap`) porta percorsi diversi a ogni build. Un percorso di build in qualunque
+# file del bundle, anche solo nella copia estratta dallo ZIP, blocca il pacchetto e non lascia nulla.
+check_rejected() {
+  local label=$1 out="$TMP_ROOT/path-$1"; shift
+  mkdir -p "$out"
+  if env "$@" PATH="$SHIMS:$PATH" "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/path-$label.stdout" 2>"$TMP_ROOT/path-$label.stderr"; then
+    fail "$label: local build path unexpectedly accepted"
+  fi
+  grep -q "${REJECT_PATTERN:-Release bundle contains a}" "$TMP_ROOT/path-$label.stderr" || fail "$label: packaging did not fail at the local path check"
+  [[ ! -e "$out/mjm.cleaner.app" ]] || fail "$label: rejection left a partial app"
+  [[ ! -e "$out/mjm.cleaner-v0.1.0-macos-universal.zip" ]] || fail "$label: rejection left a partial ZIP"
+}
+check_accepted() {
+  local label=$1 out="$TMP_ROOT/path-$1"; shift
+  mkdir -p "$out"
+  env "$@" PATH="$SHIMS:$PATH" "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/path-$label.stdout" 2>"$TMP_ROOT/path-$label.stderr" \
+    || { /bin/cat "$TMP_ROOT/path-$label.stderr" >&2; fail "$label: clean bundle rejected"; }
+  [[ -f "$out/mjm.cleaner-v0.1.0-macos-universal.zip" ]] || fail "$label: no ZIP produced"
+}
+DEBUG_MAP_PATH='/private/var/folders/ab/c0ffee/T/mjm-cleaner-release.AbCdEf/DerivedData/Build/Intermediates.noindex/MjmCleaner.build/Objects-normal/arm64/App.o'
+check_rejected oso-entry BUNDLE_TEXT="$DEBUG_MAP_PATH"
+check_rejected var-folders BUNDLE_TEXT='/private/var/folders/ab/c0ffee/T/DerivedData/Build/Intermediates.noindex/App.o'
+check_rejected scratch-dir BUNDLE_TEXT='/tmp/mjm-cleaner-release.AbCdEf'
+check_rejected source-dir BUNDLE_TEXT='/Users/builder/work/mjm.cleaner/MjmCleaner/App/MjmCleanerApp.swift'
+check_rejected resource-file BUNDLE_TEXT="$DEBUG_MAP_PATH" BUNDLE_TEXT_FILE=Resources/Localizable.strings
+check_rejected extracted-copy EXTRACT_TEXT="$DEBUG_MAP_PATH"
+# Una scansione che non riesce (file illeggibile) non vale «nessun percorso trovato».
+: > "$TMP_ROOT/unreadable-probe"; chmod 000 "$TMP_ROOT/unreadable-probe"
+if [[ -r "$TMP_ROOT/unreadable-probe" ]]; then
+  printf 'SKIP: unreadable-file scan failure (running with privileges that ignore file modes)\n'
+else
+  REJECT_PATTERN='Cannot scan' check_rejected unreadable-file BUNDLE_TEXT=x BUNDLE_TEXT_FILE=Resources/locked BUNDLE_TEXT_MODE=000
+fi
+# PathGuard nomina «/Users» di proposito: il prefisso da solo non è un percorso di build.
+check_accepted users-literals BUNDLE_TEXT='/Users
+/Users/
+percorso protetto: /Users (home di un altro utente)'
+
+# Mach-O reale: il debug map di `cc -g` nomina la cartella del sorgente; `strip -S`, che è quanto
+# fa Config/Release.xcconfig, lo toglie. Il pacchetto deve respingere il primo e accettare il secondo.
+FIXTURE="$TMP_ROOT/fixture/Users/builder/src"
+mkdir -p "$FIXTURE"
+printf 'int main(void) { return 0; }\n' > "$FIXTURE/main.c"
+(cd "$FIXTURE" && cc -g -c main.c -o main.o && cc main.o -o ../unstripped)
+cp "$FIXTURE/../unstripped" "$FIXTURE/../stripped"
+strip -S "$FIXTURE/../stripped"
+LC_ALL=C grep -a -q -F '/Users/builder/' "$FIXTURE/../unstripped" || fail "fixture binary carries no debug map"
+if LC_ALL=C grep -a -q -F '/Users/builder/' "$FIXTURE/../stripped"; then fail "strip -S left the debug map in the fixture"; fi
+check_rejected real-unstripped SHIM_BINARY="$FIXTURE/../unstripped"
+check_accepted real-stripped SHIM_BINARY="$FIXTURE/../stripped"
+
+printf 'PASS: local build path guard\n'

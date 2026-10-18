@@ -9,8 +9,8 @@ import Foundation
 /// `-MJMWindowSize <L>x<A>` (interi positivi, per esempio `900x600`) porta la finestra principale a
 /// quella misura in punti, barra degli strumenti compresa; una misura sotto il minimo dà il minimo
 /// (900×652: i 900×600 della vista più i 52 della barra), un valore assente o malformato lascia la
-/// misura predefinita. Nessun servizio finto tocca il disco: un clic su «Elimina» restituisce un
-/// resoconto inventato.
+/// misura che la finestra ricorda (`NSWindow Frame main` nei defaults). Nessun servizio finto tocca
+/// il disco: un clic su «Elimina» restituisce un resoconto inventato.
 struct DemoLaunch: Sendable {
     enum Page: String, CaseIterable, Sendable {
         case choose

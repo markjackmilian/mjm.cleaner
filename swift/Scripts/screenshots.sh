@@ -4,7 +4,10 @@
 # Senza pagine le cattura tutte. Con `--size <L>x<A>` la finestra principale si apre a quella misura
 # in punti, barra degli strumenti compresa (`-MJMWindowSize`, senza input sintetico); sotto il minimo
 # si ferma a 900x652 (i 900x600 della vista più i 52 della barra), quindi `--size 900x600` cattura la
-# finestra minima. Dopo ogni cattura si stampano le dimensioni in pixel del PNG.
+# finestra minima. Senza `--size` si passa 1120x700, la misura iniziale della spec: macOS ricorda
+# l'ultima misura della finestra (`NSWindow Frame main` nei defaults di `com.mjm.cleaner.debug`) e
+# `-ApplePersistenceIgnoreState` non la scavalca, quindi una misura implicita dipenderebbe dal giro
+# precedente. Dopo ogni cattura si stampano le dimensioni in pixel del PNG.
 # Durante la cattura si aprono e si chiudono finestre dell'app: non usare il Mac finché lo script
 # non finisce (con Claude in primo piano), perché ogni finestra prende il primo piano e i tasti
 # premuti finirebbero nella demo.
@@ -17,7 +20,7 @@ project=${here:h}/MjmCleaner.xcodeproj
 usage="uso: screenshots.sh [--size <L>x<A>] <cartella di uscita> [pagina…]"
 
 # La misura si valida prima di costruire o avviare qualunque cosa.
-size=""
+size=1120x700
 if [[ ${1:-} == --size ]]; then
     size=${2:-}
     if [[ ! $size =~ '^[1-9][0-9]{0,3}x[1-9][0-9]{0,3}$' ]]; then
@@ -84,18 +87,16 @@ pid=""
 trap 'pkill -f "$binary" 2>/dev/null; true' EXIT
 trap 'exit 130' INT TERM
 
-# Con `--size` l'app apre la finestra a quella misura (`DemoLaunch`, `-MJMWindowSize`).
-size_args=()
-if [[ -n $size ]]; then
-    size_args=(-MJMWindowSize "$size")
-fi
+# L'app apre la finestra alla misura scelta (`DemoLaunch`, `-MJMWindowSize`).
+size_args=(-MJMWindowSize "$size")
 
 failed=0
 for page in $pages; do
     for appearance in light dark; do
         # `open` avvia l'app da LaunchServices, come il Finder: un processo figlio di questa shell
         # potrebbe non ricevere finestre.
-        # `-ApplePersistenceIgnoreState`: la finestra si apre alla misura predefinita, non a quella salvata.
+        # `-ApplePersistenceIgnoreState`: niente ripristino dello stato salvato (pagina, sheet); la
+        # misura la impone `-MJMWindowSize`, perché quella ricordata dalla finestra resterebbe.
         open -n "$bundle" --args -MJMDemo "$page" -MJMAppearance "$appearance" $size_args -ApplePersistenceIgnoreState YES
         # Il tempo per caricare la pagina e, per le Impostazioni, aprire lo sheet.
         sleep 3
@@ -108,10 +109,8 @@ for page in $pages; do
                 failed=1
             elif screencapture -x -o -l"$id" "$out/$page-$appearance.png"; then
                 print "$out/$page-$appearance.png"
-                if [[ -n $size ]]; then
-                    sips -g pixelWidth -g pixelHeight "$out/$page-$appearance.png" \
-                        | awk '/pixelWidth/ {w = $2} /pixelHeight/ {h = $2} END {print "  " w "x" h " pixel"}' || true
-                fi
+                sips -g pixelWidth -g pixelHeight "$out/$page-$appearance.png" \
+                    | awk '/pixelWidth/ {w = $2} /pixelHeight/ {h = $2} END {print "  " w "x" h " pixel"}' || true
             else
                 print -u2 "cattura non riuscita per $page ($appearance): lo schermo è bloccato o spento?"
                 failed=1

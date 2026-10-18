@@ -43,7 +43,7 @@ Revisione Opus di `037b5bb..c7e3146` contro piano, spec e verbali, verdetto **DA
 | M-6: commento delle fixture verso un percorso rimosso | corretto in `b9541a9` |
 | M-7: workflow con permessi ampi, checkout per nome ambiguo, Xcode predefinito non preferito | corretto in `b9541a9`: `contents: read` globale e `write` solo nel job `release`, `ref: refs/tags/…` con `persist-credentials: false`, `/Applications/Xcode.app` provato per primo, `sw_vers` anche nel job `package` |
 | M-8: frase dei requisiti Swift | corretta in `b9541a9` |
-| M-5: il binario Release contiene percorsi locali (mappa di debug) | **corretto** il 2026-10-18 in un commit dedicato, con `strip -S` nel `Release.xcconfig` e un controllo in `package-release.sh`: vedi `2026-10-18-swift-port-5-m5.md` |
+| M-5: il binario Release contiene percorsi locali (mappa di debug) | **rinviato**: richiede di cambiare `package-release.sh` (strip) e ripetere le prove del pacchetto; da trattare a parte; corretto poi il 2026-10-18, vedi `2026-10-18-swift-port-5-m5.md` |
 
 Note della revisione, senza azione: i commit della prima sessione Codex (`436f3de`…`da662db`) non hanno il trailer `Co-Authored-By`, quelli della ripresa sì. `git log --follow` sull'icona mostra la storia del file C# identico, effetto solo cosmetico del rilevamento dei rinomini.
 

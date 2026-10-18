@@ -4,7 +4,8 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
 PACKAGE_SCRIPT="$SCRIPT_DIR/package-release.sh"
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/private/tmp}/package-release-test.XXXXXX")
-trap 'rm -rf -- "$TMP_ROOT"' EXIT
+ALT_ROOT=''
+trap 'rm -rf -- "$TMP_ROOT"; [[ -z "$ALT_ROOT" ]] || rm -rf -- "$ALT_ROOT"' EXIT
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
@@ -258,7 +259,7 @@ printf 'PASS: collision refusal and failure cleanup\n'
 check_rejected() {
   local label=$1 out="$TMP_ROOT/path-$1"; shift
   mkdir -p "$out"
-  if env "$@" PATH="$SHIMS:$PATH" "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/path-$label.stdout" 2>"$TMP_ROOT/path-$label.stderr"; then
+  if env "$@" PATH="$SHIMS:$PATH" "${SCRIPT_UNDER_TEST:-$PACKAGE_SCRIPT}" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/path-$label.stdout" 2>"$TMP_ROOT/path-$label.stderr"; then
     fail "$label: local build path unexpectedly accepted"
   fi
   grep -q "${REJECT_PATTERN:-Release bundle contains a}" "$TMP_ROOT/path-$label.stderr" || fail "$label: packaging did not fail at the local path check"
@@ -268,7 +269,7 @@ check_rejected() {
 check_accepted() {
   local label=$1 out="$TMP_ROOT/path-$1"; shift
   mkdir -p "$out"
-  env "$@" PATH="$SHIMS:$PATH" "$PACKAGE_SCRIPT" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/path-$label.stdout" 2>"$TMP_ROOT/path-$label.stderr" \
+  env "$@" PATH="$SHIMS:$PATH" "${SCRIPT_UNDER_TEST:-$PACKAGE_SCRIPT}" --tag v0.1.0 --build-number 1 --output-dir "$out" >"$TMP_ROOT/path-$label.stdout" 2>"$TMP_ROOT/path-$label.stderr" \
     || { /bin/cat "$TMP_ROOT/path-$label.stderr" >&2; fail "$label: clean bundle rejected"; }
   [[ -f "$out/mjm.cleaner-v0.1.0-macos-universal.zip" ]] || fail "$label: no ZIP produced"
 }
@@ -286,21 +287,30 @@ if [[ -r "$TMP_ROOT/unreadable-probe" ]]; then
 else
   REJECT_PATTERN='Cannot scan' check_rejected unreadable-file BUNDLE_TEXT=x BUNDLE_TEXT_FILE=Resources/locked BUNDLE_TEXT_MODE=000
 fi
+# Un checkout fuori da /Users e da /var/folders (/opt su un runner self-hosted) non ha il modello
+# della home: lo trova solo la ricerca del percorso del checkout. Lo script gira da una copia, il cui
+# percorso non somiglia a nessun altro modello.
+ALT_ROOT=$(mktemp -d /private/tmp/package-release-root.XXXXXX)
+mkdir -p "$ALT_ROOT/Scripts"
+cp "$PACKAGE_SCRIPT" "$ALT_ROOT/Scripts/package-release.sh"
+SCRIPT_UNDER_TEST="$ALT_ROOT/Scripts/package-release.sh" check_accepted checkout-clean BUNDLE_TEXT='nessun percorso'
+SCRIPT_UNDER_TEST="$ALT_ROOT/Scripts/package-release.sh" check_rejected checkout-root BUNDLE_TEXT="$ALT_ROOT/MjmCleaner/App/MjmCleanerApp.swift"
 # PathGuard nomina «/Users» di proposito: il prefisso da solo non è un percorso di build.
 check_accepted users-literals BUNDLE_TEXT='/Users
 /Users/
 percorso protetto: /Users (home di un altro utente)'
 
-# Mach-O reale: il debug map di `cc -g` nomina la cartella del sorgente; `strip -S`, che è quanto
-# fa Config/Release.xcconfig, lo toglie. Il pacchetto deve respingere il primo e accettare il secondo.
+# Mach-O reale: il debug map di `cc -g` nomina la cartella del sorgente; `strip -D -S`, che è quanto
+# fa Xcode con Config/Release.xcconfig, lo toglie. Il pacchetto deve respingere il primo e accettare
+# il secondo.
 FIXTURE="$TMP_ROOT/fixture/Users/builder/src"
 mkdir -p "$FIXTURE"
 printf 'int main(void) { return 0; }\n' > "$FIXTURE/main.c"
 (cd "$FIXTURE" && cc -g -c main.c -o main.o && cc main.o -o ../unstripped)
 cp "$FIXTURE/../unstripped" "$FIXTURE/../stripped"
-strip -S "$FIXTURE/../stripped"
+strip -D -S "$FIXTURE/../stripped"
 LC_ALL=C grep -a -q -F '/Users/builder/' "$FIXTURE/../unstripped" || fail "fixture binary carries no debug map"
-if LC_ALL=C grep -a -q -F '/Users/builder/' "$FIXTURE/../stripped"; then fail "strip -S left the debug map in the fixture"; fi
+if LC_ALL=C grep -a -q -F '/Users/builder/' "$FIXTURE/../stripped"; then fail "strip -D -S left the debug map in the fixture"; fi
 check_rejected real-unstripped SHIM_BINARY="$FIXTURE/../unstripped"
 check_accepted real-stripped SHIM_BINARY="$FIXTURE/../stripped"
 

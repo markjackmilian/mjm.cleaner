@@ -8,11 +8,14 @@ DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
 
 // Il binario distribuito non deve nominare la macchina che lo ha costruito. Il linker vi lascia la
 // mappa di debug (voci SO/OSO di `nm -ap`): percorsi della DerivedData, del checkout e della
-// cartella temporanea di Scripts/package-release.sh, diversi a ogni build. `strip -S` toglie solo
-// quelle voci e conserva i simboli, così i rapporti di crash restano leggibili anche senza il dSYM,
-// che lo script non distribuisce. Lo strip avviene prima della firma. Le tre impostazioni stanno
-// qui e non sulla riga di comando di xcodebuild: da lì varrebbero anche per gli oggetti `.o` dei
-// pacchetti Swift, che lo strip non gestisce (con STRIP_STYLE = all fallisce).
+// cartella temporanea di Scripts/package-release.sh, diversi a ogni build. Xcode la toglie con
+// `strip -D -S` prima della firma, e conserva i simboli, così i rapporti di crash restano leggibili
+// anche senza il dSYM, che lo script non distribuisce. STRIP_SWIFT_SYMBOLS = NO è necessario: con il
+// dSYM e uno STRIP_STYLE diverso da `all`, Xcode aggiunge `-T` e lo strip cancella i nomi dei simboli
+// Swift (nella slice arm64, <redacted function N> al posto di quasi tutti). Le impostazioni stanno
+// qui e non sulla riga di comando di xcodebuild: da lì lo strip partirebbe anche sugli oggetti `.o`
+// dei pacchetti Swift, prima del link (con STRIP_STYLE = all la build fallisce).
 DEPLOYMENT_POSTPROCESSING = YES
 STRIP_INSTALLED_PRODUCT = YES
 STRIP_STYLE = debugging
+STRIP_SWIFT_SYMBOLS = NO

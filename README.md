@@ -31,7 +31,7 @@ open artifacts/mjm.cleaner.app
 > `artifacts/mjm.cleaner.app` and a single ZIP,
 > `artifacts/mjm.cleaner-vX.Y.Z-macos-universal.zip`, applies the ad hoc
 > signature, and verifies architectures, signature and the absence of local build
-> paths in the binary, including on the copy extracted from the ZIP. It refuses
+> paths in the bundle, including on the copy extracted from the ZIP. It refuses
 > to overwrite an existing bundle or ZIP.
 
 Debug builds use the bundle id `com.mjm.cleaner.debug`, so their data is kept

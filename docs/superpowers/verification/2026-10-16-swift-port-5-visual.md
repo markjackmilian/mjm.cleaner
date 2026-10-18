@@ -1,8 +1,8 @@
-# Swift port 5 — verbale visivo parziale
+# Swift port 5 — verbale visivo
 
-Data: 2026-10-16, Europe/Rome. Stato: **BLOCKED — NO-GO per il gate visivo**.
+Date: 2026-10-16 (prima sessione) e 2026-10-18 (ripresa), Europe/Rome. Stato: **PASS — gate visivo superato**, con quattro rilievi Minor rinviati (vedi «Ripresa del 2026-10-18»).
 
-Il confronto offline è completo; il collaudo attivo è parziale. Restano un errore riproducibile dell’anteprima Xcode nella demo e la verifica della viewport 900×600. Il requisito VoiceOver è stato rimosso dall’utente durante la sessione («ferma voice over, non mi interessa»), quindi non costituisce un blocco.
+Il 2026-10-16 il confronto offline era completo e il collaudo attivo parziale: restavano l’errore V-01 dell’anteprima Xcode nella demo e la viewport 900×600. Il 2026-10-18 V-01 è corretto, la finestra minima è catturata su tutte le pagine e il difetto D-2 emerso da quella cattura è corretto. Il requisito VoiceOver è stato rimosso dall’utente durante la prima sessione («ferma voice over, non mi interessa»), quindi non costituisce un blocco.
 
 ## Identità e finestra autorizzata
 
@@ -69,6 +69,48 @@ Evidenza: [xcode-preview-error-light.png](2026-10-16-swift-port-5/xcode-preview-
 
 Prima della revoca: Cmd-F5 non ha prodotto uno stato osservabile; apertura diretta di `/System/Library/CoreServices/VoiceOver.app` tramite CUA terminata con timeout `-10005`. Nessuna navigazione parlata verificata. Dopo «ferma voice over, non mi interessa», interrotti tutti i tentativi. `pgrep -x VoiceOver`, eseguito con accesso necessario alla lista processi, ha restituito exit 1 senza PID: VoiceOver non risultava attivo. Le osservazioni AX del verbale sono prove funzionali, non sostituiscono il parlato.
 
-## Condizioni residue
+## Condizioni residue al 2026-10-16
 
-Correggere e riprovare V-01; ottenere una prova osservata a 900×600 con contenuti lunghi, azioni inferiori e sheet. Questo verbale parziale non autorizza il gate di consegna né l’avvio del Task 4. Nessun test RED/GREEN applicabile in questa sessione, poiché non sono state apportate correzioni al codice.
+Correggere e riprovare V-01; ottenere una prova osservata a 900×600 con contenuti lunghi, azioni inferiori e sheet. Questo verbale parziale non autorizzava il gate di consegna né l’avvio del Task 4. Nessun test RED/GREEN applicabile in quella sessione, poiché non erano state apportate correzioni al codice.
+
+## Ripresa del 2026-10-18
+
+Dopo il limite d’uso della prima sessione il lavoro è proseguito in Claude Code, nello stesso worktree. Le prove attive usano solo `swift/Scripts/screenshots.sh`, che avvia la demo per percorso assoluto con `-MJMDemo` e cattura con `screencapture -l`: nessun input sintetico, nessun trascinamento della finestra. L’utente ha lasciato il Mac libero nelle due finestre concordate (circa 17:19–17:21 e 18:03 CEST).
+
+### Correzioni
+
+| Commit | Contenuto | Prova |
+| --- | --- | --- |
+| `7e80fdf` | V-01: `DemoData.xcodeSnapshot` riceve `fileInventory` per le tre cartelle selezionabili, costruito come in `XcodeFileScanner`; la pagina `xcode-preview` seleziona anche `ShopApp-abcdefgh`. Test `swift/Scripts/demo-xcode-preview.test.sh`, che compila il vero `DemoData.swift` contro `CleanerCore` | RED sul `DemoData.swift` di `da662db`: `Selected file candidate has no complete guarded inventory entry: ShopApp-abcdefgh`; GREEN: `PASS: demo Xcode preview`. Revisione Opus: flusso reale `XcodeModel` + `DemoServices` fino al resoconto senza errori, 12 mutazioni su 15 uccise, le 3 sopravvissute non lette dalla demo |
+| `fb87d80`, `56377ec` | `-MJMWindowSize <L>x<A>` solo Debug in `DemoLaunch` e `screenshots.sh --size`; la finestra minima reale è 900×652 punti (i 900×600 della vista sotto la toolbar di 52 pt, come già provato nel piano 4b) | Validazione prima della build provata con shim; `--size 900x600` → 1800×1304 px a 2x su tutte le pagine |
+| `66d51e5` | D-2: la presa d’atto «Ho capito…» del pannello di conferma Xcode esce dallo scorrimento interno alto 220 pt e sta sopra i pulsanti. Scelta dell’utente: scostamento voluto dal C#, che ha lo stesso scorrimento (`XcodeView.axaml`, `ScrollViewer MaxHeight="220"`) | Catture [1120 chiaro](2026-10-16-swift-port-5/xcode-preview-1120-light.png), [1120 scuro](2026-10-16-swift-port-5/xcode-preview-1120-dark.png), [900 chiaro](2026-10-16-swift-port-5/xcode-preview-900-light.png), [900 scuro](2026-10-16-swift-port-5/xcode-preview-900-dark.png): casella visibile, «Conferma ed elimina» disabilitato finché non è spuntata |
+| `c4b5f77` | Lo script passa sempre `-MJMWindowSize` (1120x700 senza `--size`): macOS ricorda la misura in `NSWindow Frame main` dei defaults Debug e `-ApplePersistenceIgnoreState` non la scavalca, tanto che un giro senza `--size` dopo uno a 900×600 era uscito ancora 900×652 | Giro successivo senza `--size`: 2240×1400 px, cioè 1120×700 punti |
+
+### Finestra minima, tutte le pagine
+
+`swift/Scripts/screenshots.sh --size 900x600` su `56377ec`: 26 catture, exit 0, tutte 1800×1304 px (900×652 pt), tranne `startup-failure` 1800×1264 px (senza toolbar). Una revisione Opus ha esaminato ogni immagine in chiaro e scuro: nessuna sovrapposizione, nessun controllo fuori dalla finestra, azioni inferiori intere su tutte le pagine, sheet Impostazioni intero (circa 700×559 pt) con Annulla e Salva visibili. `c4b5f77` e `66d51e5` cambiano solo lo script e il pannello di conferma Xcode, ricatturato sopra.
+
+| Prova aperta il 2026-10-16 | Esito |
+| --- | --- |
+| Viewport 900×600 | PASS: finestra minima ottenuta da codice su tutte le pagine |
+| Selezione e anteprima cache Xcode (V-01) | PASS a 1120×700 e a 900×652 |
+| Contenuti lunghi e Conferma a 900×600 | PASS per le azioni inferiori; con i dati demo nessun testo troncato. Contenuti arbitrariamente lunghi non dimostrati dai dati demo; i percorsi lunghi reali del collaudo di parità (finestre più grandi) non hanno mostrato troncamenti con perdita d’informazione |
+| Docker sotto la piega | PASS limitato della prima sessione (scorrimento reale a 1120×700); a 900×652 i gruppi inferiori non si vedono senza scorrere, vedi D-3 |
+| Sheet Impostazioni | PASS: intero nella finestra minima ([cattura](2026-10-16-swift-port-5/settings-900-light.png)); lo scorrimento fino a soglia ed età è quello verificato attivamente il 2026-10-16 |
+
+### Rilievi rinviati (Minor)
+
+| Rilievo | Cattura | Motivo del rinvio |
+| --- | --- | --- |
+| D-1: a 900×652 la pagina Conferma della demo mostra 6 righe su 7; il gruppo «Log e crash report» è sotto la piega e nulla indica lo scorrimento | [confirm-900](2026-10-16-swift-port-5/confirm-900-light.png) | Scelta dell’utente: barre di scorrimento a comparsa di macOS, contenuto raggiungibile scorrendo, conteggio corretto nel titolo e nel pulsante |
+| D-3: a 900×652 i gruppi Docker dopo «Costruite in locale» sono sotto la piega senza indizio | [docker-900](2026-10-16-swift-port-5/docker-900-light.png) | Stesso comportamento di D-1; nessuna voce selezionata per impostazione |
+| D-4: a 900×652 la colonna Categorie dello Storico mostra 2 badge su 4, l’ultimo ritagliato | [history-900](2026-10-16-swift-port-5/history-900-light.png) | Solo presentazione; il dato completo resta nella riga a finestre più larghe |
+| Pannello di conferma Xcode: la riga UUID dell’ultimo dispositivo è tagliata dallo scorrimento interno | catture `xcode-preview-*` | Scorrimento interno identico al C#; dopo D-2 non nasconde più nulla di obbligatorio |
+
+Costo se il rinvio è sbagliato: un utente su una finestra minima non si accorge di un gruppo finché non scorre; nessun rischio di eliminazione, perché ogni pulsante distruttivo riporta il totale.
+
+Note già presenti nel 4b, fuori ambito: in scuro «Conferma ed elimina» disabilitato si distingue poco dall’abilitato; nei dati demo Fatto riporta «7 elementi eliminati» e «1 elemento non eliminato»; nelle intestazioni Xcode compare «1 voci».
+
+### Esito
+
+Gate visivo superato per le prove nel perimetro (VoiceOver escluso dall’utente). Nessun difetto Critical o Important aperto.

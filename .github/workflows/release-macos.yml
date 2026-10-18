@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Tag esistente da pubblicare, per esempio v0.0.1"
+        description: "Tag esistente da pubblicare, per esempio v0.1.0"
         required: true
         type: string
 
@@ -18,8 +18,20 @@ env:
   RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
 jobs:
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check tag format
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag non valido: '$RELEASE_TAG' (atteso vMAJOR.MINOR.PATCH)" >&2
+            exit 1
+          fi
+
   test:
     name: Test
+    needs: validate
     runs-on: macos-latest
     steps:
       - name: Check out repository
@@ -27,57 +39,71 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
+      - name: Select Xcode 27
+        run: |
+          sw_vers
+          for candidate in /Applications/Xcode_27*.app /Applications/Xcode.app; do
+            [[ -d "$candidate" ]] || continue
+            if DEVELOPER_DIR="$candidate/Contents/Developer" xcodebuild -version | head -1 | grep -q '^Xcode 27\.'; then
+              sudo xcode-select -s "$candidate/Contents/Developer"
+              xcodebuild -version
+              exit 0
+            fi
+          done
+          echo "Nessun Xcode 27 su questa immagine del runner" >&2
+          ls -d /Applications/Xcode*.app >&2 || true
+          exit 1
 
-      - name: Run tests
-        run: dotnet test --configuration Release
+      - name: Run test suites
+        working-directory: MjmCleanerKit
+        run: swift test -Xswiftc -warnings-as-errors
 
-      - name: Test bundle configuration
-        run: bash tests/build/bundle-config.test.sh
+      - name: Test scripts
+        run: |
+          bash Scripts/package-release.test.sh
+          bash Scripts/demo-xcode-preview.test.sh
+
+      - name: Build Debug
+        run: |
+          xcodebuild -project MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Debug \
+            -destination "platform=macOS,arch=$(uname -m)" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" build
 
   package:
-    name: Package ${{ matrix.architecture }}
+    name: Package universal
     needs: test
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runtime: osx-arm64
-            architecture: arm64
-          - runtime: osx-x64
-            architecture: x64
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Build application bundle
-        env:
-          RELEASE_VERSION: ${{ env.RELEASE_TAG }}
-          BUILD_NUMBER: ${{ github.run_number }}
-          RUNTIME_ID: ${{ matrix.runtime }}
+      - name: Select Xcode 27
         run: |
-          ./build/bundle.sh \
-            --runtime "$RUNTIME_ID" \
-            --version "$RELEASE_VERSION" \
-            --build-number "$BUILD_NUMBER"
+          for candidate in /Applications/Xcode_27*.app /Applications/Xcode.app; do
+            [[ -d "$candidate" ]] || continue
+            if DEVELOPER_DIR="$candidate/Contents/Developer" xcodebuild -version | head -1 | grep -q '^Xcode 27\.'; then
+              sudo xcode-select -s "$candidate/Contents/Developer"
+              xcodebuild -version
+              exit 0
+            fi
+          done
+          echo "Nessun Xcode 27 su questa immagine del runner" >&2
+          exit 1
+
+      - name: Build and verify the universal package
+        run: |
+          bash Scripts/package-release.sh \
+            --tag "$RELEASE_TAG" \
+            --build-number "$GITHUB_RUN_NUMBER" \
+            --output-dir artifacts
 
       - name: Upload application archive
         uses: actions/upload-artifact@v4
         with:
-          name: mjm.cleaner-${{ env.RELEASE_TAG }}-macos-${{ matrix.architecture }}
-          path: artifacts/*.zip
+          name: mjm.cleaner-${{ env.RELEASE_TAG }}-macos-universal
+          path: artifacts/mjm.cleaner-${{ env.RELEASE_TAG }}-macos-universal.zip
           if-no-files-found: error
           compression-level: 0
 
@@ -86,22 +112,28 @@ jobs:
     needs: package
     runs-on: ubuntu-latest
     steps:
-      - name: Download application archives
+      - name: Download application archive
         uses: actions/download-artifact@v4
         with:
-          pattern: mjm.cleaner-*-macos-*
+          name: mjm.cleaner-${{ env.RELEASE_TAG }}-macos-universal
           path: release-assets
-          merge-multiple: true
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          shopt -s nullglob
+          assets=(release-assets/*.zip)
+          if (( ${#assets[@]} != 1 )); then
+            echo "Atteso un solo ZIP, trovati ${#assets[@]}" >&2
+            exit 1
+          fi
+          # Senza --clobber: un asset omonimo già pubblicato fa fallire il job.
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" release-assets/*.zip --clobber
+            gh release upload "$RELEASE_TAG" "${assets[0]}"
           else
-            gh release create "$RELEASE_TAG" release-assets/*.zip \
+            gh release create "$RELEASE_TAG" "${assets[0]}" \
               --verify-tag \
               --generate-notes \
               --title "$RELEASE_TAG"

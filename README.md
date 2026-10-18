@@ -11,39 +11,40 @@ them.
 
 ## Requirements
 
-- macOS 13 or later
-- .NET 10 SDK — on this machine it is installed in `/usr/local/share/dotnet`
-  and is **not in `PATH`**. Prefix each `dotnet` command with:
-
-  ```bash
-  export PATH="/usr/local/share/dotnet:$PATH"
-  ```
-
-  (`build/bundle.sh` already does this internally.)
+- macOS 15 or later
+- For development: Xcode 27 with Swift 6.2 or later (the local package declares
+  `swift-tools-version: 6.2`)
 
 ## Development
 
 ```bash
-export PATH="/usr/local/share/dotnet:$PATH"
-
-dotnet build                             # build the solution and tests
-dotnet test                              # run the complete test suite
-dotnet run --project src/MjmCleaner.App  # run the development build
-./build/bundle.sh                        # create the complete macOS bundle
-open artifacts/mjm.cleaner.app           # launch the bundle
+(cd MjmCleanerKit && swift test)    # run the Core and Features test suites
+open MjmCleaner.xcodeproj            # develop and run from Xcode
+xcodebuild -project MjmCleaner.xcodeproj -scheme MjmCleaner -configuration Debug build
+Scripts/package-release.sh --tag v0.1.0 --build-number 1 --output-dir artifacts
+open artifacts/mjm.cleaner.app
 ```
 
 > [!IMPORTANT]
-> Run **`./build/bundle.sh`** to create the distributable application.
-> A plain `dotnet publish` only produces the Avalonia binaries, not a complete
-> macOS bundle. The script publishes the application, creates
-> `artifacts/mjm.cleaner.app`, adds `Info.plist` and the `.icns` icon, and then
-> applies the ad hoc signature required to launch it on macOS.
+> Run **`Scripts/package-release.sh`** to create the distributable application.
+> The script builds a universal Release (arm64 + x86_64), creates
+> `artifacts/mjm.cleaner.app` and a single ZIP,
+> `artifacts/mjm.cleaner-vX.Y.Z-macos-universal.zip`, applies the ad hoc
+> signature, and verifies architectures and signature, including on the copy
+> extracted from the ZIP. It refuses to overwrite an existing bundle or ZIP.
 
-The bundle is **ad hoc signed** (`codesign --sign -`): macOS would refuse to
-launch it without a signature. Because it is not notarized, `spctl` rejects it.
-A locally built copy still launches normally, but a copy transferred from
-another Mac must be opened for the first time with **right-click → Open**.
+Debug builds use the bundle id `com.mjm.cleaner.debug`, so their data is kept
+apart from the release app's. A Debug build can also start with fake demo data,
+without touching the disk: `-MJMDemo <page>`.
+`Scripts/screenshots.sh [--size WxH] <out-dir> [page…]` captures the demo pages
+(Debug only; do not use the Mac while it runs).
+
+The bundle is **ad hoc signed** (identity `-`, see `Config/Base.xcconfig`):
+macOS would refuse to launch it without a signature. Because it is not
+notarized, `spctl` rejects it. A locally built copy still launches normally, but
+a copy transferred from another Mac (for example, unpacked from the ZIP) must be
+opened for the first time with **right-click → Open**; on macOS 15 and later,
+use **System Settings → Privacy & Security → Open Anyway** instead.
 
 ## How it works
 
@@ -56,11 +57,13 @@ The application uses a four-step wizard, always in the same order:
 | **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard`. This is the final point at which the operation can be abandoned. |
 | **4 · Done** | Summarizes the disk space recovered and any items that could not be deleted. |
 
-In the toolbar, **Docker** opens the Docker cleanup page, **Xcode** opens the Xcode
-cache and simulator page (see below), and **History**
-shows previous cleanup sessions and the cumulative space recovered. **Settings** configures the project directories searched for
-`bin` and `obj`, the directories searched for large files, the large-file size
-threshold, and the minimum ages for Downloads, logs, and NuGet packages.
+In the sidebar, **Docker** opens the Docker cleanup page, **Xcode** opens the
+Xcode cache and simulator page (see below), and **History** shows previous
+cleanup sessions and the cumulative space recovered. **Settings**, at the bottom
+of the sidebar and in the app menu (<kbd>⌘,</kbd>), configures the project
+directories searched for `bin` and `obj`, the directories searched for large
+files, the large-file size threshold, and the minimum ages for Downloads, logs,
+and NuGet packages.
 
 ### Categories
 
@@ -129,12 +132,13 @@ deletes all Docker data and is never run automatically.
 ## History and logs
 
 All application data is stored under
-`~/Library/Application Support/mjm.cleaner/`:
+`~/Library/Application Support/com.mjm.cleaner/` (Debug builds use
+`com.mjm.cleaner.debug`):
 
 | File | Contents |
 |---|---|
 | `history.db` | SQLite database with one row per cleanup session, including duration, bytes recovered, deleted items, and failed items. It powers the history view and cumulative counter. |
-| `settings.json` | Settings editable from the **Settings** page. |
+| `settings.json` | Settings editable from **Settings**. |
 | `logs/session-NNNNNN.jsonl.gz` | Complete list of deleted paths, with one JSON record per item, compressed. Only the latest **20** sessions are retained; older files are removed automatically. |
 
 Deleted paths are deliberately not stored in SQLite: cleaning caches may touch
@@ -143,6 +147,10 @@ the disk space being recovered.
 
 This directory is under `~/Library/Application Support`, which is protected by
 the deny list: **the application cannot delete its own history**.
+
+The data of the previous C# application, in
+`~/Library/Application Support/mjm.cleaner/`, is neither read nor migrated: the
+Swift application starts from zero.
 
 ## Warnings
 
@@ -157,8 +165,8 @@ the deny list: **the application cannot delete its own history**.
   work without it. Access-denied errors are always handled and reported for any
   path, not only known protected locations. When needed, grant access to the
   bundle under **System Settings → Privacy & Security → Full Disk Access** by
-  adding `artifacts/mjm.cleaner.app` with the **+** button (<kbd>⌘⇧G</kbd> lets
-  you paste the path). Because the bundle uses an ad hoc signature, the grant is
+  adding `artifacts/mjm.cleaner.app` (or wherever you install it) with the
+  **+** button (<kbd>⌘⇧G</kbd> lets you paste the path). Because the bundle uses an ad hoc signature, the grant is
   tied to its fingerprint: **it must be granted again after a code change**,
   while rebuilding unchanged source preserves it.
 - **No privilege elevation:** the application never uses `sudo` or asks for a
@@ -169,6 +177,16 @@ the deny list: **the application cannot delete its own history**.
   **Docker** page, through the `docker` CLI.
 
 ## Documentation
+
+- Swift port specification: `docs/superpowers/specs/2026-10-13-swift-native-port-design.md`
+- Phase 5 specification: `docs/superpowers/specs/2026-10-16-swift-port-5-handoff-design.md`
+- Parity ledger: `docs/superpowers/porting/2026-10-13-parity.md`
+- Phase 5 verification reports: `docs/superpowers/verification/2026-10-16-swift-port-5-visual.md`,
+  `docs/superpowers/verification/2026-10-16-swift-port-5-parity.md` and
+  `docs/superpowers/verification/2026-10-16-swift-port-5-gate.md`
+
+The entries below predate the Swift port and describe the original C#
+application; they are kept as history.
 
 - Specification: `docs/superpowers/specs/2026-09-15-mjm-cleaner-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-09-15-mjm-cleaner.md`

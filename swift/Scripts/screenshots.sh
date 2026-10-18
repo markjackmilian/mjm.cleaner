@@ -95,8 +95,8 @@ for page in $pages; do
     for appearance in light dark; do
         # `open` avvia l'app da LaunchServices, come il Finder: un processo figlio di questa shell
         # potrebbe non ricevere finestre.
-        # `-ApplePersistenceIgnoreState`: niente ripristino dello stato salvato (pagina, sheet); la
-        # misura la impone `-MJMWindowSize`, perché quella ricordata dalla finestra resterebbe.
+        # `-ApplePersistenceIgnoreState`: macOS non ripristina lo stato salvato dell'app; la misura
+        # ricordata in `NSWindow Frame main` resta, quindi la impone `-MJMWindowSize`.
         open -n "$bundle" --args -MJMDemo "$page" -MJMAppearance "$appearance" $size_args -ApplePersistenceIgnoreState YES
         # Il tempo per caricare la pagina e, per le Impostazioni, aprire lo sheet.
         sleep 3

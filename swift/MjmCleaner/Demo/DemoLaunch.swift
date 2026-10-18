@@ -30,7 +30,8 @@ struct DemoLaunch: Sendable {
 
     let page: Page
     let appearance: AppearancePreference
-    /// La misura del contenuto della finestra principale, in punti; `nil` lascia la predefinita.
+    /// La misura del contenuto della finestra principale, in punti; `nil` lascia la misura che la
+    /// finestra ricorda.
     let windowSize: CGSize?
 
     static let current = parse(ProcessInfo.processInfo.arguments)

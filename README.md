@@ -12,8 +12,8 @@ them.
 ## Requirements
 
 - macOS 15 or later
-- For development: Xcode 27 with Swift 6.2 or later (the local package declares
-  `swift-tools-version: 6.2`)
+- For development: Xcode 27 (Swift 6 language mode; the package needs Swift
+  tools 6.2 or later)
 
 ## Development
 
@@ -41,10 +41,10 @@ without touching the disk: `-MJMDemo <page>`.
 
 The bundle is **ad hoc signed** (identity `-`, see `Config/Base.xcconfig`):
 macOS would refuse to launch it without a signature. Because it is not
-notarized, `spctl` rejects it. A locally built copy still launches normally, but
-a copy transferred from another Mac (for example, unpacked from the ZIP) must be
-opened for the first time with **right-click → Open**; on macOS 15 and later,
-use **System Settings → Privacy & Security → Open Anyway** instead.
+notarized, `spctl` rejects it. A locally built copy launches normally; a
+downloaded copy (for example, unpacked from the release ZIP) is blocked the
+first time it is opened: then choose **System Settings → Privacy & Security →
+Open Anyway**.
 
 ## How it works
 
@@ -166,9 +166,10 @@ Swift application starts from zero.
   path, not only known protected locations. When needed, grant access to the
   bundle under **System Settings → Privacy & Security → Full Disk Access** by
   adding `artifacts/mjm.cleaner.app` (or wherever you install it) with the
-  **+** button (<kbd>⌘⇧G</kbd> lets you paste the path). Because the bundle uses an ad hoc signature, the grant is
-  tied to its fingerprint: **it must be granted again after a code change**,
-  while rebuilding unchanged source preserves it.
+  **+** button (<kbd>⌘⇧G</kbd> lets you paste the path). Because the bundle
+  uses an ad hoc signature, the grant is tied to that exact build: **grant it
+  again after every new build**, even from unchanged source (each
+  `Scripts/package-release.sh` run produces a different signature).
 - **No privilege elevation:** the application never uses `sudo` or asks for a
   password. Items owned by `root` fail with an access-denied error and appear in
   the final summary in step 4.

@@ -12,7 +12,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
@@ -37,12 +37,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
 
       - name: Select Xcode 27
         run: |
           sw_vers
-          for candidate in /Applications/Xcode_27*.app /Applications/Xcode.app; do
+          for candidate in /Applications/Xcode.app /Applications/Xcode_27*.app; do
             [[ -d "$candidate" ]] || continue
             if DEVELOPER_DIR="$candidate/Contents/Developer" xcodebuild -version | head -1 | grep -q '^Xcode 27\.'; then
               sudo xcode-select -s "$candidate/Contents/Developer"
@@ -77,11 +78,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
 
       - name: Select Xcode 27
         run: |
-          for candidate in /Applications/Xcode_27*.app /Applications/Xcode.app; do
+          sw_vers
+          for candidate in /Applications/Xcode.app /Applications/Xcode_27*.app; do
             [[ -d "$candidate" ]] || continue
             if DEVELOPER_DIR="$candidate/Contents/Developer" xcodebuild -version | head -1 | grep -q '^Xcode 27\.'; then
               sudo xcode-select -s "$candidate/Contents/Developer"
@@ -111,6 +114,8 @@ jobs:
     name: Publish GitHub release
     needs: package
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download application archive
         uses: actions/download-artifact@v4

@@ -1,7 +1,8 @@
 import Foundation
 
-/// Le fixture JSON dei test C# (`tests/MjmCleaner.Core.Tests/Xcode/Fixtures`), copiate byte per
-/// byte in `Fixtures/` accanto a questo file e lette dal disco: nessuna risorsa nel bundle.
+/// Le fixture JSON dei test C# (`tests/MjmCleaner.Core.Tests/Xcode/Fixtures`, rimosso con il C# e
+/// rimasto nella storia del repository), copiate byte per byte in `Fixtures/` accanto a questo
+/// file e lette dal disco: nessuna risorsa nel bundle.
 enum XcodeFixtures {
     private static let directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures")
 

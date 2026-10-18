@@ -6,7 +6,7 @@ Data: 2026-10-18, Europe/Rome. Esito: **GO** — il Task 6 (rimozione del C# e S
 
 - Commit verificato: `47d5a796016a3150baacd1c4889f58c1f6757af4`, branch `codex/swift-port-5`, worktree pulito prima e dopo le prove.
 - Albero `swift/` del pacchetto: `30dea2b96051ef74a013eb0ef0243b8b1f050f32` (`swift/MjmCleaner` `6fd4490f7f8898e1475abf24e76cfcfebe2e937d`, `swift/MjmCleanerKit` `6747826cc2bc14faf7692892ceb03d23e49e26b6`).
-- macOS 27.0.1 (26A434), Xcode 27.0 (27A266a).
+- macOS 27.0.1 (26A434), Xcode 27.1 (27A9275): aggiornato dall'App Store alle 17:19 del 2026-10-18, prima delle prove del gate (lo ZIP riporta `DTXcodeBuild=27A9275`).
 
 ## Gate
 
@@ -31,7 +31,7 @@ Il confronto reale è stato fatto su `56377ec`. Fra quel commit e `47d5a79` sott
 - `swift/MjmCleaner/Demo/DemoLaunch.swift`: commenti; il file è compilato solo in Debug.
 - `swift/Scripts/screenshots.sh`: strumento di sviluppo, non entra nel pacchetto.
 
-Il pacchetto è costruito dall'albero finale `30dea2b9…`, lo stesso che ha passato suite, build e prove visive finali.
+Il pacchetto è costruito dall'albero finale `30dea2b9…`, lo stesso che ha passato suite e build; le prove visive finali sono su `c4b5f77` (albero `2e558fe1`), che ne differisce solo per due commenti (`DemoLaunch.swift`, `screenshots.sh`).
 
 ## Minor rinviati
 

@@ -25,7 +25,7 @@ struct MjmCleanerApp: App {
                     main.showSettings()
                     Task { await updates.checkNow() }
                 }
-                .disabled(!(startup.main?.canShowSettings ?? false) || startup.main?.updates == nil)
+                .disabled(!(startup.main?.canShowSettings ?? false) || startup.main?.updates == nil || (startup.main?.updates?.isBusy ?? false))
             }
             CommandGroup(replacing: .appSettings) {
                 Button("Impostazioni…") { startup.main?.showSettings() }

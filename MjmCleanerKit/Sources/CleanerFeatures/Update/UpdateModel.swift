@@ -187,6 +187,9 @@ public final class UpdateModel {
             try updater.install(update)
         } catch {
             state = .failed(FeatureText.message(error))
+            installFailureText = String(
+                localized: "L'aggiornamento non è partito: \(FeatureText.message(error)). È rimasta la versione \(currentVersionText).",
+                bundle: .module)
             return
         }
         state = .installing

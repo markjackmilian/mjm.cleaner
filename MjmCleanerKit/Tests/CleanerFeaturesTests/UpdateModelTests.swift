@@ -287,6 +287,7 @@ struct UpdateModelTests {
         fixture.model.install()
 
         #expect(fixture.model.state == .failed(UpdateError.installFailed("script di installazione mancante").errorDescription ?? ""))
+        #expect(fixture.model.installFailureText?.contains("script di installazione mancante") == true)
         #expect(fixture.host.terminations == 0)
     }
 

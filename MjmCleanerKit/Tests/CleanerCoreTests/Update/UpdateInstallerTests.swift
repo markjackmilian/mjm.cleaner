@@ -67,7 +67,8 @@ struct UpdateInstallerTests {
         try temp.file("updates/install-result", contents: "ok v0.1.0")
         let launcher = RecordingLauncher()
         let fresh = updates + "/v0.2.0/expanded/mjm.cleaner.app"
-        try Self.installer(bundle: bundle, updates: updates, launcher: launcher).launch(try Self.update(bundle: fresh))
+        let installer = Self.installer(bundle: bundle, updates: updates, launcher: launcher)
+        try installer.launch(try Self.update(bundle: fresh))
 
         let (executable, arguments, environment) = try #require(launcher.recorded.first)
         #expect(executable == "/bin/sh")
@@ -77,7 +78,16 @@ struct UpdateInstallerTests {
         #expect(script.hasSuffix("/update-install.sh"))
         let bundled = try #require(Bundle.module.url(forResource: "update-install", withExtension: "sh"))
         #expect(try Data(contentsOf: URL(fileURLWithPath: script)) == Data(contentsOf: bundled))
+        #expect(script != bundled.path(percentEncoded: false), "lo script si lancia dalla sua copia, non dal bundle")
+        #expect(!script.hasPrefix(updates + "/"), "la copia sta in una cartella temporanea propria")
         #expect(!FileManager.default.fileExists(atPath: updates + "/install-result"), "un esito vecchio va cancellato")
+
+        // Un secondo tentativo ha la sua copia: non riusa né sovrascrive la prima.
+        try installer.launch(try Self.update(bundle: fresh))
+        #expect(launcher.recorded.count == 2)
+        let second = try #require(launcher.recorded.last?.1.first)
+        #expect(second != script, "ogni tentativo lancia una copia propria")
+        #expect(second.hasSuffix("/update-install.sh"))
     }
 
     @Test func manualModeNeverLaunchesTheScript() throws {

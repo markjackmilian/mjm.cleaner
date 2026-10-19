@@ -64,7 +64,8 @@ public struct UpdateVerifier: Sendable {
         }
         guard let executableName = info["CFBundleExecutable"] as? String, !executableName.isEmpty,
               !executableName.contains("/"),
-              manager.isExecutableFile(atPath: PathText.join(bundle, "Contents/MacOS/" + executableName))
+              manager.isExecutableFile(atPath: PathText.join(bundle, "Contents/MacOS/" + executableName)),
+              (try? manager.attributesOfItem(atPath: PathText.join(bundle, "Contents/MacOS/" + executableName))[.type] as? FileAttributeType) == .typeRegular
         else {
             throw invalid(String(localized: "eseguibile mancante", bundle: .module))
         }

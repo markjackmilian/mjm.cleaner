@@ -41,6 +41,8 @@ struct UpdateVerifierTests {
             ["/usr/bin/codesign", "--verify", "--deep", "--strict", bundle],
             ["/usr/bin/lipo", "-archs", bundle + "/Contents/MacOS/MjmCleaner"],
         ])
+        #expect(tools.timeouts.values == [.seconds(120), .seconds(120), .seconds(30)])
+        #expect(FileManager.default.isExecutableFile(atPath: bundle + "/Contents/MacOS/MjmCleaner"))
     }
 
     @Test func zipThatDoesNotExtractIsRejected() async throws {
@@ -102,5 +104,28 @@ struct UpdateVerifierTests {
     @Test(arguments: ["arm64\n", "x86_64\n", "", "arm64e x86_64\n"])
     func singleArchitectureBundleIsRejected(archs: String) async throws {
         try await rejects(FakeUpdateTools(bundle: makeFakeBundle(), archs: archs))
+    }
+
+    @Test func nonExecutableFileIsRejected() async throws {
+        try await rejects(FakeUpdateTools(bundle: makeFakeBundle(permissions: 0o644)))
+    }
+
+    @Test(arguments: ["", ".", ".."]) func emptyOrDotExecutableIsRejected(executable: String) async throws {
+        try await rejects(FakeUpdateTools(bundle: makeFakeBundle(executable: executable)))
+    }
+
+    @Test func lipoFailureIsRejected() async throws {
+        try await rejects(FakeUpdateTools(bundle: makeFakeBundle(), lipoExit: 1))
+    }
+
+    /// Un'estrazione interrotta lascia file e cartelle: non devono sopravvivere al giro successivo.
+    @Test func leftoversOfAPreviousExtractionAreCleared() async throws {
+        let temp = try TemporaryDirectory()
+        defer { temp.remove() }
+        let download = try Self.download(in: temp)
+        try temp.directory("v0.2.0/expanded/old.app")
+        try temp.file("v0.2.0/expanded/stray")
+        _ = try await UpdateVerifier(runner: FakeUpdateTools(bundle: makeFakeBundle())).verify(download)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: download.directory + "/expanded") == ["mjm.cleaner.app"])
     }
 }

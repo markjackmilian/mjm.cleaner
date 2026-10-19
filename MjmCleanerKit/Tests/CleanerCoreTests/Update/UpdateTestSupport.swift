@@ -94,18 +94,23 @@ struct FakeUpdateTools: ProcessRunning {
     var codesignExit: Int32 = 0
     var codesignTimesOut = false
     var archs = "x86_64 arm64\n"
+    var lipoExit: Int32 = 0
     let calls = Recorder<[String]>()
+    let timeouts = Recorder<Duration>()
 
     func run(_ executable: String, _ arguments: [String], timeout: Duration, environment: [String: String]?) async throws -> ProcessResult {
         calls.append([executable] + arguments)
+        timeouts.append(timeout)
         switch executable {
         case "/usr/bin/ditto":
-            if dittoExit == 0, let destination = arguments.last { try bundle(destination) }
+            // Anche con un esito d'errore il bundle viene scritto: un'estrazione parziale deve essere
+            // rifiutata dal solo controllo dell'esito.
+            if let destination = arguments.last { try bundle(destination) }
             return ProcessResult(exitCode: dittoExit, standardOutput: "", standardError: "", timedOut: false)
         case "/usr/bin/codesign":
             return ProcessResult(exitCode: codesignTimesOut ? -1 : codesignExit, standardOutput: "", standardError: "", timedOut: codesignTimesOut)
         case "/usr/bin/lipo":
-            return ProcessResult(exitCode: 0, standardOutput: archs, standardError: "", timedOut: false)
+            return ProcessResult(exitCode: lipoExit, standardOutput: archs, standardError: "", timedOut: false)
         default:
             return ProcessResult(exitCode: 127, standardOutput: "", standardError: "", timedOut: false)
         }
@@ -118,7 +123,8 @@ func makeFakeBundle(
     identifier: String = "com.mjm.cleaner",
     version: String = "0.2.0",
     executable: String = "MjmCleaner",
-    executableIsPresent: Bool = true
+    executableIsPresent: Bool = true,
+    permissions: Int = 0o755
 ) -> @Sendable (String) throws -> Void {
     { destination in
         let contents = destination + "/" + name + "/Contents"
@@ -129,7 +135,7 @@ func makeFakeBundle(
         try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
             .write(to: URL(fileURLWithPath: contents + "/Info.plist"))
         if executableIsPresent {
-            FileManager.default.createFile(atPath: contents + "/MacOS/MjmCleaner", contents: Data("bin".utf8), attributes: [.posixPermissions: 0o755])
+            FileManager.default.createFile(atPath: contents + "/MacOS/MjmCleaner", contents: Data("bin".utf8), attributes: [.posixPermissions: permissions])
         }
     }
 }

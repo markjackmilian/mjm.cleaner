@@ -244,7 +244,7 @@ struct DockerCleanupServiceTests {
             try await cleanup.execute([image, volume, buildCache], on: analysis.target, progress: nil)
         }
 
-        #expect(error == DockerUnavailableError("Docker Desktop non è in esecuzione (contesto «desktop-linux»). Avvialo e premi Riprova."))
+        #expect(error == DockerUnavailableError("Docker Desktop non è in esecuzione (contesto «desktop-linux»). Avvialo e premi di nuovo «Elimina»."))
         #expect(deletions(desktop).isEmpty)
         #expect(orbStack.calls.isEmpty)
     }

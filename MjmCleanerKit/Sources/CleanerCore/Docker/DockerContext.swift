@@ -45,6 +45,20 @@ extension DockerUnavailableError {
             String(localized: "Il motore Docker del contesto «\(context.name)» non risponde. Avvialo e premi Riprova.", bundle: .module)
         }
     }
+
+    /// Il testo per un daemon che non risponde all'avvio di «Elimina». L'analisi resta valida:
+    /// avviato il motore, basta premere di nuovo «Elimina». Il contesto viene dall'analisi, che ne
+    /// ha già validato il nome.
+    public static func notRunningForDeletionMessage(_ context: DockerContext, homeDirectory: String) -> String {
+        return switch context.engineKind(homeDirectory: homeDirectory) {
+        case .dockerDesktop:
+            String(localized: "Docker Desktop non è in esecuzione (contesto «\(context.name)»). Avvialo e premi di nuovo «Elimina».", bundle: .module)
+        case .orbStack:
+            String(localized: "OrbStack non è in esecuzione (contesto «\(context.name)»). Avvialo e premi di nuovo «Elimina».", bundle: .module)
+        case .other:
+            String(localized: "Il motore Docker del contesto «\(context.name)» non risponde. Avvialo e premi di nuovo «Elimina».", bundle: .module)
+        }
+    }
 }
 
 /// Legge il contesto attivo, a cui l'analisi resta fissata, e nomina il motore di un contesto
@@ -67,6 +81,11 @@ public struct DockerContextReader: Sendable {
     /// in quel momento, che può essere già un altro.
     public func notRunningMessage(for context: DockerContext) -> String {
         DockerUnavailableError.notRunningMessage(context, homeDirectory: homeDirectory)
+    }
+
+    /// Il testo per un daemon che non risponde all'avvio di «Elimina», per il contesto analizzato.
+    public func notRunningForDeletionMessage(for context: DockerContext) -> String {
+        DockerUnavailableError.notRunningForDeletionMessage(context, homeDirectory: homeDirectory)
     }
 }
 

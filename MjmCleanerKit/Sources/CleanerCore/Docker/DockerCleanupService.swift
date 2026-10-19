@@ -74,7 +74,8 @@ public struct DockerCleanupService: Sendable {
 
     /// L'esecuzione resta sul bersaglio dell'analisi. Un daemon che non risponde prima di ogni
     /// cancellazione (quello perso a metà finisce nel resoconto) diventa l'errore che nomina il
-    /// motore del contesto analizzato, anche se il contesto attivo ora è un altro.
+    /// motore del contesto analizzato, anche se il contesto attivo ora è un altro, e chiede di
+    /// premere di nuovo «Elimina» dopo averlo avviato.
     public func execute(
         _ selected: [DockerCandidate],
         on target: DockerTarget,
@@ -83,7 +84,7 @@ public struct DockerCleanupService: Sendable {
         do {
             return try await executor.execute(selected, on: target, progress: progress)
         } catch let error as DockerUnavailableError where error.reason == .notRunning {
-            throw DockerUnavailableError(contexts.notRunningMessage(for: target.context))
+            throw DockerUnavailableError(contexts.notRunningForDeletionMessage(for: target.context))
         }
     }
 

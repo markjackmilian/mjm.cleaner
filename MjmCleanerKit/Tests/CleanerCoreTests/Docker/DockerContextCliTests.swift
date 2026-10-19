@@ -1,3 +1,4 @@
+import Synchronization
 import Testing
 @testable import CleanerCore
 
@@ -55,5 +56,37 @@ struct DockerContextCliTests {
         #expect(engine == DockerEngine(serverVersion: "29.8.0", operatingSystem: "Docker Desktop", id: "desktop-id"))
         #expect(docker.calls == [["--context", "desktop-linux", "info", "--format", DockerInventoryCollector.engineFormat]])
         #expect(orbStack.calls.isEmpty)
+    }
+
+    /// Un nome non valido ferma il collettore fissato: niente ripiego sul contesto attivo.
+    @Test func pinnedRefusesAnInvalidNameInsteadOfFallingBackToTheActiveContext() {
+        let collector = DockerInventoryCollector(cli: FakeDockerCli(), fileSystem: InMemoryFileSystem())
+
+        #expect(throws: DockerOutputError("Nome del contesto Docker non valido: «-H».")) {
+            try collector.pinned(to: "-H")
+        }
+    }
+
+    /// Il decoratore inoltra il timeout del chiamante: l'esecutore cancella con 600 secondi, non con
+    /// il limite predefinito della CLI.
+    @Test func decoratorForwardsTheCallersTimeout() async throws {
+        let spy = TimeoutSpy()
+
+        _ = try await DockerContextCli(spy, context: "orbstack").run(["volume", "rm", "x"], timeout: .seconds(600))
+        _ = try await DockerContextCli(spy, context: "orbstack").run(["info"], timeout: nil)
+
+        #expect(spy.timeouts == [.seconds(600), nil])
+    }
+}
+
+/// Registra il timeout di ogni comando.
+private final class TimeoutSpy: DockerCommandRunning {
+    private let seen = Mutex<[Duration?]>([])
+
+    var timeouts: [Duration?] { seen.withLock { $0 } }
+
+    func run(_ arguments: [String], timeout: Duration?) async throws -> ProcessResult {
+        seen.withLock { $0.append(timeout) }
+        return FakeDockerCli.ok()
     }
 }

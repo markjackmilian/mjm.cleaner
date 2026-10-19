@@ -99,6 +99,7 @@ public struct DockerCleanExecutor: Sendable {
         var handled = Set<Int>()
         var retry: [(offset: Int, element: DockerCandidate)] = []
         var daemonLost = false
+        var lostReason = DockerUnavailableError.Reason.notRunning
 
         func countDeleted(_ category: String) {
             if let index = deletedByCategory.firstIndex(where: { $0.category == category }) {
@@ -124,8 +125,9 @@ public struct DockerCleanExecutor: Sendable {
                     result = try await Self.shielded(cli, Self.command(candidate))
                 } catch let error as DockerUnavailableError {
                     daemonLost = true
+                    lostReason = error.reason
                     handled.insert(entry.offset)
-                    errors.append(ScanError(path: candidate.displayName, kind: .other, message: error.message))
+                    errors.append(ScanError(path: candidate.displayName, kind: .other, message: Self.interruptedMessage(error)))
                     return false
                 }
 
@@ -173,7 +175,7 @@ public struct DockerCleanExecutor: Sendable {
                 errors.append(ScanError(
                     path: entry.element.displayName,
                     kind: .other,
-                    message: String(localized: "non eseguito: \(DockerUnavailableError.notRunning)", bundle: .module)))
+                    message: Self.notAttemptedMessage(lostReason)))
             }
         }
 
@@ -215,6 +217,22 @@ public struct DockerCleanExecutor: Sendable {
             return nil
         } catch is DockerOutputError {
             return nil
+        }
+    }
+
+    /// Le voci del resoconto non rimandano a pulsanti: il resoconto non ha «Riprova». Dicono solo
+    /// che cosa è successo; il motore e l'azione («Nuova analisi») li dice il banner del resoconto.
+    private static func interruptedMessage(_ error: DockerUnavailableError) -> String {
+        switch error.reason {
+        case .notRunning: String(localized: "il motore Docker si è fermato durante l'eliminazione", bundle: .module)
+        case .notInstalled: error.message
+        }
+    }
+
+    private static func notAttemptedMessage(_ reason: DockerUnavailableError.Reason) -> String {
+        switch reason {
+        case .notRunning: String(localized: "non eseguito: il motore Docker si era fermato", bundle: .module)
+        case .notInstalled: String(localized: "non eseguito: \(DockerUnavailableError.notInstalled)", bundle: .module)
         }
     }
 

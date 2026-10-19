@@ -85,7 +85,7 @@ public final class DockerReportModel {
         }
 
         daemonLostText = result.daemonLost
-            ? String(localized: "\(engine.displayName) si è fermato durante la pulizia: le voci restanti non sono state eliminate.", bundle: .module)
+            ? String(localized: "\(engine.displayName) si è fermato durante la pulizia: le voci restanti non sono state eliminate. Avvialo e premi «Nuova analisi» per riprovare.", bundle: .module)
             : ""
 
         deleted = report.deletedPaths.map(Self.describe)

@@ -17,6 +17,11 @@ struct DockerCleanExecutorTests {
 
     private static let ryukId = DockerFixtures.ryukId
 
+    /// Il bersaglio dell'analisi: Docker Desktop su `desktop-linux`.
+    private static let target = DockerTarget(
+        context: FakeDockerContexts.desktopLinux,
+        engine: DockerEngine(serverVersion: "29.8.0", operatingSystem: "Docker Desktop", id: "5f0d6c1e-desktop"))
+
     private static let buildCache = DockerCandidate(
         kind: .buildCache, id: DockerClassifier.buildCacheId, displayName: "Cache di build", sizeBytes: 1_000,
         verdict: .delete, ruleId: "build-cache", reason: "m", cost: "c")
@@ -29,22 +34,29 @@ struct DockerCleanExecutorTests {
         DockerCandidate(kind: .volume, id: name, displayName: name, sizeBytes: 1_000, verdict: verdict, ruleId: "rule", reason: "motivo", cost: "costo")
     }
 
-    /// CLI che accetta ogni cancellazione e restituisce il df prima e dopo.
+    /// CLI del motore analizzato: accetta ogni cancellazione e restituisce il df prima e dopo.
     private func succeedingCli() -> FakeDockerCli {
         let dfCalls = Shared(0)
         return FakeDockerCli()
+            .on(FakeDockerCli.infoCommand, FakeDockerCli.info("29.8.0", id: Self.target.engine.id))
             .on("system df --format {{json .}}") { FakeDockerCli.ok(dfCalls.increment() == 1 ? Self.dfBefore : Self.dfAfter) }
             .onPrefix("rmi ") { _ in FakeDockerCli.ok("Deleted") }
             .onPrefix("volume rm ") { arguments in FakeDockerCli.ok(arguments.last ?? "") }
             .on("builder prune -f", "Total reclaimed space: 106.9MB")
     }
 
+    /// `cli` è il motore di `desktop-linux`; il contesto attivo è `orbstack`, un motore che non
+    /// risponde a nulla: un comando senza `--context desktop-linux` non arriva mai a `cli`.
+    private static func contexts(_ cli: FakeDockerCli, orbStack: FakeDockerCli = FakeDockerCli()) -> FakeDockerContexts {
+        FakeDockerContexts(active: "orbstack", [(FakeDockerContexts.desktopLinux, cli), (FakeDockerContexts.orbstack, orbStack)])
+    }
+
     private func executor(_ cli: FakeDockerCli) -> DockerCleanExecutor {
-        DockerCleanExecutor(cli: cli, clock: FixedWallClock(now: Date(timeIntervalSince1970: 0)))
+        DockerCleanExecutor(cli: Self.contexts(cli), clock: FixedWallClock(now: Date(timeIntervalSince1970: 0)))
     }
 
     private func execute(_ cli: FakeDockerCli, _ selected: DockerCandidate...) async throws -> DockerCleanResult {
-        try await executor(cli).execute(selected, progress: nil)
+        try await executor(cli).execute(selected, on: Self.target, progress: nil)
     }
 
     @Test func imagesAreRemovedByIdNeverByTag() async throws {
@@ -256,7 +268,7 @@ struct DockerCleanExecutorTests {
         let selected = [image(Self.ryukId, "ryuk"), image(DockerFixtures.alpineId, "alpine")]
 
         let result = try await Task {
-            try await executor.execute(selected, progress: { _ in cancelCurrentTask() })
+            try await executor.execute(selected, on: Self.target, progress: { _ in cancelCurrentTask() })
         }.value
 
         #expect(result.report.itemsDeleted == 1)
@@ -266,7 +278,7 @@ struct DockerCleanExecutorTests {
     @Test func progressIsReportedForEveryItem() async throws {
         let reports = Recorder<CleanProgress>()
 
-        _ = try await executor(succeedingCli()).execute([image(Self.ryukId, "ryuk"), volume("old-data")], progress: reports.append)
+        _ = try await executor(succeedingCli()).execute([image(Self.ryukId, "ryuk"), volume("old-data")], on: Self.target, progress: reports.append)
 
         #expect(reports.values.map(\.itemsDone) == [1, 2])
     }
@@ -279,7 +291,7 @@ struct DockerCleanExecutorTests {
         let selected = [image(Self.ryukId, "ryuk"), volume("old-data")]
 
         let result = try await Task {
-            try await executor.execute(selected, progress: { _ in cancelCurrentTask() })
+            try await executor.execute(selected, on: Self.target, progress: { _ in cancelCurrentTask() })
         }.value
 
         #expect(result.report.itemsDeleted == 1)
@@ -299,7 +311,7 @@ struct DockerCleanExecutorTests {
                 return FakeDockerCli.ok("Deleted")
             }
         let executor = DockerCleanExecutor(
-            cli: CancellationCheckingCli(inner: cli),
+            cli: CancellationCheckingCli(inner: Self.contexts(cli)),
             clock: FixedWallClock(now: Date(timeIntervalSince1970: 0)))
         let selected = [image(Self.ryukId, "ryuk"), image(DockerFixtures.alpineId, "alpine")]
         let (gate, open) = AsyncStream<Void>.makeStream()
@@ -308,7 +320,7 @@ struct DockerCleanExecutorTests {
         // quando parte il primo `rmi`.
         let task = Task<DockerCleanResult, any Error> {
             for await _ in gate { break }
-            return try await executor.execute(selected, progress: nil)
+            return try await executor.execute(selected, on: Self.target, progress: nil)
         }
         outer.set(task)
         open.yield(())
@@ -321,13 +333,63 @@ struct DockerCleanExecutorTests {
         #expect(!cli.commandLines.contains("rmi \(DockerFixtures.alpineId)"))
         #expect(result.after != nil)
     }
+
+    /// Il contesto attivo è `orbstack`: ogni comando va comunque a `desktop-linux`, e prima della
+    /// misura iniziale si legge il motore.
+    @Test func everyCommandGoesToTheContextOfTheAnalysis() async throws {
+        let cli = succeedingCli()
+        let orbStack = FakeDockerCli()
+        let docker = Self.contexts(cli, orbStack: orbStack)
+        let executor = DockerCleanExecutor(cli: docker, clock: FixedWallClock(now: Date(timeIntervalSince1970: 0)))
+
+        let result = try await executor.execute(
+            [image(Self.ryukId, "ryuk"), volume("old-data"), Self.buildCache], on: Self.target, progress: nil)
+
+        #expect(result.report.itemsDeleted == 3)
+        #expect(docker.calls.allSatisfy { $0.starts(with: ["--context", "desktop-linux"]) })
+        #expect(cli.commandLines.prefix(2) == ["info --format \(DockerInventoryCollector.engineFormat)", "system df --format {{json .}}"])
+        #expect(orbStack.calls.isEmpty)
+    }
+
+    /// Lo stesso contesto ma un altro daemon: `default` riscritto da un altro motore, un motore
+    /// aggiornato o sostituito. Dopo `docker info` non parte nessun comando.
+    @Test(arguments: [
+        ("9a8b7c6d-other", "29.8.0", "Docker Desktop"),
+        ("5f0d6c1e-desktop", "29.9.0", "Docker Desktop"),
+        ("5f0d6c1e-desktop", "29.8.0", "OrbStack"),
+    ])
+    func anotherDaemonBehindTheSameContextDeletesNothing(id: String, version: String, operatingSystem: String) async throws {
+        let cli = succeedingCli().on(FakeDockerCli.infoCommand, FakeDockerCli.info(version, operatingSystem, id: id))
+
+        let error = await #expect(throws: DockerEngineChangedError.self) {
+            try await execute(cli, image(Self.ryukId, "ryuk"), volume("old-data"), Self.buildCache)
+        }
+
+        #expect(error == DockerEngineChangedError(context: "desktop-linux"))
+        #expect(error?.message == "Il motore Docker del contesto «desktop-linux» non è più quello analizzato: non è stato eliminato nulla. Premi Riprova per analizzarlo di nuovo.")
+        #expect(cli.commandLines == ["info --format \(DockerInventoryCollector.engineFormat)"])
+    }
+
+    @Test func aTargetWithAnInvalidContextNameDeletesNothing() async throws {
+        let cli = succeedingCli()
+        let docker = Self.contexts(cli)
+        let executor = DockerCleanExecutor(cli: docker, clock: FixedWallClock(now: Date(timeIntervalSince1970: 0)))
+        let target = DockerTarget(
+            context: DockerContext(name: "--host=tcp://10.0.0.1:2375", description: "", host: ""),
+            engine: Self.target.engine)
+
+        await #expect(throws: DockerOutputError("Nome del contesto Docker non valido: «--host=tcp://10.0.0.1:2375».")) {
+            try await executor.execute([volume("old-data")], on: target, progress: nil)
+        }
+        #expect(docker.calls.isEmpty)
+    }
 }
 
 /// Come `ProcessRunner`: il comando risponde e solo dopo controlla l'annullamento del task che lo
 /// attende (il processo reale viene ucciso da `onCancel`, e il suo esito si riconosce dopo l'uscita).
 /// `FakeDockerCli` controlla invece solo prima di rispondere.
 private struct CancellationCheckingCli: DockerCommandRunning {
-    let inner: FakeDockerCli
+    let inner: any DockerCommandRunning
 
     func run(_ arguments: [String], timeout: Duration?) async throws -> ProcessResult {
         let result = try await inner.run(arguments, timeout: timeout)

@@ -194,4 +194,58 @@ struct DockerCleanupServiceTests {
         #expect(error == DockerUnavailableError("Docker Desktop non è in esecuzione (contesto «desktop-linux»). Avvialo e premi Riprova."))
         #expect(orbStack.calls.isEmpty)
     }
+
+    /// Un'immagine, un volume e la cache di build dell'analisi, da cancellare.
+    private func deletable(_ analysis: DockerAnalysis) throws -> (image: DockerCandidate, volume: DockerCandidate, buildCache: DockerCandidate) {
+        (
+            try #require(analysis.candidates.first { $0.kind == .image && $0.verdict != .keep }),
+            try #require(analysis.candidates.first { $0.kind == .volume && $0.verdict != .keep }),
+            try #require(analysis.candidates.first { $0.kind == .buildCache }))
+    }
+
+    /// I comandi che cancellano, fra quelli arrivati a `cli`.
+    private func deletions(_ cli: FakeDockerCli) -> [String] {
+        cli.commandLines.filter { $0.hasPrefix("rmi ") || $0.hasPrefix("volume rm ") || $0.hasPrefix("builder prune") }
+    }
+
+    /// Il caso del 2026-10-19: dopo l'analisi di Docker Desktop, OrbStack si avvia e prende il
+    /// contesto attivo. «Elimina» cancella su Docker Desktop, ciò che l'utente ha confermato, e
+    /// OrbStack non riceve nemmeno un comando, anche se accetterebbe ogni cancellazione.
+    @Test func aContextSwitchBetweenAnalysisAndDeletionLeavesTheOtherEngineAlone() async throws {
+        let (docker, desktop, orbStack) = try twoEngines()
+        for cli in [desktop, orbStack] {
+            cli.onPrefix("rmi ") { _ in FakeDockerCli.ok("Deleted") }
+                .onPrefix("volume rm ") { arguments in FakeDockerCli.ok(arguments.last ?? "") }
+                .on("builder prune -f", "Total reclaimed space: 106.9MB")
+        }
+        let cleanup = service(InMemoryFileSystem(), docker: docker)
+        let analysis = try await cleanup.analyze([])
+        let (image, volume, buildCache) = try deletable(analysis)
+
+        docker.activate("orbstack")
+        let result = try await cleanup.execute([image, volume, buildCache], on: analysis.target, progress: nil)
+
+        #expect(result.report.itemsDeleted == 3)
+        #expect(deletions(desktop) == ["rmi \(image.id)", "volume rm \(volume.id)", "builder prune -f"])
+        #expect(orbStack.calls.isEmpty)
+    }
+
+    /// Dopo il cambio Docker Desktop è anche spento: non si cancella nulla, né lì né su OrbStack, e
+    /// l'errore nomina Docker Desktop.
+    @Test func aStoppedEngineAfterTheSwitchDeletesNothingAnywhere() async throws {
+        let (docker, desktop, orbStack) = try twoEngines()
+        let cleanup = service(InMemoryFileSystem(), docker: docker)
+        let analysis = try await cleanup.analyze([])
+        let (image, volume, buildCache) = try deletable(analysis)
+
+        docker.activate("orbstack")
+        desktop.on(FakeDockerCli.infoCommand) { throw DockerUnavailableError(DockerUnavailableError.notRunning) }
+        let error = await #expect(throws: DockerUnavailableError.self) {
+            try await cleanup.execute([image, volume, buildCache], on: analysis.target, progress: nil)
+        }
+
+        #expect(error == DockerUnavailableError("Docker Desktop non è in esecuzione (contesto «desktop-linux»). Avvialo e premi Riprova."))
+        #expect(deletions(desktop).isEmpty)
+        #expect(orbStack.calls.isEmpty)
+    }
 }

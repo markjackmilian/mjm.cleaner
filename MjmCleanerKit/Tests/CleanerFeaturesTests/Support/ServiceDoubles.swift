@@ -256,12 +256,14 @@ final class FakeDocker: DockerCleanupServing {
         var measuredEngines: [DockerEngine] = []
         var analyzedRoots: [[String]] = []
         var executed: [[DockerCandidate]] = []
+        var targets: [DockerTarget] = []
     }
 
     private let state = Mutex(State())
 
     var analyzedRoots: [[String]] { state.withLock { $0.analyzedRoots } }
     var executed: [[DockerCandidate]] { state.withLock { $0.executed } }
+    var targets: [DockerTarget] { state.withLock { $0.targets } }
 
     func enqueue(_ analysis: Result<DockerAnalysis, any Error>) { state.withLock { $0.analyses.append(analysis) } }
     func respond(with result: Result<DockerCleanResult, any Error>) { state.withLock { $0.executeResult = result } }
@@ -277,9 +279,10 @@ final class FakeDocker: DockerCleanupServing {
         return try next.get()
     }
 
-    func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
+    func execute(_ selected: [DockerCandidate], on target: DockerTarget, progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
         let result = state.withLock { state -> Result<DockerCleanResult, any Error> in
             state.executed.append(selected)
+            state.targets.append(target)
             return state.executeResult
         }
         for (index, candidate) in selected.enumerated() {

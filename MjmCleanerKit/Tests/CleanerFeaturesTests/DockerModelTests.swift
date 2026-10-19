@@ -220,6 +220,21 @@ struct DockerModelTests {
         #expect(navigation.events.isEmpty)
     }
 
+    /// «Elimina» resta sul contesto e sul motore dell'ultima analisi riuscita, così come sono.
+    @Test func deleteRunsOnTheTargetOfTheLatestAnalysis() async throws {
+        let orbStack = DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack", id: "b2756783-e527-49e3-a6c6-cd7f4e49c9ff")
+        let orbstack = DockerContext(name: "orbstack", description: "OrbStack", host: "unix:///Users/tester/.orbstack/run/docker.sock")
+        let docker = FakeDocker()
+        docker.enqueue(.success(dockerAnalysis(Self.mixed)))
+        docker.enqueue(.success(dockerAnalysis(Self.mixed, engine: orbStack, context: orbstack, disk: nil)))
+        let model = try await opened(docker: docker)
+        await model.retry()
+
+        await model.delete()
+
+        #expect(docker.targets == [DockerTarget(context: orbstack, engine: orbStack)])
+    }
+
     @Test func diskDescriptionsCoverMissingAndUnmeasurableImages() {
         #expect(DockerModel.describeDisk(DockerDiskUsage(path: "/x", allocatedBytes: nil, apparentBytes: nil), engine: dockerDesktop)
             == "Disco virtuale di Docker Desktop non trovato: lo spazio occupato sul Mac non è misurabile.")
@@ -403,7 +418,7 @@ private final class SlowFirstAnalysisDocker: DockerCleanupServing {
         return analysis
     }
 
-    func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
+    func execute(_ selected: [DockerCandidate], on target: DockerTarget, progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
         DockerCleanResult(report: makeReport(), before: .empty, after: .empty, daemonLost: false)
     }
 
@@ -443,7 +458,7 @@ private final class SequencedDocker: DockerCleanupServing {
         analysis
     }
 
-    func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
+    func execute(_ selected: [DockerCandidate], on target: DockerTarget, progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
         events.append("execute")
         started.open()
         if state.withLock({ $0.waitsForRelease }) {

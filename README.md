@@ -103,8 +103,15 @@ to the cumulative history total.
 ### Docker
 
 The **Docker** page cleans images, volumes, and build cache through the `docker`
-CLI only — no file under Docker Desktop's folder is ever deleted. It never starts
-Docker Desktop: if the daemon is not running it says so and offers **Retry**.
+CLI only, on the engine of the active Docker context: Docker Desktop, OrbStack,
+or any other Docker-compatible engine (Colima, Rancher Desktop, …). The page
+names the engine that answered `docker info`. No file under an engine's own
+folders is ever deleted, and no engine is ever started: if the daemon is not
+running, the page names the engine of the active context (read with
+`docker context inspect`) and offers **Retry**. The `docker` binary is looked up
+in `~/.docker/bin`, `~/.orbstack/bin`, `/usr/local/bin`, `/opt/homebrew/bin`, and
+inside `Docker.app` and `OrbStack.app`; a dangling link left by an uninstalled
+engine is skipped.
 
 The analysis is read-only and is the dry run. Every resource gets an outcome
 (KEEP / DELETE / PROPOSE / ASK), a reason, and the cost of recreating it:
@@ -125,10 +132,13 @@ The analysis is read-only and is the dry run. Every resource gets an outcome
 Images are removed by full ID (`docker rmi sha256:…`), never by tag and never
 with `-f`; `docker system prune` is never used. The report shows what was
 deleted, what failed and why, and the space recovered according to
-`docker system df` and to the real allocated size of `Docker.raw` (a sparse
-file: its apparent size is only the disk limit). If `Docker.raw` does not shrink,
-the report suggests **Docker Desktop → Troubleshoot → Clean / Purge data**, which
-deletes all Docker data and is never run automatically.
+`docker system df`. With Docker Desktop it also shows the real allocated size of
+`Docker.raw` (a sparse file: its apparent size is only the disk limit); if
+`Docker.raw` does not shrink, the report suggests **Docker Desktop →
+Troubleshoot → Clean / Purge data**, which deletes all Docker data and is never
+run automatically. OrbStack shrinks its disk image on its own, and macOS
+protects the folder that holds it, so the app does not measure it; the disk
+image of any other engine is not measured either.
 
 ## History and logs
 
@@ -176,8 +186,10 @@ Swift application starts from zero.
 - **No privilege elevation:** the application never uses `sudo` or asks for a
   password. Items owned by `root` fail with an access-denied error and appear in
   the final summary in step 4.
-- **Docker files are never deleted:** `~/Library/Containers/com.docker.docker`
-  and `~/.docker` stay on the deny list. Docker space is reclaimed only from the
+- **Docker engine files are never deleted:**
+  `~/Library/Containers/com.docker.docker`, `~/.docker`, and `~/.orbstack` stay on
+  the deny list (OrbStack's group container is covered by
+  `~/Library/Group Containers`). Docker space is reclaimed only from the
   **Docker** page, through the `docker` CLI.
 
 ## Documentation

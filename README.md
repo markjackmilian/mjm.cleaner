@@ -180,6 +180,23 @@ Swift application starts from zero.
   and `~/.docker` stay on the deny list. Docker space is reclaimed only from the
   **Docker** page, through the `docker` CLI.
 
+## Updates
+
+The release app checks the GitHub releases at launch and then once a day
+(**Settings → Updates** turns this off; **Check for Updates…** in the app menu
+checks right away). When a newer release exists, it downloads
+`mjm.cleaner-vX.Y.Z-macos-universal.zip` into
+`~/Library/Application Support/com.mjm.cleaner/updates/`, accepts it only if its
+SHA-256 matches the digest GitHub publishes for the asset, extracts it and checks
+the bundle id, the version, the signature and both architectures. A banner then
+offers **Install and Relaunch**: the app quits, a small script swaps the bundle
+in place (restoring the old one if the swap fails) and reopens it; the outcome
+is in `updates/install-result` and `updates/install.log`. If the folder that
+holds the app is not writable, the banner offers **Show in Finder** instead.
+
+Because the bundle is ad hoc signed, **Full Disk Access must be granted again
+after every update** (see Warnings). Debug builds never check for updates.
+
 ## Documentation
 
 - Swift port specification: `docs/superpowers/specs/2026-10-13-swift-native-port-design.md`
@@ -188,6 +205,7 @@ Swift application starts from zero.
 - Phase 5 verification reports: `docs/superpowers/verification/2026-10-16-swift-port-5-visual.md`,
   `docs/superpowers/verification/2026-10-16-swift-port-5-parity.md` and
   `docs/superpowers/verification/2026-10-16-swift-port-5-gate.md`
+- In-app updates design: `docs/superpowers/specs/2026-10-19-app-updates-design.md`
 
 The entries below predate the Swift port and describe the original C#
 application; they are kept as history.

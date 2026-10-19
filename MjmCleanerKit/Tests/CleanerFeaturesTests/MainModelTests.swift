@@ -212,7 +212,7 @@ struct MainModelTests {
             diskAfter: DockerDiskUsage(path: "/Docker.raw", allocatedBytes: 3 * 1_073_741_824, apparentBytes: nil))
         let report = try #require(main.page.dockerReportModel)
         #expect(report.diskText == "Docker.raw sul disco: 4 GB → 3 GB")
-        #expect(report.daemonLostText == "Docker Desktop si è fermato durante la pulizia: le voci restanti non sono state eliminate.")
+        #expect(report.daemonLostText == "Docker Desktop si è fermato durante la pulizia: le voci restanti non sono state eliminate. Avvialo e premi «Nuova analisi» per riprovare.")
         await report.persistence?.value
     }
 
@@ -230,7 +230,7 @@ struct MainModelTests {
         let report = try #require(main.page.dockerReportModel)
         #expect(report.diskText == "Disco virtuale: OrbStack restituisce lo spazio al Mac automaticamente.")
         #expect(report.purgeHint == "")
-        #expect(report.daemonLostText == "OrbStack si è fermato durante la pulizia: le voci restanti non sono state eliminate.")
+        #expect(report.daemonLostText == "OrbStack si è fermato durante la pulizia: le voci restanti non sono state eliminate. Avvialo e premi «Nuova analisi» per riprovare.")
         await report.persistence?.value
     }
 

@@ -209,7 +209,11 @@ struct DockerCleanExecutorTests {
         #expect(result.report.itemsFailed == 2)
         #expect(!cli.commandLines.contains("volume rm old-data"))
         #expect(result.after == nil)
-        #expect(result.report.errors.allSatisfy { $0.message.contains("Docker") })
+        #expect(result.report.errors.map(\.path) == ["alpine:3.20", "old-data"])
+        #expect(result.report.errors.map(\.message) == [
+            "il motore Docker si è fermato durante l'eliminazione",
+            "non eseguito: il motore Docker si era fermato",
+        ])
     }
 
     @Test func daemonLostDuringARetryStillAccountsForEveryItem() async throws {
@@ -229,6 +233,43 @@ struct DockerCleanExecutorTests {
 
         #expect(result.report.itemsDeleted == 1)
         #expect(result.report.errors.map(\.path) == ["azurelinux", "old-data", "Cache di build"])
+        #expect(result.report.errors.map(\.message) == [
+            "il motore Docker si è fermato durante l'eliminazione",
+            "non eseguito: il motore Docker si era fermato",
+            "non eseguito: il motore Docker si era fermato",
+        ])
+    }
+
+    /// Il resoconto ha «Nuova analisi» e non «Riprova»: nessuna sua voce deve citare un'azione.
+    @Test func interruptedReportLinesNeverPointToAButtonTheReportLacks() async throws {
+        let cli = succeedingCli()
+            .on("rmi \(DockerFixtures.alpineId)") { throw DockerUnavailableError(DockerUnavailableError.notRunning) }
+
+        let result = try await execute(cli,
+            image(DockerFixtures.alpineId, "alpine:3.20"),
+            volume("old-data"),
+            Self.buildCache)
+
+        #expect(result.report.errors.count == 3)
+        #expect(result.report.errors.allSatisfy { !$0.message.contains("Riprova") && !$0.message.contains("premi") })
+    }
+
+    @Test func aCliThatVanishesMidwayKeepsItsOwnMessageAndNamesNoButton() async throws {
+        let cli = succeedingCli()
+            .on("rmi \(DockerFixtures.alpineId)") {
+                throw DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled)
+            }
+
+        let result = try await execute(cli,
+            image(DockerFixtures.alpineId, "alpine:3.20"),
+            volume("old-data"))
+
+        #expect(result.daemonLost)
+        #expect(result.report.errors.map(\.message) == [
+            DockerUnavailableError.notInstalled,
+            "non eseguito: \(DockerUnavailableError.notInstalled)",
+        ])
+        #expect(result.report.errors.allSatisfy { !$0.message.contains("Riprova") && !$0.message.contains("premi") })
     }
 
     @Test func bytesFreedAreTheSystemDfDeltaPerType() async throws {

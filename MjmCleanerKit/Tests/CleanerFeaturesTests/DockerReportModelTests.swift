@@ -31,7 +31,7 @@ struct DockerReportModelTests {
         #expect(model.dfText == "docker system df: 5 GB → 2 GB")
         #expect(model.diskText == "Docker.raw sul disco: 4 GB → 4 GB")
         #expect(model.purgeHint.hasPrefix("Docker.raw non si è ridotto"))
-        #expect(model.daemonLostText == "Docker Desktop si è fermato durante la pulizia: le voci restanti non sono state eliminate.")
+        #expect(model.daemonLostText == "Docker Desktop si è fermato durante la pulizia: le voci restanti non sono state eliminate. Avvialo e premi «Nuova analisi» per riprovare.")
         #expect(model.deleted == ["immagine nginx:1.27", "volume dati"])
         #expect(model.failed == ["nome-volume — volume is in use"])
         #expect(model.hasFailures)
@@ -129,10 +129,10 @@ struct DockerReportModelTests {
     @Test(arguments: [
         (DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack"),
          "Disco virtuale: OrbStack restituisce lo spazio al Mac automaticamente.",
-         "OrbStack si è fermato durante la pulizia: le voci restanti non sono state eliminate."),
+         "OrbStack si è fermato durante la pulizia: le voci restanti non sono state eliminate. Avvialo e premi «Nuova analisi» per riprovare."),
         (DockerEngine(serverVersion: "29.8.2", operatingSystem: "Ubuntu 24.04"),
          "Disco virtuale: non misurato per questo motore.",
-         "Docker si è fermato durante la pulizia: le voci restanti non sono state eliminate."),
+         "Docker si è fermato durante la pulizia: le voci restanti non sono state eliminate. Avvialo e premi «Nuova analisi» per riprovare."),
     ])
     func otherEnginesDescribeTheirDiskWithoutMeasures(engine: DockerEngine, diskText: String, daemonLostText: String) throws {
         let result = DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: nil, daemonLost: true)
@@ -144,6 +144,18 @@ struct DockerReportModelTests {
         #expect(model.diskText == diskText)
         #expect(model.daemonLostText == daemonLostText)
         #expect(model.purgeHint == "")
+    }
+
+    /// Il resoconto ha «Nuova analisi» e non «Riprova»: il banner del motore fermo rimanda al primo.
+    @Test func daemonLostBannerPointsToTheButtonTheReportHas() throws {
+        let result = DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: nil, daemonLost: true)
+
+        let model = DockerReportModel(
+            environment: try makeEnvironment(), navigation: nil, result: result,
+            engine: dockerDesktop, diskBefore: nil, diskAfter: nil)
+
+        #expect(model.daemonLostText.contains("«Nuova analisi»"))
+        #expect(!model.daemonLostText.contains("Riprova"))
     }
 
     /// Il Purge è un comando di Docker Desktop: anche con due misure di un disco che non cala, gli

@@ -1,7 +1,7 @@
 /// Il motore che risponde dietro la CLI `docker`, riconosciuto dall'`OperatingSystem` del daemon
 /// («Docker Desktop», «OrbStack»; Colima, per esempio, riporta la distribuzione della sua macchina
-/// virtuale). Quale motore si pulisce lo decide il contesto attivo della CLI: qui lo si riconosce
-/// soltanto, per i testi e per il disco virtuale.
+/// virtuale). Quale motore si pulisce lo decide il contesto attivo all'inizio dell'analisi: qui lo
+/// si riconosce, per i testi e per il disco virtuale, e se ne conserva l'identità.
 public enum DockerEngineKind: Sendable, Equatable {
     case dockerDesktop
     case orbStack

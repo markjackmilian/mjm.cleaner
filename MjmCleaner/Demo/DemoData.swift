@@ -75,6 +75,7 @@ enum DemoData {
 
     static let dockerAnalysis = DockerAnalysis(
         engine: DockerEngine(serverVersion: "27.3.1", operatingSystem: "Docker Desktop"),
+        context: DockerContext(name: "desktop-linux", description: "Docker Desktop", host: "unix:///Users/demo/.docker/run/docker.sock"),
         snapshot: DockerSnapshot(
             containers: [], images: [], volumes: [],
             df: DockerDfSummary(entries: [

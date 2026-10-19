@@ -4,6 +4,8 @@ import Testing
 struct DockerCleanupServiceTests {
     private static let rawPath = "/Users/tester/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
     private static let contextCommand = "context inspect --format {{json .}}"
+    private static let desktopEngine = DockerEngine(serverVersion: "29.8.0", operatingSystem: "Docker Desktop", id: "5f0d6c1e-desktop")
+    private static let orbStackEngine = DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack", id: "b2756783-orbstack")
 
     private struct NoProcess: ProcessRunning {
         let calls = Recorder<[String]>()
@@ -14,18 +16,42 @@ struct DockerCleanupServiceTests {
         }
     }
 
+    /// Un servizio su `cli`, il motore del contesto attivo `desktop-linux`.
     private func service(
         _ fs: InMemoryFileSystem,
         _ cli: FakeDockerCli,
         du: NoProcess = NoProcess(),
         diskFiles: (any FileSystem)? = nil
     ) -> DockerCleanupService {
+        service(fs, docker: FakeDockerContexts(active: "desktop-linux", [(FakeDockerContexts.desktopLinux, cli)]), du: du, diskFiles: diskFiles)
+    }
+
+    private func service(
+        _ fs: InMemoryFileSystem,
+        docker: any DockerCommandRunning,
+        du: NoProcess = NoProcess(),
+        diskFiles: (any FileSystem)? = nil
+    ) -> DockerCleanupService {
         DockerCleanupService(
-            collector: DockerInventoryCollector(cli: cli, fileSystem: fs),
+            collector: DockerInventoryCollector(cli: docker, fileSystem: fs),
             scanner: ProjectReferenceScanner(fileSystem: fs),
             disk: DiskUsageProbe(runner: du, fileSystem: diskFiles ?? fs, diskImagePath: Self.rawPath),
-            executor: DockerCleanExecutor(cli: cli, clock: SystemWallClock()),
-            contexts: DockerContextReader(cli: cli, homeDirectory: "/Users/tester"))
+            executor: DockerCleanExecutor(cli: docker, clock: SystemWallClock()),
+            contexts: DockerContextReader(cli: docker, homeDirectory: "/Users/tester"))
+    }
+
+    /// Docker Desktop (`desktop-linux`, attivo) con il caso reale delle fixture e OrbStack
+    /// (`orbstack`) con lo stesso caso: un comando arrivato al motore sbagliato troverebbe risposta.
+    private func twoEngines() throws -> (docker: FakeDockerContexts, desktop: FakeDockerCli, orbStack: FakeDockerCli) {
+        let desktop = try FakeDockerCli.withRealCase()
+            .on(FakeDockerCli.infoCommand, FakeDockerCli.info("29.8.0", id: Self.desktopEngine.id))
+        let orbStack = try FakeDockerCli.withRealCase()
+            .on(FakeDockerCli.infoCommand, FakeDockerCli.info("29.8.2", "OrbStack", id: Self.orbStackEngine.id))
+        let docker = FakeDockerContexts(active: "desktop-linux", [
+            (FakeDockerContexts.desktopLinux, desktop),
+            (FakeDockerContexts.orbstack, orbStack),
+        ])
+        return (docker, desktop, orbStack)
     }
 
     @Test func analysisClassifiesWithTheReferencesFoundInTheProjects() async throws {
@@ -77,7 +103,6 @@ struct DockerCleanupServiceTests {
     @Test func aDaemonThatDoesNotAnswerNamesTheEngineOfTheActiveContext() async {
         let cli = FakeDockerCli()
             .on(FakeDockerCli.infoCommand) { throw DockerUnavailableError(DockerUnavailableError.notRunning) }
-            .on(Self.contextCommand, #"{"Name":"desktop-linux","Metadata":{"Description":"Docker Desktop"},"Endpoints":{"docker":{"Host":"unix:///Users/tester/.docker/run/docker.sock"}}}"#)
 
         let error = await #expect(throws: DockerUnavailableError.self) {
             try await service(InMemoryFileSystem(), cli).analyze([])
@@ -86,16 +111,41 @@ struct DockerCleanupServiceTests {
         #expect(error == DockerUnavailableError("Docker Desktop non è in esecuzione (contesto «desktop-linux»). Avvialo e premi Riprova."))
     }
 
-    @Test func anUnreadableContextKeepsTheGenericMessage() async {
+    /// Senza un contesto non si può fissare l'analisi: si ferma prima di parlare con un daemon.
+    @Test func anUnreadableContextStopsTheAnalysis() async {
         let cli = FakeDockerCli()
-            .on(FakeDockerCli.infoCommand) { throw DockerUnavailableError(DockerUnavailableError.notRunning) }
+            .on(Self.contextCommand) { FakeDockerCli.fail(#"context "gone": context not found"#) }
 
-        let error = await #expect(throws: DockerUnavailableError.self) {
-            try await service(InMemoryFileSystem(), cli).analyze([])
+        let error = await #expect(throws: DockerCommandError.self) {
+            try await service(InMemoryFileSystem(), docker: cli).analyze([])
         }
 
-        #expect(error == DockerUnavailableError(DockerUnavailableError.notRunning))
-        #expect(cli.commandLines.last == Self.contextCommand)
+        #expect(error == DockerCommandError(#"docker context inspect: context "gone": context not found"#))
+        #expect(cli.commandLines == [Self.contextCommand])
+    }
+
+    @Test func aContextWithoutAValidNameStopsTheAnalysis() async {
+        let cli = FakeDockerCli()
+            .on(Self.contextCommand, #"{"Name":"","Metadata":{},"Endpoints":{"docker":{"Host":"unix:///var/run/docker.sock"}}}"#)
+
+        let error = await #expect(throws: DockerOutputError.self) {
+            try await service(InMemoryFileSystem(), docker: cli).analyze([])
+        }
+
+        #expect(error == DockerOutputError("Nome del contesto Docker non valido: «»."))
+        #expect(cli.commandLines == [Self.contextCommand])
+    }
+
+    @Test func aMissingDockerStopsAtTheContextRead() async {
+        let cli = FakeDockerCli()
+            .on(Self.contextCommand) { throw DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled) }
+
+        let error = await #expect(throws: DockerUnavailableError.self) {
+            try await service(InMemoryFileSystem(), docker: cli).analyze([])
+        }
+
+        #expect(error == DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled))
+        #expect(cli.commandLines == [Self.contextCommand])
     }
 
     @Test func aMissingDockerIsNeverRewritten() async {
@@ -107,6 +157,41 @@ struct DockerCleanupServiceTests {
         }
 
         #expect(error == DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled))
-        #expect(!cli.commandLines.contains { $0.hasPrefix("context") })
+    }
+
+    /// OrbStack, avviandosi, cambia il contesto attivo subito dopo che l'analisi lo ha letto: ogni
+    /// comando successivo resta su `desktop-linux`, e il bersaglio è Docker Desktop.
+    @Test func everyAnalysisCommandStaysOnTheContextReadAtTheStart() async throws {
+        let (docker, desktop, orbStack) = try twoEngines()
+        desktop.on(FakeDockerCli.infoCommand) {
+            docker.activate("orbstack")
+            return FakeDockerCli.ok(FakeDockerCli.info("29.8.0", id: Self.desktopEngine.id))
+        }
+
+        let analysis = try await service(InMemoryFileSystem(), docker: docker).analyze([])
+
+        #expect(analysis.target == DockerTarget(context: FakeDockerContexts.desktopLinux, engine: Self.desktopEngine))
+        #expect(!analysis.candidates.isEmpty)
+        #expect(docker.calls.first == ["context", "inspect", "--format", "{{json .}}"])
+        #expect(docker.calls.dropFirst().allSatisfy { $0.starts(with: ["--context", "desktop-linux"]) })
+        #expect(docker.calls.count > 2)
+        #expect(orbStack.calls.isEmpty)
+    }
+
+    /// Docker Desktop si ferma e OrbStack prende il contesto attivo: l'errore nomina il motore
+    /// analizzato, non quello che risponde ora.
+    @Test func aStoppedEngineIsNamedFromTheContextReadAtTheStart() async throws {
+        let (docker, desktop, orbStack) = try twoEngines()
+        desktop.on(FakeDockerCli.infoCommand) {
+            docker.activate("orbstack")
+            throw DockerUnavailableError(DockerUnavailableError.notRunning)
+        }
+
+        let error = await #expect(throws: DockerUnavailableError.self) {
+            try await service(InMemoryFileSystem(), docker: docker).analyze([])
+        }
+
+        #expect(error == DockerUnavailableError("Docker Desktop non è in esecuzione (contesto «desktop-linux»). Avvialo e premi Riprova."))
+        #expect(orbStack.calls.isEmpty)
     }
 }

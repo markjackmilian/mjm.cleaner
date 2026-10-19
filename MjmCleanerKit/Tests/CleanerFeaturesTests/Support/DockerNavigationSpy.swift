@@ -36,14 +36,19 @@ func dockerCandidate(
 /// Il motore delle analisi di prova, se il test non ne sceglie un altro.
 let dockerDesktop = DockerEngine(serverVersion: "27.3.1", operatingSystem: "Docker Desktop")
 
+/// Il contesto delle analisi di prova, se il test non ne sceglie un altro.
+let desktopLinux = DockerContext(name: "desktop-linux", description: "Docker Desktop", host: "unix:///Users/tester/.docker/run/docker.sock")
+
 func dockerAnalysis(
     _ candidates: [DockerCandidate],
     engine: DockerEngine = dockerDesktop,
+    context: DockerContext = desktopLinux,
     disk: DockerDiskUsage? = DockerDiskUsage(path: "/Docker.raw", allocatedBytes: 4 * 1_073_741_824, apparentBytes: 64 * 1_073_741_824),
     df: DockerDfSummary = .empty
 ) -> DockerAnalysis {
     DockerAnalysis(
         engine: engine,
+        context: context,
         snapshot: DockerSnapshot(containers: [], images: [], volumes: [], df: df, existingComposeProjects: []),
         candidates: candidates,
         disk: disk)

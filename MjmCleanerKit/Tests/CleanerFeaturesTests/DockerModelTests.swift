@@ -204,6 +204,8 @@ struct DockerModelTests {
 
     @Test(arguments: [
         (DockerUnavailableError("Docker si è fermato.") as any Error, "Docker si è fermato."),
+        (DockerEngineChangedError(context: "desktop-linux") as any Error,
+         "Il motore Docker del contesto «desktop-linux» non è più quello analizzato: non è stato eliminato nulla. Premi Riprova per analizzarlo di nuovo."),
         (UnexpectedTestError(description: "timeout") as any Error, "Pulizia non riuscita: timeout"),
     ])
     func deleteFailuresAreShownOnThePage(error: any Error, expected: String) async throws {
@@ -217,6 +219,25 @@ struct DockerModelTests {
         #expect(model.deleteErrorText == expected)
         #expect(model.hasDeleteError)
         #expect(!model.isDeleting)
+        #expect(navigation.events.isEmpty)
+    }
+
+    /// Il daemon è cambiato dopo l'analisi: la pagina resta com'era, con elenco e selezione, e un
+    /// nuovo clic viene di nuovo consegnato all'esecuzione, che lo rifiuterà.
+    @Test func aChangedEngineKeepsTheListAndTheSelection() async throws {
+        let docker = FakeDocker()
+        docker.respond(with: .failure(DockerEngineChangedError(context: "desktop-linux")))
+        let navigation = DockerNavigationSpy()
+        let model = try await loaded(docker: docker, navigation: navigation)
+        let groups = model.groups.map(\.definition.id)
+        let selection = model.selection()
+
+        await model.delete()
+
+        #expect(model.isReady)
+        #expect(model.groups.map(\.definition.id) == groups)
+        #expect(model.selection() == selection)
+        #expect(model.canDelete)
         #expect(navigation.events.isEmpty)
     }
 

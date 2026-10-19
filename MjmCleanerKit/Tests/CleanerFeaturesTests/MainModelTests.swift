@@ -216,6 +216,24 @@ struct MainModelTests {
         await report.persistence?.value
     }
 
+    /// Il resoconto Docker riceve il motore che gli passa la pagina: con OrbStack niente Purge né
+    /// Docker.raw, anche con due misure di un disco che non cala.
+    @Test func theDockerReportKeepsTheEngineItIsGiven() async throws {
+        let main = MainModel(environment: try makeEnvironment(), appearance: FakeAppearance(), folders: FakePicker())
+        let orbStack = DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack")
+        let disk = DockerDiskUsage(path: "/Docker.raw", allocatedBytes: 4 * 1_073_741_824, apparentBytes: nil)
+
+        main.showDockerReport(
+            DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: nil, daemonLost: true),
+            engine: orbStack, diskBefore: disk, diskAfter: disk)
+
+        let report = try #require(main.page.dockerReportModel)
+        #expect(report.diskText == "Disco virtuale: OrbStack restituisce lo spazio al Mac automaticamente.")
+        #expect(report.purgeHint == "")
+        #expect(report.daemonLostText == "OrbStack si è fermato durante la pulizia: le voci restanti non sono state eliminate.")
+        await report.persistence?.value
+    }
+
     /// La pagina Xcode aperta dalla finestra usa servizio, storico, log di sessione e orologio
     /// dell'ambiente: il diario si apre all'ora dell'ambiente prima di `execute` e si scarta dopo il log.
     @Test func theXcodePageUsesTheEnvironmentServices() async throws {

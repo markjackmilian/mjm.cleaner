@@ -9,6 +9,11 @@
 set -u
 trap '' HUP
 
+[ "$#" -eq 6 ] || exit 2
+case "$4" in v[0-9]*.[0-9]*.[0-9]*) ;; *) exit 2 ;; esac
+case "$1" in ''|*[!0-9]*) exit 2 ;; esac
+case "$6" in ''|*[!0-9]*) exit 2 ;; esac
+
 pid=$1
 target=$2
 source=$3
@@ -48,6 +53,7 @@ while kill -0 "$pid" 2>/dev/null; do
 done
 
 rm -rf "$staging" "$old"
+if [ -e "$staging" ] || [ -e "$old" ]; then finish "failed copy"; fi
 if ! ditto "$source" "$staging" >>"$log" 2>&1; then
   rm -rf "$staging"
   finish "failed copy"

@@ -70,3 +70,26 @@ public struct DockerContextReader: Sendable {
         DockerUnavailableError.notRunningMessage(await activeContext(), homeDirectory: homeDirectory)
     }
 }
+
+/// Ogni comando va al daemon del contesto `name`, qualunque sia il contesto attivo. `--context`
+/// vale per il singolo comando e non cambia il contesto dell'utente: analisi ed esecuzione restano
+/// così sul motore analizzato anche se nel frattempo il contesto attivo cambia (OrbStack lo
+/// reimposta quando si avvia).
+struct DockerContextCli: DockerCommandRunning {
+    private let base: any DockerCommandRunning
+    private let name: String
+
+    /// Lancia per un nome che Docker non accetta: vuoto, oppure che comincia con «-» e verrebbe
+    /// letto come un'opzione.
+    init(_ base: any DockerCommandRunning, context name: String) throws {
+        guard name.firstMatch(of: /^[A-Za-z0-9][A-Za-z0-9_.+\-]*$/.matchingSemantics(.unicodeScalar)) != nil else {
+            throw DockerOutputError(String(localized: "Nome del contesto Docker non valido: «\(name)».", bundle: .module))
+        }
+        self.base = base
+        self.name = name
+    }
+
+    func run(_ arguments: [String], timeout: Duration?) async throws -> ProcessResult {
+        try await base.run(["--context", name] + arguments, timeout: timeout)
+    }
+}

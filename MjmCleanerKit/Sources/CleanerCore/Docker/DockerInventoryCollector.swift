@@ -16,6 +16,11 @@ public struct DockerInventoryCollector: Sendable {
         self.fileSystem = fileSystem
     }
 
+    /// Lo stesso collettore con ogni comando fissato al contesto `name` (`DockerContextCli`).
+    func pinned(to name: String) throws -> DockerInventoryCollector {
+        DockerInventoryCollector(cli: try DockerContextCli(cli, context: name), fileSystem: fileSystem)
+    }
+
     /// Verifica che il daemon risponda e riconosce il motore che lo esegue.
     public func checkDaemon() async throws -> DockerEngine {
         try await Self.readEngine(cli)

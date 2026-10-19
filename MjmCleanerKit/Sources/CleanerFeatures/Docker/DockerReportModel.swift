@@ -25,7 +25,7 @@ public final class DockerReportModel {
         navigation: (any DockerNavigating)?,
         result: DockerCleanResult,
         diskBefore: DockerDiskUsage?,
-        diskAfter: DockerDiskUsage
+        diskAfter: DockerDiskUsage?
     ) {
         self.navigation = navigation
         let report = result.report
@@ -53,7 +53,7 @@ public final class DockerReportModel {
             dfText = String(localized: "docker system df: misura finale non disponibile.", bundle: .module)
         }
 
-        if let before = diskBefore?.allocatedBytes, let after = diskAfter.allocatedBytes {
+        if let before = diskBefore?.allocatedBytes, let after = diskAfter?.allocatedBytes {
             diskText = String(localized: "Docker.raw sul disco: \(Formatting.bytes(before)) → \(Formatting.bytes(after))", bundle: .module)
         } else {
             diskText = String(localized: "Docker.raw sul disco: non misurabile.", bundle: .module)
@@ -64,7 +64,7 @@ public final class DockerReportModel {
         // cancella TUTTO: lo si suggerisce, mai lo si esegue.
         if report.itemsDeleted > 0,
            let rawBefore = diskBefore?.allocatedBytes,
-           let rawAfter = diskAfter.allocatedBytes,
+           let rawAfter = diskAfter?.allocatedBytes,
            rawAfter >= rawBefore {
             purgeHint = String(
                 localized: "Docker.raw non si è ridotto: Docker Desktop restituisce lo spazio al Mac con calma. Per recuperarlo subito: Docker Desktop → Troubleshoot → Clean / Purge data. Attenzione: quell'operazione cancella tutte le immagini, i container e i volumi.",

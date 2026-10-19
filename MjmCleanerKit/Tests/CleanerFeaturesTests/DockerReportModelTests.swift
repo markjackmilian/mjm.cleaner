@@ -168,5 +168,5 @@ private final class SharedEventsNavigation: DockerNavigating {
     func startOver() {}
     func refreshTotal() async throws { events.append("refreshTotal") }
     func showDocker() {}
-    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage) {}
+    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?) {}
 }

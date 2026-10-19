@@ -40,9 +40,25 @@ struct DockerCleanupServiceTests {
 
         let analysis = try await service(fs, FakeDockerCli.withRealCase()).analyze([])
 
-        #expect(analysis.disk.allocatedBytes == Int64(16 * 1024))
-        #expect(analysis.disk.apparentBytes == 100)
+        #expect(analysis.engine == DockerEngine(serverVersion: "29.8.0", operatingSystem: "Docker Desktop"))
+        #expect(analysis.disk?.allocatedBytes == Int64(16 * 1024))
+        #expect(analysis.disk?.apparentBytes == 100)
         #expect(analysis.snapshot.df.images == 5_840_000_000)
+    }
+
+    /// Sul Mac dell'utente Docker Desktop ha lasciato un Docker.raw: con OrbStack non si misura.
+    @Test func orbStackHasNoDiskToMeasureEvenWithADockerRawLeftBehind() async throws {
+        let fs = InMemoryFileSystem()
+        fs.addFile(Self.rawPath, size: 100)
+        let cli = try FakeDockerCli.withRealCase().on(FakeDockerCli.infoCommand, FakeDockerCli.info("29.8.2", "OrbStack"))
+        let docker = service(fs, cli)
+
+        let analysis = try await docker.analyze([])
+        let after = try await docker.measureDisk(for: analysis.engine)
+
+        #expect(analysis.engine.kind == .orbStack)
+        #expect(analysis.disk == nil)
+        #expect(after == nil)
     }
 
     @Test func aDaemonThatDoesNotAnswerNamesTheEngineOfTheActiveContext() async {

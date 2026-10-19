@@ -74,7 +74,7 @@ enum DemoData {
     static let diskAfter = DockerDiskUsage(path: diskBefore.path, allocatedBytes: 24 * gigabyte, apparentBytes: 64 * gigabyte)
 
     static let dockerAnalysis = DockerAnalysis(
-        serverVersion: "27.3.1",
+        engine: DockerEngine(serverVersion: "27.3.1", operatingSystem: "Docker Desktop"),
         snapshot: DockerSnapshot(
             containers: [], images: [], volumes: [],
             df: DockerDfSummary(entries: [

@@ -51,7 +51,7 @@ struct DockerModelTests {
         #expect(docker.analyzedRoots == [["/Users/tester/src"]])
         #expect(!model.isLoading)
         #expect(model.isReady)
-        #expect(model.serverText == "Docker 27.3.1 in esecuzione")
+        #expect(model.serverText == "Docker Desktop · Docker 27.3.1 in esecuzione")
         #expect(model.diskText == "Docker.raw occupa 4 GB sul disco (dimensione apparente 64 GB: è il limite massimo del disco virtuale, non lo spazio usato).")
         #expect(model.dfText == "Immagini 2 GB (recuperabili 1 GB) · Volumi 512 MB (recuperabili 0 B) · Cache di build 1 GB (recuperabili 1 GB)")
         #expect(model.groups.map(\.definition.id) == ["safe", "local-builds", "unused-images", "unused-volumes", "keep"])
@@ -192,6 +192,7 @@ struct DockerModelTests {
         await model.delete()
 
         #expect(docker.executed.map { $0.map(\.id) } == [["dangling"]])
+        #expect(docker.measuredEngines == [dockerDesktop])
         #expect(model.deleteProgressText == "1 / 1 · nome-dangling")
         #expect(navigation.events == ["dockerReport"])
         #expect(navigation.reportResult == result)
@@ -219,11 +220,49 @@ struct DockerModelTests {
     }
 
     @Test func diskDescriptionsCoverMissingAndUnmeasurableImages() {
-        #expect(DockerModel.describeDisk(DockerDiskUsage(path: "/x", allocatedBytes: nil, apparentBytes: nil))
+        #expect(DockerModel.describeDisk(DockerDiskUsage(path: "/x", allocatedBytes: nil, apparentBytes: nil), engine: dockerDesktop)
             == "Disco virtuale di Docker Desktop non trovato: lo spazio occupato sul Mac non è misurabile.")
-        #expect(DockerModel.describeDisk(DockerDiskUsage(path: "/x", allocatedBytes: nil, apparentBytes: 10))
+        #expect(DockerModel.describeDisk(DockerDiskUsage(path: "/x", allocatedBytes: nil, apparentBytes: 10), engine: dockerDesktop)
             == "Docker.raw trovato, ma lo spazio occupato non è misurabile.")
         #expect(DockerModel.typeLabel("Altro") == "Altro")
+    }
+
+    @Test(arguments: [
+        (DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack"),
+         "OrbStack · Docker 29.8.2 in esecuzione",
+         "OrbStack restituisce da solo al Mac lo spazio liberato: il suo disco virtuale non viene misurato."),
+        (DockerEngine(serverVersion: "29.8.2", operatingSystem: "Ubuntu 24.04"),
+         "Docker 29.8.2 in esecuzione su «Ubuntu 24.04»",
+         "Disco virtuale di questo motore non misurato: fa fede docker system df."),
+        (DockerEngine(serverVersion: "29.8.2", operatingSystem: ""),
+         "Docker 29.8.2 in esecuzione",
+         "Disco virtuale di questo motore non misurato: fa fede docker system df."),
+    ])
+    func summaryNamesTheEngineAndItsDisk(engine: DockerEngine, server: String, disk: String) async throws {
+        let docker = FakeDocker()
+        docker.enqueue(.success(dockerAnalysis(Self.mixed, engine: engine, disk: nil)))
+        let model = try await opened(docker: docker)
+
+        #expect(model.serverText == server)
+        #expect(model.diskText == disk)
+    }
+
+    /// Dopo la pulizia il disco si misura per il motore dell'analisi: con OrbStack non c'è nulla da
+    /// misurare e il resoconto non riceve misure.
+    @Test func theDiskAfterTheCleanupBelongsToTheEngineOfTheAnalysis() async throws {
+        let orbStack = DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack")
+        let docker = FakeDocker()
+        docker.enqueue(.success(dockerAnalysis(Self.mixed, engine: orbStack, disk: nil)))
+        docker.setDiskAfter(nil)
+        let navigation = DockerNavigationSpy()
+        let model = try await opened(docker: docker, navigation: navigation)
+
+        await model.delete()
+
+        #expect(docker.measuredEngines == [orbStack])
+        #expect(navigation.events == ["dockerReport"])
+        #expect(navigation.reportDiskBefore == nil)
+        #expect(navigation.reportDiskAfter == nil)
     }
 
     @Test func rowTextsNameKindSizeAndCost() async throws {
@@ -366,7 +405,7 @@ private final class SlowFirstAnalysisDocker: DockerCleanupServing {
         DockerCleanResult(report: makeReport(), before: .empty, after: .empty, daemonLost: false)
     }
 
-    func measureDisk() async throws -> DockerDiskUsage {
+    func measureDisk(for engine: DockerEngine) async throws -> DockerDiskUsage? {
         DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil)
     }
 }
@@ -420,7 +459,7 @@ private final class SequencedDocker: DockerCleanupServing {
     /// Sul main actor, come la pagina: una misura avviata insieme all'esecuzione si accoda prima che il
     /// test riprenda da `started`, quindi la trova sempre ancora trattenuta da `release`.
     @MainActor
-    func measureDisk() async throws -> DockerDiskUsage {
+    func measureDisk(for engine: DockerEngine) async throws -> DockerDiskUsage? {
         // Come `DiskUsageProbe`: `ProcessRunner.run` comincia con `Task.checkCancellation()`.
         try Task.checkCancellation()
         events.append("measure")

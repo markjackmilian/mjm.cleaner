@@ -252,7 +252,8 @@ final class FakeDocker: DockerCleanupServing {
         var analyses: [Result<DockerAnalysis, any Error>] = []
         var executeResult: Result<DockerCleanResult, any Error> = .success(DockerCleanResult(
             report: makeReport(), before: .empty, after: .empty, daemonLost: false))
-        var disk = DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil)
+        var disk: DockerDiskUsage? = DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil)
+        var measuredEngines: [DockerEngine] = []
         var analyzedRoots: [[String]] = []
         var executed: [[DockerCandidate]] = []
     }
@@ -264,7 +265,8 @@ final class FakeDocker: DockerCleanupServing {
 
     func enqueue(_ analysis: Result<DockerAnalysis, any Error>) { state.withLock { $0.analyses.append(analysis) } }
     func respond(with result: Result<DockerCleanResult, any Error>) { state.withLock { $0.executeResult = result } }
-    func setDiskAfter(_ disk: DockerDiskUsage) { state.withLock { $0.disk = disk } }
+    var measuredEngines: [DockerEngine] { state.withLock { $0.measuredEngines } }
+    func setDiskAfter(_ disk: DockerDiskUsage?) { state.withLock { $0.disk = disk } }
 
     func analyze(_ projectRoots: [String]) async throws -> DockerAnalysis {
         let next = state.withLock { state -> Result<DockerAnalysis, any Error>? in
@@ -286,8 +288,11 @@ final class FakeDocker: DockerCleanupServing {
         return try result.get()
     }
 
-    func measureDisk() async throws -> DockerDiskUsage {
-        state.withLock { $0.disk }
+    func measureDisk(for engine: DockerEngine) async throws -> DockerDiskUsage? {
+        state.withLock { state in
+            state.measuredEngines.append(engine)
+            return state.disk
+        }
     }
 }
 

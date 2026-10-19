@@ -112,7 +112,7 @@ private struct DemoDocker: DockerCleanupServing {
         DemoData.dockerResult
     }
 
-    func measureDisk() async throws -> DockerDiskUsage {
+    func measureDisk(for engine: DockerEngine) async throws -> DockerDiskUsage? {
         DemoData.diskAfter
     }
 }

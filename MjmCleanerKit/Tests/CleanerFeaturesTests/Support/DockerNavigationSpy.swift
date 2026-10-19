@@ -11,7 +11,7 @@ final class DockerNavigationSpy: NavigationSpy, DockerNavigating {
         record("docker")
     }
 
-    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage) {
+    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?) {
         record("dockerReport")
         reportResult = result
         reportDiskBefore = diskBefore
@@ -31,10 +31,18 @@ func dockerCandidate(
     DockerCandidate(kind: kind, id: id, displayName: "nome-\(id)", sizeBytes: size, verdict: verdict, ruleId: rule, reason: "motivo", cost: cost)
 }
 
-func dockerAnalysis(_ candidates: [DockerCandidate], version: String = "27.3.1", disk: DockerDiskUsage? = nil, df: DockerDfSummary = .empty) -> DockerAnalysis {
+/// Il motore delle analisi di prova, se il test non ne sceglie un altro.
+let dockerDesktop = DockerEngine(serverVersion: "27.3.1", operatingSystem: "Docker Desktop")
+
+func dockerAnalysis(
+    _ candidates: [DockerCandidate],
+    engine: DockerEngine = dockerDesktop,
+    disk: DockerDiskUsage? = DockerDiskUsage(path: "/Docker.raw", allocatedBytes: 4 * 1_073_741_824, apparentBytes: 64 * 1_073_741_824),
+    df: DockerDfSummary = .empty
+) -> DockerAnalysis {
     DockerAnalysis(
-        serverVersion: version,
+        engine: engine,
         snapshot: DockerSnapshot(containers: [], images: [], volumes: [], df: df, existingComposeProjects: []),
         candidates: candidates,
-        disk: disk ?? DockerDiskUsage(path: "/Docker.raw", allocatedBytes: 4 * 1_073_741_824, apparentBytes: 64 * 1_073_741_824))
+        disk: disk)
 }

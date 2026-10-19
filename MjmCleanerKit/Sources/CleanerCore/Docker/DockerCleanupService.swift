@@ -1,12 +1,13 @@
-/// `serverVersion`: versione del daemon che ha risposto.
+/// `engine`: il motore che ha risposto. `disk`: il suo disco virtuale, `nil` per un motore che non
+/// ne ha uno da misurare (`DiskUsageProbe.measure(for:)`).
 public struct DockerAnalysis: Sendable, Equatable {
-    public let serverVersion: String
+    public let engine: DockerEngine
     public let snapshot: DockerSnapshot
     public let candidates: [DockerCandidate]
-    public let disk: DockerDiskUsage
+    public let disk: DockerDiskUsage?
 
-    public init(serverVersion: String, snapshot: DockerSnapshot, candidates: [DockerCandidate], disk: DockerDiskUsage) {
-        self.serverVersion = serverVersion
+    public init(engine: DockerEngine, snapshot: DockerSnapshot, candidates: [DockerCandidate], disk: DockerDiskUsage?) {
+        self.engine = engine
         self.snapshot = snapshot
         self.candidates = candidates
         self.disk = disk
@@ -50,8 +51,9 @@ public struct DockerCleanupService: Sendable {
         try await executor.execute(selected, progress: progress)
     }
 
-    public func measureDisk() async throws -> DockerDiskUsage {
-        try await disk.measure()
+    /// Il disco del motore dell'analisi dopo la pulizia; `nil` se quel motore non ne ha uno da misurare.
+    public func measureDisk(for engine: DockerEngine) async throws -> DockerDiskUsage? {
+        try await disk.measure(for: engine)
     }
 
     /// Raccolta da Docker e ricerca nei progetti procedono in parallelo: sono indipendenti, e la
@@ -62,11 +64,11 @@ public struct DockerCleanupService: Sendable {
         let engine = try await collector.checkDaemon()
 
         async let references = scanner.scan(projectRoots)
-        async let usage = disk.measure()
+        async let usage = disk.measure(for: engine)
         let snapshot = try await collector.collect()
 
         return DockerAnalysis(
-            serverVersion: engine.serverVersion,
+            engine: engine,
             snapshot: snapshot,
             candidates: try DockerClassifier.classify(snapshot, try await references),
             disk: try await usage)

@@ -133,9 +133,9 @@ public struct DockerCli: DockerCommandRunning {
         return result
     }
 
-    /// Un'app aperta dal Finder riceve un PATH minimo (/usr/bin:/bin:…): la CLI di Docker Desktop
-    /// cerca accanto a sé i propri helper (credential helper, plugin), quindi la sua cartella va in
-    /// testa.
+    /// Un'app aperta dal Finder riceve un PATH minimo (/usr/bin:/bin:…): la CLI, di Docker Desktop
+    /// come di OrbStack, cerca accanto a sé i propri helper (credential helper, plugin), quindi la
+    /// sua cartella va in testa.
     private static func environment(_ binary: String) -> [String: String] {
         let directory = PathText.parent(binary) ?? "/usr/local/bin"
         let inherited = ProcessInfo.processInfo.environment["PATH"] ?? ""
@@ -145,16 +145,31 @@ public struct DockerCli: DockerCommandRunning {
 }
 
 public enum DockerBinaryLocator {
-    /// Percorsi noti, in ordine: Docker Desktop per l'utente, installazione di sistema, Homebrew,
-    /// bundle dell'app.
-    public static func find(_ fileSystem: any FileSystem, homeDirectory: String) -> String? {
-        let candidates = [
+    /// Percorsi noti, in ordine: Docker Desktop e OrbStack per l'utente, installazione di sistema,
+    /// Homebrew, bundle delle due app. Il binario non sceglie il motore (lo fa il contesto attivo
+    /// della CLI): basta che si avvii.
+    public static func candidates(homeDirectory: String) -> [String] {
+        [
             PathText.join(PathText.join(PathText.join(homeDirectory, ".docker"), "bin"), "docker"),
+            PathText.join(PathText.join(PathText.join(homeDirectory, ".orbstack"), "bin"), "docker"),
             "/usr/local/bin/docker",
             "/opt/homebrew/bin/docker",
             "/Applications/Docker.app/Contents/Resources/bin/docker",
+            "/Applications/OrbStack.app/Contents/MacOS/xbin/docker",
         ]
+    }
 
-        return candidates.first(where: fileSystem.fileExists)
+    /// Il primo candidato che si può eseguire. Disinstallare Docker Desktop può lasciare
+    /// `~/.docker/bin/docker` come collegamento orfano: `FileSystem.fileExists` lo darebbe per
+    /// presente e l'app direbbe «Docker non è installato» anche con OrbStack acceso.
+    public static func find(homeDirectory: String, isExecutable: (String) -> Bool = DockerBinaryLocator.isExecutableFile) -> String? {
+        candidates(homeDirectory: homeDirectory).first(where: isExecutable)
+    }
+
+    /// Un file regolare eseguibile, raggiunto seguendo i collegamenti (`stat`, non `lstat`).
+    public static func isExecutableFile(_ path: String) -> Bool {
+        var status = stat()
+        guard stat(path, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { return false }
+        return access(path, X_OK) == 0
     }
 }

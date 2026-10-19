@@ -73,10 +73,11 @@ public struct AppEnvironment: Sendable {
         let pathGuard = try PathGuard(denyList: DenyList(homeDirectory: home), fileSystem: fileSystem, links: links, homeDirectory: home)
         let scanner = RuleScanner(fileSystem: fileSystem, pathGuard: pathGuard, links: links, clock: clock)
 
-        // Docker passa solo dalla CLI: nessun file sotto la cartella di Docker Desktop viene mai
-        // cancellato (la deny-list resta invariata); di Docker.raw si legge soltanto la dimensione.
+        // Docker passa solo dalla CLI: nessun file sotto le cartelle dei motori (Docker Desktop,
+        // OrbStack) viene mai cancellato, perché la deny-list le protegge; di Docker.raw si legge
+        // soltanto la dimensione.
         let processes = ProcessRunner()
-        let dockerCli = DockerCli(runner: processes, binaryPath: DockerBinaryLocator.find(fileSystem, homeDirectory: home))
+        let dockerCli = DockerCli(runner: processes, binaryPath: DockerBinaryLocator.find(homeDirectory: home))
         let docker = DockerCleanupService(
             collector: DockerInventoryCollector(cli: dockerCli, fileSystem: fileSystem),
             scanner: ProjectReferenceScanner(fileSystem: fileSystem),

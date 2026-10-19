@@ -63,6 +63,7 @@ jobs:
         run: |
           bash Scripts/package-release.test.sh
           bash Scripts/demo-xcode-preview.test.sh
+          bash Scripts/update-install.test.sh
 
       - name: Build Debug
         run: |

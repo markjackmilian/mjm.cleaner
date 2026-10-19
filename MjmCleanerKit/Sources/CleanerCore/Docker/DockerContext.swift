@@ -31,8 +31,8 @@ public struct DockerContext: Sendable, Equatable {
 }
 
 extension DockerUnavailableError {
-    /// Il testo per un daemon che non risponde, con il motore del contesto attivo quando lo si
-    /// conosce; senza contesto, o con un contesto senza nome, il testo generico.
+    /// Il testo per un daemon che non risponde, con il motore del contesto analizzato quando lo si
+    /// riconosce; senza contesto, o con un contesto senza nome, il testo generico.
     public static func notRunningMessage(_ context: DockerContext?, homeDirectory: String) -> String {
         guard let context, !DockerText.isBlank(context.name) else { return notRunning }
 
@@ -78,8 +78,8 @@ struct DockerContextCli: DockerCommandRunning {
     private let base: any DockerCommandRunning
     private let name: String
 
-    /// Lancia per un nome che Docker non accetta: vuoto, oppure che comincia con «-» e verrebbe
-    /// letto come un'opzione.
+    /// Lancia per un nome fuori dalla forma `[A-Za-z0-9][A-Za-z0-9_.+-]*`: vuoto, con spazi, segni
+    /// o lettere non ASCII, oppure che comincia con «-» e verrebbe letto come un'opzione.
     init(_ base: any DockerCommandRunning, context name: String) throws {
         guard name.firstMatch(of: /^[A-Za-z0-9][A-Za-z0-9_.+\-]*$/.matchingSemantics(.unicodeScalar)) != nil else {
             throw DockerOutputError(String(localized: "Nome del contesto Docker non valido: «\(name)».", bundle: .module))

@@ -65,10 +65,11 @@ public struct DockerCleanExecutor: Sendable {
         self.clock = clock
     }
 
-    /// Lancia prima di cancellare qualunque cosa se il nome del contesto non è valido, se lì non
-    /// risponde più il daemon dell'analisi (`DockerEngineChangedError`) o se la misura iniziale
-    /// fallisce; poi solo per un errore fuori contratto della CLI, come il C#. L'annullamento ferma
-    /// la pulizia fra un elemento e l'altro e restituisce il resoconto parziale.
+    /// Lancia prima di cancellare qualunque cosa se il nome del contesto non è valido, se lì
+    /// risponde un daemon diverso da quello dell'analisi (`DockerEngineChangedError`), se non
+    /// risponde nessun daemon (`DockerUnavailableError`) o se la misura iniziale fallisce; poi solo
+    /// per un errore fuori contratto della CLI, come il C#. L'annullamento ferma la pulizia fra un
+    /// elemento e l'altro e restituisce il resoconto parziale.
     @concurrent
     public func execute(
         _ selected: [DockerCandidate],

@@ -194,10 +194,12 @@ public final class DockerModel {
             await relay.finish()
             deleteErrorText = error.message
         } catch let error as DockerEngineChangedError {
-            // Non si è cancellato nulla e il messaggio dice già cosa fare: l'elenco resta com'è, e
-            // un nuovo clic verrebbe rifiutato di nuovo.
+            // Non si è cancellato nulla, ma l'analisi non vale più: la pagina torna allo stato
+            // d'errore, dove «Riprova» la rifà sul contesto attivo.
             await relay.finish()
-            deleteErrorText = error.message
+            errorText = error.message
+            isReady = false
+            groups = []
         } catch {
             await relay.finish()
             deleteErrorText = String(localized: "Pulizia non riuscita: \(FeatureText.message(error))", bundle: .module)

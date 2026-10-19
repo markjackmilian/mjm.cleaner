@@ -4,14 +4,14 @@ import Foundation
 /// pensato per l'utente — l'interfaccia lo mostra così com'è. Porting di `DockerUnavailableException`.
 public struct DockerUnavailableError: Error, Equatable, Sendable, LocalizedError {
     /// Perché Docker non risponde. Solo per «non in esecuzione» ha senso nominare il motore del
-    /// contesto attivo: il motivo non si deduce più dal testo.
+    /// contesto su cui si lavora: il motivo non si deduce più dal testo.
     public enum Reason: Sendable, Equatable {
         case notInstalled
         case notRunning
     }
 
-    /// Testo generico: quando il contesto attivo dice quale motore è, l'analisi lo sostituisce con
-    /// un testo che lo nomina.
+    /// Testo generico: analisi ed esecuzione lo sostituiscono con un testo che nomina il motore del
+    /// contesto analizzato, quando lo si riconosce.
     public static var notRunning: String {
         String(localized: "Docker non è in esecuzione. Avvia il motore Docker (Docker Desktop, OrbStack…) e premi Riprova.", bundle: .module)
     }

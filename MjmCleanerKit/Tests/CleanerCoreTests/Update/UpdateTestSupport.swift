@@ -85,3 +85,51 @@ final class FakeHTTP: HTTPClient, @unchecked Sendable {
         return status
     }
 }
+
+/// `ditto` finto: invece di estrarre crea il bundle descritto da `bundle`; `codesign` e `lipo`
+/// rispondono con i valori indicati.
+struct FakeUpdateTools: ProcessRunning {
+    var bundle: @Sendable (String) throws -> Void
+    var dittoExit: Int32 = 0
+    var codesignExit: Int32 = 0
+    var codesignTimesOut = false
+    var archs = "x86_64 arm64\n"
+    let calls = Recorder<[String]>()
+
+    func run(_ executable: String, _ arguments: [String], timeout: Duration, environment: [String: String]?) async throws -> ProcessResult {
+        calls.append([executable] + arguments)
+        switch executable {
+        case "/usr/bin/ditto":
+            if dittoExit == 0, let destination = arguments.last { try bundle(destination) }
+            return ProcessResult(exitCode: dittoExit, standardOutput: "", standardError: "", timedOut: false)
+        case "/usr/bin/codesign":
+            return ProcessResult(exitCode: codesignTimesOut ? -1 : codesignExit, standardOutput: "", standardError: "", timedOut: codesignTimesOut)
+        case "/usr/bin/lipo":
+            return ProcessResult(exitCode: 0, standardOutput: archs, standardError: "", timedOut: false)
+        default:
+            return ProcessResult(exitCode: 127, standardOutput: "", standardError: "", timedOut: false)
+        }
+    }
+}
+
+/// Scrive in `destination` un bundle `name` con l'Info.plist e l'eseguibile indicati.
+func makeFakeBundle(
+    name: String = "mjm.cleaner.app",
+    identifier: String = "com.mjm.cleaner",
+    version: String = "0.2.0",
+    executable: String = "MjmCleaner",
+    executableIsPresent: Bool = true
+) -> @Sendable (String) throws -> Void {
+    { destination in
+        let contents = destination + "/" + name + "/Contents"
+        try FileManager.default.createDirectory(atPath: contents + "/MacOS", withIntermediateDirectories: true)
+        let info: [String: Any] = [
+            "CFBundleIdentifier": identifier, "CFBundleShortVersionString": version, "CFBundleExecutable": executable,
+        ]
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: URL(fileURLWithPath: contents + "/Info.plist"))
+        if executableIsPresent {
+            FileManager.default.createFile(atPath: contents + "/MacOS/MjmCleaner", contents: Data("bin".utf8), attributes: [.posixPermissions: 0o755])
+        }
+    }
+}

@@ -139,3 +139,15 @@ func makeFakeBundle(
         }
     }
 }
+
+/// Registra gli avvii staccati invece di eseguirli.
+final class RecordingLauncher: DetachedLaunching, @unchecked Sendable {
+    private let lock = NSLock()
+    private var launches: [(String, [String], [String: String])] = []
+
+    var recorded: [(String, [String], [String: String])] { lock.withLock { launches } }
+
+    func launch(_ executable: String, _ arguments: [String], environment: [String: String]) throws {
+        lock.withLock { launches.append((executable, arguments, environment)) }
+    }
+}

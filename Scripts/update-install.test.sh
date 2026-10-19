@@ -133,7 +133,31 @@ FAIL_MV_MATCH=".mjm.cleaner-" run_install "$(dead_pid)"
 [[ "$(cat "$UPDATES/install-result")" == "failed rollback" ]] || fail "wrong result: $(cat "$UPDATES/install-result")"
 [[ "$(cat "$APPS/.mjm.cleaner-old-v0.2.0.app/Contents/version")" == vecchio ]] || fail "old bundle not kept after a failed rollback"
 [[ -d "$SOURCE" ]] || fail "verified bundle removed after a failed rollback"
+grep -q "il bundle precedente è in" "$UPDATES/install.log" || fail "log without the location of the old bundle"
 printf 'PASS: rollback failure keeps the old bundle\n'
+
+# Il bundle da aggiornare è la copia nascosta lasciata da un rollback fallito: non si tocca.
+setup hidden_target
+HIDDEN="$APPS/.mjm.cleaner-old-v0.2.0.app"
+/bin/mv "$TARGET" "$HIDDEN"
+TARGET="$HIDDEN"
+run_install "$(dead_pid)"
+[[ "$(cat "$UPDATES/install-result")" == "failed target" ]] || fail "wrong result: $(cat "$UPDATES/install-result")"
+[[ "$(cat "$HIDDEN/Contents/version")" == vecchio ]] || fail "hidden copy touched"
+[[ "$(ls -A "$APPS")" == ".mjm.cleaner-old-v0.2.0.app" ]] || fail "other files created next to the hidden copy: $(ls -A "$APPS")"
+[[ -d "$SOURCE" ]] || fail "verified bundle removed after failed target"
+[[ ! -s "$MV_CALLS" ]] || fail "something was moved: $(cat "$MV_CALLS")"
+[[ "$(cat "$OPENED")" == "$HIDDEN|failed target" ]] || fail "hidden copy not reopened with the result: $(cat "$OPENED")"
+printf 'PASS: hidden copy never swapped\n'
+
+# Il bundle da aggiornare non esiste: niente da sostituire.
+setup missing_target
+rm -rf "$TARGET"
+run_install "$(dead_pid)"
+[[ "$(cat "$UPDATES/install-result")" == "failed target" ]] || fail "wrong result: $(cat "$UPDATES/install-result")"
+[[ -z "$(ls -A "$APPS")" ]] || fail "files created for a missing target: $(ls -A "$APPS")"
+[[ -d "$SOURCE" ]] || fail "verified bundle removed after failed target"
+printf 'PASS: missing target\n'
 
 # Residui di un tentativo precedente: vengono rimossi prima di installare.
 setup leftovers
@@ -178,4 +202,7 @@ expect_rejected "$pid" "$TARGET" "$SOURCE" "" "$UPDATES" 150
 expect_rejected "$pid" "$TARGET" "$SOURCE" latest "$UPDATES" 150
 expect_rejected abc "$TARGET" "$SOURCE" v0.2.0 "$UPDATES" 150
 expect_rejected "$pid" "$TARGET" "$SOURCE" v0.2.0 "$UPDATES" x
+expect_rejected "$pid" "$TARGET" "$SOURCE" "v1/../../x.0.0" "$UPDATES" 150
+expect_rejected "$pid" "$TARGET" "$SOURCE" "v1.2.3 x" "$UPDATES" 150
+expect_rejected "$pid" "$TARGET" "$SOURCE" v0.2.0 "$UPDATES" 150 extra
 printf 'PASS: invalid arguments rejected\n'

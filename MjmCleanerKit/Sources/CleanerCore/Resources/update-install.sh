@@ -11,6 +11,7 @@ trap '' HUP
 
 [ "$#" -eq 6 ] || exit 2
 case "$4" in v[0-9]*.[0-9]*.[0-9]*) ;; *) exit 2 ;; esac
+case "${4#v}" in *[!0-9.]*) exit 2 ;; esac
 case "$1" in ''|*[!0-9]*) exit 2 ;; esac
 case "$6" in ''|*[!0-9]*) exit 2 ;; esac
 
@@ -52,6 +53,11 @@ while kill -0 "$pid" 2>/dev/null; do
   sleep 0.2
 done
 
+# Mai sostituire una copia di appoggio (dopo un «failed rollback» l'unica copia sta lì) né un
+# percorso che non esiste: `rm -rf "$old"` qui sotto cancellerebbe il bundle in uso.
+case "$(basename -- "$target")" in .mjm.cleaner-update-*|.mjm.cleaner-old-*) finish "failed target" ;; esac
+[ -d "$target" ] || finish "failed target"
+
 rm -rf "$staging" "$old"
 if [ -e "$staging" ] || [ -e "$old" ]; then finish "failed copy"; fi
 if ! ditto "$source" "$staging" >>"$log" 2>&1; then
@@ -67,6 +73,7 @@ if ! mv "$staging" "$target" >>"$log" 2>&1; then
     rm -rf "$staging"
     finish "failed move-new"
   fi
+  note "il bundle precedente è in $old"
   finish "failed rollback"
 fi
 rm -rf "$old" "$updates/$tag"

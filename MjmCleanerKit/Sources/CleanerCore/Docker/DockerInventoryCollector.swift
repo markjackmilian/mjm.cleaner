@@ -5,6 +5,9 @@ public struct DockerInventoryCollector: Sendable {
     private static let json = "{{json .}}"
     private static let composeWorkingDirLabel = "com.docker.compose.project.working_dir"
 
+    /// Versione del server e motore con una sola chiamata `docker info`.
+    static let engineFormat = #"{"ServerVersion":{{json .ServerVersion}},"OperatingSystem":{{json .OperatingSystem}}}"#
+
     private let cli: any DockerCommandRunning
     private let fileSystem: any FileSystem
 
@@ -13,18 +16,18 @@ public struct DockerInventoryCollector: Sendable {
         self.fileSystem = fileSystem
     }
 
-    /// Verifica che il daemon risponda. Restituisce la versione del server.
-    public func checkDaemon() async throws -> String {
-        let output = try await cli.runChecked(["info", "--format", "{{json .ServerVersion}}"])
-        let version = DockerText.trimmed(DockerText.trimmed(output), "\"")
+    /// Verifica che il daemon risponda e riconosce il motore che lo esegue.
+    public func checkDaemon() async throws -> DockerEngine {
+        let info = try DockerJson.parseEngineInfo(try await cli.runChecked(["info", "--format", Self.engineFormat]))
+        let version = DockerText.trimmed(info.serverVersion)
 
         // Senza daemon "docker info" può stampare comunque la parte client e uscire con 0: una
         // versione del server vuota è l'unico segnale affidabile.
-        if version.isEmpty || version == "null" {
+        if version.isEmpty {
             throw DockerUnavailableError(DockerUnavailableError.notRunning)
         }
 
-        return version
+        return DockerEngine(serverVersion: version, operatingSystem: info.operatingSystem)
     }
 
     @concurrent

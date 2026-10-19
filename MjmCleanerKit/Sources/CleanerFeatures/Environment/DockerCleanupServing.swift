@@ -6,7 +6,9 @@ import CleanerCore
 public protocol DockerCleanupServing: Sendable {
     func analyze(_ projectRoots: [String]) async throws -> DockerAnalysis
     func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult
-    func measureDisk() async throws -> DockerDiskUsage
+    /// Il disco virtuale del motore dell'analisi dopo la pulizia; `nil` se quel motore non ne ha
+    /// uno da misurare.
+    func measureDisk(for engine: DockerEngine) async throws -> DockerDiskUsage?
 }
 
 extension DockerCleanupService: DockerCleanupServing {}

@@ -1,0 +1,72 @@
+/// Il contesto attivo della CLI, letto con `docker context inspect`, che non contatta il daemon: a
+/// daemon spento è l'unico modo di dire quale motore l'utente deve avviare.
+public struct DockerContext: Sendable, Equatable {
+    public let name: String
+    public let description: String
+    /// L'endpoint Docker come lo scrive la CLI, per esempio `unix:///Users/x/.orbstack/run/docker.sock`.
+    public let host: String
+
+    public init(name: String, description: String, host: String) {
+        self.name = name
+        self.description = description
+        self.host = host
+    }
+
+    /// Il motore del contesto: decide la descrizione («Docker Desktop», «OrbStack»), poi l'endpoint,
+    /// riconosciuto solo nella forma `unix://` sotto la home. `/var/run/docker.sock` non si risolve:
+    /// è un collegamento che l'ultimo motore installato può riscrivere.
+    public func engineKind(homeDirectory: String) -> DockerEngineKind {
+        let named = DockerEngine.kind(named: description)
+        if named != .other { return named }
+
+        let scheme = "unix://"
+        guard DockerText.hasPrefix(host, scheme) else { return .other }
+        let socket = String(decoding: host.utf8.dropFirst(scheme.utf8.count), as: UTF8.self)
+        let home = PathText.trimmingTrailingSlashes(homeDirectory)
+
+        if PathText.isSameOrUnder(socket, home + "/.docker/run") { return .dockerDesktop }
+        if PathText.isSameOrUnder(socket, home + "/.orbstack/run") { return .orbStack }
+        return .other
+    }
+}
+
+extension DockerUnavailableError {
+    /// Il testo per un daemon che non risponde, con il motore del contesto attivo quando lo si
+    /// conosce; senza contesto, o con un contesto senza nome, il testo generico.
+    public static func notRunningMessage(_ context: DockerContext?, homeDirectory: String) -> String {
+        guard let context, !DockerText.isBlank(context.name) else { return notRunning }
+
+        return switch context.engineKind(homeDirectory: homeDirectory) {
+        case .dockerDesktop:
+            String(localized: "Docker Desktop non è in esecuzione (contesto «\(context.name)»). Avvialo e premi Riprova.", bundle: .module)
+        case .orbStack:
+            String(localized: "OrbStack non è in esecuzione (contesto «\(context.name)»). Avvialo e premi Riprova.", bundle: .module)
+        case .other:
+            String(localized: "Il motore Docker del contesto «\(context.name)» non risponde. Avvialo e premi Riprova.", bundle: .module)
+        }
+    }
+}
+
+/// Legge il contesto attivo. Non lancia: un contesto illeggibile, anche per annullamento, lascia
+/// il testo generico, e il messaggio d'errore non deve diventare a sua volta un errore.
+public struct DockerContextReader: Sendable {
+    private let cli: any DockerCommandRunning
+    private let homeDirectory: String
+
+    public init(cli: any DockerCommandRunning, homeDirectory: String) {
+        self.cli = cli
+        self.homeDirectory = homeDirectory
+    }
+
+    public func activeContext() async -> DockerContext? {
+        do {
+            return try DockerJson.parseContext(try await cli.runChecked(["context", "inspect", "--format", "{{json .}}"]))
+        } catch {
+            return nil
+        }
+    }
+
+    public func notRunningMessage() async -> String {
+        DockerUnavailableError.notRunningMessage(await activeContext(), homeDirectory: homeDirectory)
+    }
+}

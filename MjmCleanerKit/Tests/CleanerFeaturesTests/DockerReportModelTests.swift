@@ -24,14 +24,14 @@ struct DockerReportModelTests {
 
         let model = DockerReportModel(
             environment: try makeEnvironment(), navigation: nil, result: result,
-            diskBefore: disk(4 * Self.gigabyte), diskAfter: disk(4 * Self.gigabyte))
+            engine: dockerDesktop, diskBefore: disk(4 * Self.gigabyte), diskAfter: disk(4 * Self.gigabyte))
 
         #expect(model.freedText == "3 GB recuperati")
         #expect(model.summaryText == "2 voci eliminate · 1 non eliminata")
         #expect(model.dfText == "docker system df: 5 GB → 2 GB")
         #expect(model.diskText == "Docker.raw sul disco: 4 GB → 4 GB")
         #expect(model.purgeHint.hasPrefix("Docker.raw non si è ridotto"))
-        #expect(model.daemonLostText == "Docker si è fermato durante la pulizia: le voci restanti non sono state eliminate.")
+        #expect(model.daemonLostText == "Docker Desktop si è fermato durante la pulizia: le voci restanti non sono state eliminate.")
         #expect(model.deleted == ["immagine nginx:1.27", "volume dati"])
         #expect(model.failed == ["nome-volume — volume is in use"])
         #expect(model.hasFailures)
@@ -42,9 +42,9 @@ struct DockerReportModelTests {
 
         let shrunk = DockerReportModel(
             environment: try makeEnvironment(), navigation: nil, result: result,
-            diskBefore: disk(4 * Self.gigabyte), diskAfter: disk(3 * Self.gigabyte))
+            engine: dockerDesktop, diskBefore: disk(4 * Self.gigabyte), diskAfter: disk(3 * Self.gigabyte))
         let unmeasured = DockerReportModel(
-            environment: try makeEnvironment(), navigation: nil, result: result, diskBefore: nil, diskAfter: disk(nil))
+            environment: try makeEnvironment(), navigation: nil, result: result, engine: dockerDesktop, diskBefore: nil, diskAfter: disk(nil))
 
         #expect(shrunk.summaryText == "1 voce eliminata")
         #expect(shrunk.dfText == "docker system df: misura finale non disponibile.")
@@ -74,7 +74,7 @@ struct DockerReportModelTests {
             environment: try makeEnvironment(history: FakeHistory(events: events), sessionLog: FakeSessionLog(events: events)),
             navigation: navigation,
             result: DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: .empty, daemonLost: false),
-            diskBefore: nil, diskAfter: disk(nil))
+            engine: dockerDesktop, diskBefore: nil, diskAfter: disk(nil))
 
         await model.persistence?.value
 
@@ -90,7 +90,7 @@ struct DockerReportModelTests {
         let model = DockerReportModel(
             environment: try makeEnvironment(history: history), navigation: nil,
             result: DockerCleanResult(report: makeReport(), before: .empty, after: .empty, daemonLost: false),
-            diskBefore: nil, diskAfter: disk(nil))
+            engine: dockerDesktop, diskBefore: nil, diskAfter: disk(nil))
 
         await model.persistence?.value
 
@@ -102,7 +102,7 @@ struct DockerReportModelTests {
         let model = DockerReportModel(
             environment: try makeEnvironment(), navigation: navigation,
             result: DockerCleanResult(report: makeReport(), before: .empty, after: .empty, daemonLost: false),
-            diskBefore: nil, diskAfter: disk(nil))
+            engine: dockerDesktop, diskBefore: nil, diskAfter: disk(nil))
 
         model.analyzeAgain()
         model.close()
@@ -116,14 +116,50 @@ struct DockerReportModelTests {
         let nothingDeleted = DockerReportModel(
             environment: try makeEnvironment(), navigation: nil,
             result: DockerCleanResult(report: makeReport(itemsDeleted: 0), before: .empty, after: .empty, daemonLost: false),
-            diskBefore: disk(4 * Self.gigabyte), diskAfter: disk(4 * Self.gigabyte))
+            engine: dockerDesktop, diskBefore: disk(4 * Self.gigabyte), diskAfter: disk(4 * Self.gigabyte))
         let unmeasuredBefore = DockerReportModel(
             environment: try makeEnvironment(), navigation: nil,
             result: DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: .empty, daemonLost: false),
-            diskBefore: disk(nil), diskAfter: disk(4 * Self.gigabyte))
+            engine: dockerDesktop, diskBefore: disk(nil), diskAfter: disk(4 * Self.gigabyte))
 
         #expect(nothingDeleted.purgeHint == "")
         #expect(unmeasuredBefore.purgeHint == "")
+    }
+
+    @Test(arguments: [
+        (DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack"),
+         "Disco virtuale: OrbStack restituisce lo spazio al Mac automaticamente.",
+         "OrbStack si è fermato durante la pulizia: le voci restanti non sono state eliminate."),
+        (DockerEngine(serverVersion: "29.8.2", operatingSystem: "Ubuntu 24.04"),
+         "Disco virtuale: non misurato per questo motore.",
+         "Docker si è fermato durante la pulizia: le voci restanti non sono state eliminate."),
+    ])
+    func otherEnginesDescribeTheirDiskWithoutMeasures(engine: DockerEngine, diskText: String, daemonLostText: String) throws {
+        let result = DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: nil, daemonLost: true)
+
+        let model = DockerReportModel(
+            environment: try makeEnvironment(), navigation: nil, result: result,
+            engine: engine, diskBefore: nil, diskAfter: nil)
+
+        #expect(model.diskText == diskText)
+        #expect(model.daemonLostText == daemonLostText)
+        #expect(model.purgeHint == "")
+    }
+
+    /// Il Purge è un comando di Docker Desktop: anche con due misure di un disco che non cala, gli
+    /// altri motori non lo suggeriscono.
+    @Test(arguments: [
+        DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack"),
+        DockerEngine(serverVersion: "29.8.2", operatingSystem: "Ubuntu 24.04"),
+    ])
+    func purgeIsSuggestedOnlyForDockerDesktop(engine: DockerEngine) throws {
+        let result = DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: .empty, daemonLost: false)
+
+        let model = DockerReportModel(
+            environment: try makeEnvironment(), navigation: nil, result: result,
+            engine: engine, diskBefore: disk(4 * Self.gigabyte), diskAfter: disk(4 * Self.gigabyte))
+
+        #expect(model.purgeHint == "")
     }
 
     @Test func persistenceWritesTheLogUnderTheSavedIdBeforeRefreshingTheTotal() async throws {
@@ -134,7 +170,7 @@ struct DockerReportModelTests {
             environment: try makeEnvironment(history: FakeHistory(events: events), sessionLog: sessionLog),
             navigation: navigation,
             result: DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: .empty, daemonLost: false),
-            diskBefore: nil, diskAfter: disk(nil))
+            engine: dockerDesktop, diskBefore: nil, diskAfter: disk(nil))
 
         await model.persistence?.value
 
@@ -148,7 +184,7 @@ struct DockerReportModelTests {
         let model = DockerReportModel(
             environment: try makeEnvironment(sessionLog: sessionLog), navigation: nil,
             result: DockerCleanResult(report: makeReport(), before: .empty, after: .empty, daemonLost: false),
-            diskBefore: nil, diskAfter: disk(nil))
+            engine: dockerDesktop, diskBefore: nil, diskAfter: disk(nil))
 
         await model.persistence?.value
 
@@ -168,5 +204,5 @@ private final class SharedEventsNavigation: DockerNavigating {
     func startOver() {}
     func refreshTotal() async throws { events.append("refreshTotal") }
     func showDocker() {}
-    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage) {}
+    func showDockerReport(_ result: DockerCleanResult, engine: DockerEngine, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?) {}
 }

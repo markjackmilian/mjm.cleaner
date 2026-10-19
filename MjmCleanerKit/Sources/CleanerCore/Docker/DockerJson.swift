@@ -82,6 +82,23 @@ public enum DockerJson {
         })
     }
 
+    /// `docker info --format` con l'oggetto di `DockerInventoryCollector.engineFormat`. Campi
+    /// assenti o `null` valgono stringa vuota.
+    public static func parseEngineInfo(_ json: String) throws -> (serverVersion: String, operatingSystem: String) {
+        let root = try parse(json, "docker info")
+        return (string(root, "ServerVersion") ?? "", string(root, "OperatingSystem") ?? "")
+    }
+
+    /// `docker context inspect --format {{json .}}`: nome, descrizione ed endpoint Docker. Campi
+    /// assenti valgono stringa vuota (il contesto `default` non ha descrizione).
+    public static func parseContext(_ json: String) throws -> DockerContext {
+        let root = try parse(json, "docker context inspect")
+        return DockerContext(
+            name: string(root, "Name") ?? "",
+            description: string(child(root, "Metadata"), "Description") ?? "",
+            host: string(child(child(root, "Endpoints"), "docker"), "Host") ?? "")
+    }
+
     /// Un valore per riga: `docker ps -aq`.
     public static func parseLines(_ output: String) -> [String] {
         DockerText.distinct(DockerText.lines(output))

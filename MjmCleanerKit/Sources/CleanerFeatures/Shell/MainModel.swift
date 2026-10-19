@@ -120,9 +120,9 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
     }
 
     /// Come il passo 4: il resoconto salva la pulizia già avvenuta anche se la pagina non cambia.
-    public func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage) {
+    public func showDockerReport(_ result: DockerCleanResult, engine: DockerEngine, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?) {
         let report = DockerReportModel(
-            environment: environment, navigation: self, result: result, diskBefore: diskBefore, diskAfter: diskAfter)
+            environment: environment, navigation: self, result: result, engine: engine, diskBefore: diskBefore, diskAfter: diskAfter)
         guard canNavigateGlobally else { return }
         page = .dockerReport(report)
     }

@@ -24,8 +24,9 @@ public final class DockerReportModel {
         environment: AppEnvironment,
         navigation: (any DockerNavigating)?,
         result: DockerCleanResult,
+        engine: DockerEngine,
         diskBefore: DockerDiskUsage?,
-        diskAfter: DockerDiskUsage
+        diskAfter: DockerDiskUsage?
     ) {
         self.navigation = navigation
         let report = result.report
@@ -53,18 +54,28 @@ public final class DockerReportModel {
             dfText = String(localized: "docker system df: misura finale non disponibile.", bundle: .module)
         }
 
-        if let before = diskBefore?.allocatedBytes, let after = diskAfter.allocatedBytes {
-            diskText = String(localized: "Docker.raw sul disco: \(Formatting.bytes(before)) → \(Formatting.bytes(after))", bundle: .module)
-        } else {
-            diskText = String(localized: "Docker.raw sul disco: non misurabile.", bundle: .module)
+        // Solo Docker Desktop ha un disco misurato (`DiskUsageProbe.measure(for:)`).
+        switch engine.kind {
+        case .dockerDesktop:
+            if let before = diskBefore?.allocatedBytes, let after = diskAfter?.allocatedBytes {
+                diskText = String(localized: "Docker.raw sul disco: \(Formatting.bytes(before)) → \(Formatting.bytes(after))", bundle: .module)
+            } else {
+                diskText = String(localized: "Docker.raw sul disco: non misurabile.", bundle: .module)
+            }
+        case .orbStack:
+            diskText = String(localized: "Disco virtuale: OrbStack restituisce lo spazio al Mac automaticamente.", bundle: .module)
+        case .other:
+            diskText = String(localized: "Disco virtuale: non misurato per questo motore.", bundle: .module)
         }
 
         // Docker Desktop restituisce lo spazio al Mac in modo differito: il disco virtuale può
         // restare grande anche dopo una pulizia riuscita. Purge è l'unico modo per forzarlo, e
-        // cancella TUTTO: lo si suggerisce, mai lo si esegue.
-        if report.itemsDeleted > 0,
+        // cancella TUTTO: lo si suggerisce, mai lo si esegue. È un comando di Docker Desktop: gli
+        // altri motori non lo hanno.
+        if engine.kind == .dockerDesktop,
+           report.itemsDeleted > 0,
            let rawBefore = diskBefore?.allocatedBytes,
-           let rawAfter = diskAfter.allocatedBytes,
+           let rawAfter = diskAfter?.allocatedBytes,
            rawAfter >= rawBefore {
             purgeHint = String(
                 localized: "Docker.raw non si è ridotto: Docker Desktop restituisce lo spazio al Mac con calma. Per recuperarlo subito: Docker Desktop → Troubleshoot → Clean / Purge data. Attenzione: quell'operazione cancella tutte le immagini, i container e i volumi.",
@@ -74,7 +85,7 @@ public final class DockerReportModel {
         }
 
         daemonLostText = result.daemonLost
-            ? String(localized: "Docker si è fermato durante la pulizia: le voci restanti non sono state eliminate.", bundle: .module)
+            ? String(localized: "\(engine.displayName) si è fermato durante la pulizia: le voci restanti non sono state eliminate.", bundle: .module)
             : ""
 
         deleted = report.deletedPaths.map(Self.describe)

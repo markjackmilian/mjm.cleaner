@@ -72,6 +72,12 @@ public struct DenyList: Sendable {
             "\(home)/.aws",
             "\(home)/.kube",
             "\(home)/.docker",
+            // OrbStack: socket, configurazione e chiavi SSH della sua macchina virtuale. Il suo
+            // group container è già coperto da "Library/Group Containers".
+            "\(home)/.orbstack",
+            // OrbStack monta qui, in NFS, i dati del motore (volumi, immagini, container): si
+            // puliscono solo dalla pagina Docker, attraverso la CLI.
+            "\(home)/OrbStack",
             "\(home)/.config",
             "\(home)/.password-store",
             "\(home)/.local",

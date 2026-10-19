@@ -5,7 +5,7 @@ import Observation
 @MainActor
 public protocol DockerNavigating: Navigating {
     func showDocker()
-    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage)
+    func showDockerReport(_ result: DockerCleanResult, engine: DockerEngine, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?)
 }
 
 /// Una risorsa Docker nella schermata di conferma.
@@ -124,6 +124,7 @@ public final class DockerModel {
     @ObservationIgnored private let environment: AppEnvironment
     @ObservationIgnored private weak var navigation: (any DockerNavigating)?
     @ObservationIgnored private var diskBefore: DockerDiskUsage?
+    @ObservationIgnored private var engine: DockerEngine?
     @ObservationIgnored private var deleteTask: Task<DockerCleanResult, any Error>?
 
     public private(set) var isLoading = true
@@ -165,7 +166,8 @@ public final class DockerModel {
     }
 
     public func delete() async {
-        guard canDelete else { return }
+        // `canDelete` richiede un'analisi riuscita, che ha fissato il motore.
+        guard canDelete, let engine else { return }
         isDeleting = true
         deleteErrorText = ""
 
@@ -184,8 +186,8 @@ public final class DockerModel {
             // La misura non eredita l'annullamento di chi ha chiamato `delete()`, come il
             // `CancellationToken.None` del C#: le voci sono già state rimosse e il resoconto va
             // comunque mostrato e salvato.
-            let diskAfter = try await Task { try await docker.measureDisk() }.value
-            navigation?.showDockerReport(result, diskBefore: diskBefore, diskAfter: diskAfter)
+            let diskAfter = try await Task { try await docker.measureDisk(for: engine) }.value
+            navigation?.showDockerReport(result, engine: engine, diskBefore: diskBefore, diskAfter: diskAfter)
         } catch let error as DockerUnavailableError {
             await relay.finish()
             deleteErrorText = error.message
@@ -245,15 +247,16 @@ public final class DockerModel {
 
         do {
             let analysis = try await environment.docker.analyze(environment.expandedProjectRoots())
+            engine = analysis.engine
             diskBefore = analysis.disk
-            serverText = String(localized: "Docker \(analysis.serverVersion) in esecuzione", bundle: .module)
-            diskText = Self.describeDisk(analysis.disk)
+            serverText = Self.describeServer(analysis.engine)
+            diskText = Self.describeDisk(analysis.disk, engine: analysis.engine)
             dfText = Self.describeDf(analysis.snapshot.df)
             groups = DockerConfirmationGroups.build(analysis.candidates).map(DockerGroupNode.init)
             isReady = true
         } catch let error as DockerUnavailableError {
-            // Messaggio già pensato per l'utente: Docker Desktop non viene avviato da qui, è
-            // l'utente a deciderlo.
+            // Messaggio già pensato per l'utente: nessun motore viene avviato da qui, è l'utente a
+            // deciderlo.
             errorText = error.message
         } catch {
             errorText = String(localized: "Analisi di Docker non riuscita: \(FeatureText.message(error))", bundle: .module)
@@ -262,7 +265,28 @@ public final class DockerModel {
         isLoading = false
     }
 
-    static func describeDisk(_ disk: DockerDiskUsage) -> String {
+    static func describeServer(_ engine: DockerEngine) -> String {
+        switch engine.kind {
+        case .dockerDesktop, .orbStack:
+            String(localized: "\(engine.displayName) · Docker \(engine.serverVersion) in esecuzione", bundle: .module)
+        case .other where engine.operatingSystem.isEmpty:
+            String(localized: "Docker \(engine.serverVersion) in esecuzione", bundle: .module)
+        case .other:
+            String(localized: "Docker \(engine.serverVersion) in esecuzione su «\(engine.operatingSystem)»", bundle: .module)
+        }
+    }
+
+    /// Solo Docker Desktop ha un disco misurato (`DiskUsageProbe.measure(for:)`): OrbStack lo riduce
+    /// da solo, per gli altri motori fa fede `docker system df`.
+    static func describeDisk(_ disk: DockerDiskUsage?, engine: DockerEngine) -> String {
+        if engine.kind == .orbStack {
+            return String(
+                localized: "OrbStack restituisce da solo al Mac lo spazio liberato: il suo disco virtuale non viene misurato.",
+                bundle: .module)
+        }
+        guard let disk else {
+            return String(localized: "Disco virtuale di questo motore non misurato: fa fede docker system df.", bundle: .module)
+        }
         guard disk.exists else {
             return String(
                 localized: "Disco virtuale di Docker Desktop non trovato: lo spazio occupato sul Mac non è misurabile.",

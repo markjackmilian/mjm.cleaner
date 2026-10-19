@@ -36,12 +36,22 @@ public struct DiskUsageProbe: Sendable {
         "\(PathText.trimmingTrailingSlashes(homeDirectory))/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
     }
 
+    /// Il disco virtuale del motore che risponde. Si misura solo `Docker.raw` di Docker Desktop:
+    /// OrbStack riduce da solo il suo `data.img.raw`, che sta in un group container protetto da
+    /// macOS (leggerlo chiederebbe all'utente l'accesso ai dati di altre app), e degli altri motori
+    /// non si sa dove sia il disco. `nil`: nessun accesso al filesystem, nessun `du`.
+    @concurrent
+    public func measure(for engine: DockerEngine) async throws -> DockerDiskUsage? {
+        guard engine.kind == .dockerDesktop else { return nil }
+        return try await measure()
+    }
+
     /// Lancia solo `CancellationError`: una misura non disponibile non deve impedire né l'analisi né
     /// la pulizia.
     @concurrent
-    public func measure() async throws -> DockerDiskUsage {
-        // Altre piattaforme, Docker non Desktop (Colima, OrbStack) o un disco spostato altrove: il
-        // file può non esistere, e allora non c'è nulla da misurare.
+    func measure() async throws -> DockerDiskUsage {
+        // Altre piattaforme o un disco spostato altrove: il file può non esistere, e allora non c'è
+        // nulla da misurare.
         guard fileSystem.fileExists(diskImagePath) else {
             return DockerDiskUsage(path: diskImagePath, allocatedBytes: nil, apparentBytes: nil)
         }

@@ -65,7 +65,8 @@ struct DockerCliTests {
             try await cli.run(["info"])
         }
 
-        #expect(error?.message.contains("Docker non è in esecuzione") == true)
+        #expect(error == DockerUnavailableError(DockerUnavailableError.notRunning, reason: .notRunning))
+        #expect(error?.message.contains("Avvia il motore Docker") == true)
     }
 
     @Test func missingBinaryBecomesAReadableException() async {
@@ -76,14 +77,17 @@ struct DockerCliTests {
         }
 
         #expect(error?.message.contains("non è stato trovato") == true)
+        #expect(error?.reason == .notInstalled)
     }
 
     @Test func binaryThatCannotStartBecomesAReadableException() async {
         let cli = DockerCli(runner: FakeRunner { _, _ in throw ProcessLaunchError(executable: "/usr/local/bin/docker", code: ENOENT) }, binaryPath: "/usr/local/bin/docker")
 
-        await #expect(throws: DockerUnavailableError.self) {
+        let error = await #expect(throws: DockerUnavailableError.self) {
             try await cli.run(["info"])
         }
+
+        #expect(error?.reason == .notInstalled)
     }
 
     @Test func checkedRunFailsWithTheDockerErrorText() async {
@@ -106,22 +110,77 @@ struct DockerCliTests {
         #expect(error?.message.contains("tempo") == true)
     }
 
-    @Test func locatorPrefersTheDockerDesktopUserBinary() {
-        let fs = InMemoryFileSystem()
-        fs.addFile("/usr/local/bin/docker")
-        fs.addFile("/Users/tester/.docker/bin/docker")
-
-        #expect(DockerBinaryLocator.find(fs, homeDirectory: "/Users/tester") == "/Users/tester/.docker/bin/docker")
+    @Test func candidatesKeepTheirOrder() {
+        #expect(DockerBinaryLocator.candidates(homeDirectory: "/Users/tester") == [
+            "/Users/tester/.docker/bin/docker",
+            "/Users/tester/.orbstack/bin/docker",
+            "/usr/local/bin/docker",
+            "/opt/homebrew/bin/docker",
+            "/Applications/Docker.app/Contents/Resources/bin/docker",
+            "/Applications/OrbStack.app/Contents/MacOS/xbin/docker",
+        ])
     }
 
-    @Test func locatorFallsBackToTheAppBundle() {
-        let fs = InMemoryFileSystem()
-        fs.addFile("/Applications/Docker.app/Contents/Resources/bin/docker")
-
-        #expect(DockerBinaryLocator.find(fs, homeDirectory: "/Users/tester") == "/Applications/Docker.app/Contents/Resources/bin/docker")
+    @Test(arguments: [
+        (["/usr/local/bin/docker", "/Users/tester/.orbstack/bin/docker", "/Users/tester/.docker/bin/docker"], "/Users/tester/.docker/bin/docker"),
+        (["/usr/local/bin/docker", "/Users/tester/.orbstack/bin/docker"], "/Users/tester/.orbstack/bin/docker"),
+        (["/Applications/OrbStack.app/Contents/MacOS/xbin/docker", "/Applications/Docker.app/Contents/Resources/bin/docker"], "/Applications/Docker.app/Contents/Resources/bin/docker"),
+        (["/Applications/OrbStack.app/Contents/MacOS/xbin/docker"], "/Applications/OrbStack.app/Contents/MacOS/xbin/docker"),
+    ])
+    func locatorTakesTheFirstExecutableCandidate(executables: [String], expected: String) {
+        #expect(DockerBinaryLocator.find(homeDirectory: "/Users/tester", isExecutable: Set(executables).contains) == expected)
     }
 
-    @Test func locatorReturnsNullWhenDockerIsNotInstalled() {
-        #expect(DockerBinaryLocator.find(InMemoryFileSystem(), homeDirectory: "/Users/tester") == nil)
+    @Test func locatorReturnsNilWhenDockerIsNotInstalled() {
+        #expect(DockerBinaryLocator.find(homeDirectory: "/Users/tester", isExecutable: { _ in false }) == nil)
+    }
+
+    /// Solo Swift: conta un file regolare eseguibile, raggiunto seguendo i collegamenti; un
+    /// collegamento orfano non è un binario.
+    @Test func onlyAnExecutableFileReachedThroughItsLinksCounts() throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let binary = try directory.file("bin/docker")
+        #expect(chmod(binary, 0o755) == 0)
+        let plain = try directory.file("bin/plain")
+        let link = try directory.symlink("links/docker", to: binary)
+        let orphan = try directory.symlink("links/orphan", to: directory.path + "/missing/docker")
+        let folder = try directory.directory("folder")
+
+        #expect(DockerBinaryLocator.isExecutableFile(binary))
+        #expect(DockerBinaryLocator.isExecutableFile(link))
+        #expect(!DockerBinaryLocator.isExecutableFile(orphan))
+        #expect(!DockerBinaryLocator.isExecutableFile(plain))
+        #expect(!DockerBinaryLocator.isExecutableFile(folder))
+        #expect(!DockerBinaryLocator.isExecutableFile(directory.path + "/missing/docker"))
+
+        let fifo = directory.path + "/bin/fifo"
+        #expect(mkfifo(fifo, 0o755) == 0)
+        #expect(chmod(fifo, 0o755) == 0)
+        #expect(!DockerBinaryLocator.isExecutableFile(fifo))
+    }
+
+    /// Solo Swift: disinstallare Docker Desktop può lasciare `~/.docker/bin/docker` orfano; con il
+    /// predicato predefinito il locator passa al binario di OrbStack.
+    @Test func locatorSkipsAnOrphanedDockerDesktopLink() throws {
+        let home = try TemporaryDirectory()
+        defer { home.remove() }
+        try home.symlink(".docker/bin/docker", to: "/Applications/Docker.app/Contents/Resources/bin/docker-uninstalled")
+        let orbStack = try home.file(".orbstack/bin/docker")
+        #expect(chmod(orbStack, 0o755) == 0)
+
+        #expect(DockerBinaryLocator.find(homeDirectory: home.path) == orbStack)
+    }
+
+    /// Solo Swift: una cartella dove dovrebbe stare il binario non è un binario; il locator passa a
+    /// quello di OrbStack.
+    @Test func locatorSkipsAFolderWhereTheBinaryShouldBe() throws {
+        let home = try TemporaryDirectory()
+        defer { home.remove() }
+        try home.directory(".docker/bin/docker")
+        let orbStack = try home.file(".orbstack/bin/docker")
+        #expect(chmod(orbStack, 0o755) == 0)
+
+        #expect(DockerBinaryLocator.find(homeDirectory: home.path) == orbStack)
     }
 }

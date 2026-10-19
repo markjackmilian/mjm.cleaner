@@ -3,8 +3,17 @@ import Foundation
 /// Docker non raggiungibile: binario assente, daemon spento, socket chiuso. Il messaggio è già
 /// pensato per l'utente — l'interfaccia lo mostra così com'è. Porting di `DockerUnavailableException`.
 public struct DockerUnavailableError: Error, Equatable, Sendable, LocalizedError {
+    /// Perché Docker non risponde. Solo per «non in esecuzione» ha senso nominare il motore del
+    /// contesto attivo: il motivo non si deduce più dal testo.
+    public enum Reason: Sendable, Equatable {
+        case notInstalled
+        case notRunning
+    }
+
+    /// Testo generico: quando il contesto attivo dice quale motore è, l'analisi lo sostituisce con
+    /// un testo che lo nomina.
     public static var notRunning: String {
-        String(localized: "Docker non è in esecuzione. Avvia Docker Desktop e premi Riprova.", bundle: .module)
+        String(localized: "Docker non è in esecuzione. Avvia il motore Docker (Docker Desktop, OrbStack…) e premi Riprova.", bundle: .module)
     }
 
     public static var notInstalled: String {
@@ -12,9 +21,12 @@ public struct DockerUnavailableError: Error, Equatable, Sendable, LocalizedError
     }
 
     public let message: String
+    public let reason: Reason
 
-    public init(_ message: String) {
+    /// Il motivo predefinito è «non in esecuzione»: solo `DockerCli` lancia «non installato».
+    public init(_ message: String, reason: Reason = .notRunning) {
         self.message = message
+        self.reason = reason
     }
 
     public var errorDescription: String? { message }
@@ -102,14 +114,14 @@ public struct DockerCli: DockerCommandRunning {
 
     public func run(_ arguments: [String], timeout: Duration?) async throws -> ProcessResult {
         guard let binaryPath else {
-            throw DockerUnavailableError(DockerUnavailableError.notInstalled)
+            throw DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled)
         }
 
         let result: ProcessResult
         do {
             result = try await runner.run(binaryPath, arguments, timeout: timeout ?? Self.defaultTimeout, environment: Self.environment(binaryPath))
         } catch is ProcessLaunchError {
-            throw DockerUnavailableError(DockerUnavailableError.notInstalled)
+            throw DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled)
         }
 
         // Il daemon può spegnersi in qualunque momento, anche fra un comando e l'altro di una
@@ -121,9 +133,9 @@ public struct DockerCli: DockerCommandRunning {
         return result
     }
 
-    /// Un'app aperta dal Finder riceve un PATH minimo (/usr/bin:/bin:…): la CLI di Docker Desktop
-    /// cerca accanto a sé i propri helper (credential helper, plugin), quindi la sua cartella va in
-    /// testa.
+    /// Un'app aperta dal Finder riceve un PATH minimo (/usr/bin:/bin:…): la CLI, di Docker Desktop
+    /// come di OrbStack, cerca accanto a sé i propri helper (credential helper, plugin), quindi la
+    /// sua cartella va in testa.
     private static func environment(_ binary: String) -> [String: String] {
         let directory = PathText.parent(binary) ?? "/usr/local/bin"
         let inherited = ProcessInfo.processInfo.environment["PATH"] ?? ""
@@ -133,16 +145,31 @@ public struct DockerCli: DockerCommandRunning {
 }
 
 public enum DockerBinaryLocator {
-    /// Percorsi noti, in ordine: Docker Desktop per l'utente, installazione di sistema, Homebrew,
-    /// bundle dell'app.
-    public static func find(_ fileSystem: any FileSystem, homeDirectory: String) -> String? {
-        let candidates = [
+    /// Percorsi noti, in ordine: Docker Desktop e OrbStack per l'utente, installazione di sistema,
+    /// Homebrew, bundle delle due app. Il binario non sceglie il motore (lo fa il contesto attivo
+    /// della CLI): basta che si avvii.
+    public static func candidates(homeDirectory: String) -> [String] {
+        [
             PathText.join(PathText.join(PathText.join(homeDirectory, ".docker"), "bin"), "docker"),
+            PathText.join(PathText.join(PathText.join(homeDirectory, ".orbstack"), "bin"), "docker"),
             "/usr/local/bin/docker",
             "/opt/homebrew/bin/docker",
             "/Applications/Docker.app/Contents/Resources/bin/docker",
+            "/Applications/OrbStack.app/Contents/MacOS/xbin/docker",
         ]
+    }
 
-        return candidates.first(where: fileSystem.fileExists)
+    /// Il primo candidato che si può eseguire. Disinstallare Docker Desktop può lasciare
+    /// `~/.docker/bin/docker` come collegamento orfano: `FileSystem.fileExists` lo darebbe per
+    /// presente e l'app direbbe «Docker non è installato» anche con OrbStack acceso.
+    public static func find(homeDirectory: String, isExecutable: (String) -> Bool = DockerBinaryLocator.isExecutableFile) -> String? {
+        candidates(homeDirectory: homeDirectory).first(where: isExecutable)
+    }
+
+    /// Un file regolare eseguibile, raggiunto seguendo i collegamenti (`stat`, non `lstat`).
+    public static func isExecutableFile(_ path: String) -> Bool {
+        var status = stat()
+        guard stat(path, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { return false }
+        return access(path, X_OK) == 0
     }
 }

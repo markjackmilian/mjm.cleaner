@@ -140,7 +140,9 @@ struct DemoLaunch: Sendable {
         case .docker, .dockerUnavailable:
             main.select(.docker)
         case .dockerReport:
-            main.showDockerReport(DemoData.dockerResult, diskBefore: DemoData.diskBefore, diskAfter: DemoData.diskAfter)
+            main.showDockerReport(
+                DemoData.dockerResult, engine: DemoData.dockerAnalysis.engine,
+                diskBefore: DemoData.diskBefore, diskAfter: DemoData.diskAfter)
         case .xcode:
             main.select(.xcode)
         case .xcodePreview:

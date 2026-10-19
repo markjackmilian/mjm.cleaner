@@ -113,6 +113,15 @@ in `~/.docker/bin`, `~/.orbstack/bin`, `/usr/local/bin`, `/opt/homebrew/bin`, an
 inside `Docker.app` and `OrbStack.app`; a dangling link left by an uninstalled
 engine is skipped.
 
+The context is read once, when the analysis starts, and every command of the
+analysis and of the cleanup runs with `docker --context <name>` on that context.
+If the active context changes in the meantime (OrbStack, for example, makes its
+own context active when it starts), the cleanup still deletes only on the
+analyzed engine. Before deleting anything, the page checks that the daemon behind
+that context is still the analyzed one (same ID, operating system, and version).
+If it is not, nothing is deleted and the page asks you to analyze again. The
+active context is never changed.
+
 The analysis is read-only and is the dry run. Every resource gets an outcome
 (KEEP / DELETE / PROPOSE / ASK), a reason, and the cost of recreating it:
 

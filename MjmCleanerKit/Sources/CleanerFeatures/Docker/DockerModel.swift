@@ -124,7 +124,8 @@ public final class DockerModel {
     @ObservationIgnored private let environment: AppEnvironment
     @ObservationIgnored private weak var navigation: (any DockerNavigating)?
     @ObservationIgnored private var diskBefore: DockerDiskUsage?
-    @ObservationIgnored private var engine: DockerEngine?
+    /// Il contesto e il motore dell'ultima analisi riuscita: «Elimina» resta lì.
+    @ObservationIgnored private var target: DockerTarget?
     @ObservationIgnored private var deleteTask: Task<DockerCleanResult, any Error>?
 
     public private(set) var isLoading = true
@@ -166,8 +167,9 @@ public final class DockerModel {
     }
 
     public func delete() async {
-        // `canDelete` richiede un'analisi riuscita, che ha fissato il motore.
-        guard canDelete, let engine else { return }
+        // `canDelete` richiede un'analisi riuscita, che ha fissato il bersaglio.
+        guard canDelete, let target else { return }
+        let engine = target.engine
         isDeleting = true
         deleteErrorText = ""
 
@@ -177,7 +179,7 @@ public final class DockerModel {
         }
         let docker = environment.docker
         let report = relay.report
-        let task = Task { try await docker.execute(selected, progress: report) }
+        let task = Task { try await docker.execute(selected, on: target, progress: report) }
         deleteTask = task
 
         do {
@@ -191,6 +193,13 @@ public final class DockerModel {
         } catch let error as DockerUnavailableError {
             await relay.finish()
             deleteErrorText = error.message
+        } catch let error as DockerEngineChangedError {
+            // Non si è cancellato nulla, ma l'analisi non vale più: la pagina torna allo stato
+            // d'errore, dove «Riprova» la rifà sul contesto attivo.
+            await relay.finish()
+            errorText = error.message
+            isReady = false
+            groups = []
         } catch {
             await relay.finish()
             deleteErrorText = String(localized: "Pulizia non riuscita: \(FeatureText.message(error))", bundle: .module)
@@ -247,7 +256,7 @@ public final class DockerModel {
 
         do {
             let analysis = try await environment.docker.analyze(environment.expandedProjectRoots())
-            engine = analysis.engine
+            target = analysis.target
             diskBefore = analysis.disk
             serverText = Self.describeServer(analysis.engine)
             diskText = Self.describeDisk(analysis.disk, engine: analysis.engine)

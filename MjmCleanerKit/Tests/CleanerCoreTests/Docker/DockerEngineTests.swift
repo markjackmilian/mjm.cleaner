@@ -20,4 +20,15 @@ struct DockerEngineTests {
         #expect(engine.operatingSystem == operatingSystem)
         #expect(engine.serverVersion == "29.8.2")
     }
+
+    /// Due daemon con lo stesso sistema e la stessa versione restano diversi se l'ID è diverso:
+    /// l'esecutore confronta il motore intero.
+    @Test func theIdTellsTwoDaemonsOfTheSameKindApart() {
+        let colima = DockerEngine(serverVersion: "29.8.2", operatingSystem: "Ubuntu 24.04", id: "a1")
+
+        #expect(colima.id == "a1")
+        #expect(colima == DockerEngine(serverVersion: "29.8.2", operatingSystem: "Ubuntu 24.04", id: "a1"))
+        #expect(colima != DockerEngine(serverVersion: "29.8.2", operatingSystem: "Ubuntu 24.04", id: "b2"))
+        #expect(DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack").id == "")
+    }
 }

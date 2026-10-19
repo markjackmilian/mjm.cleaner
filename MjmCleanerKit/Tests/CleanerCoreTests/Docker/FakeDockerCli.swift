@@ -70,9 +70,11 @@ final class FakeDockerCli: DockerCommandRunning {
     /// La riga di `docker info` con cui `DockerInventoryCollector.checkDaemon` riconosce il motore.
     static let infoCommand = "info --format " + DockerInventoryCollector.engineFormat
 
-    /// La risposta di `docker info` di un daemon `version` che si presenta come `operatingSystem`.
-    static func info(_ version: String, _ operatingSystem: String = "Docker Desktop") -> String {
-        #"{"ServerVersion":"\#(version)","OperatingSystem":"\#(operatingSystem)"}"# + "\n"
+    /// La risposta di `docker info` di un daemon `version` che si presenta come `operatingSystem`;
+    /// con `id`, anche l'`ID` del daemon.
+    static func info(_ version: String, _ operatingSystem: String = "Docker Desktop", id: String? = nil) -> String {
+        let idField = id.map { #","ID":"\#($0)""# } ?? ""
+        return #"{"ServerVersion":"\#(version)","OperatingSystem":"\#(operatingSystem)"\#(idField)}"# + "\n"
     }
 
     /// Una CLI che risponde con l'intero caso reale delle fixture.

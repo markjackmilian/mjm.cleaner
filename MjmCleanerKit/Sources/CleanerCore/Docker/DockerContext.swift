@@ -31,8 +31,8 @@ public struct DockerContext: Sendable, Equatable {
 }
 
 extension DockerUnavailableError {
-    /// Il testo per un daemon che non risponde, con il motore del contesto attivo quando lo si
-    /// conosce; senza contesto, o con un contesto senza nome, il testo generico.
+    /// Il testo per un daemon che non risponde, con il motore del contesto analizzato quando lo si
+    /// riconosce; senza contesto, o con un contesto senza nome, il testo generico.
     public static func notRunningMessage(_ context: DockerContext?, homeDirectory: String) -> String {
         guard let context, !DockerText.isBlank(context.name) else { return notRunning }
 
@@ -47,8 +47,8 @@ extension DockerUnavailableError {
     }
 }
 
-/// Legge il contesto attivo. Non lancia: un contesto illeggibile, anche per annullamento, lascia
-/// il testo generico, e il messaggio d'errore non deve diventare a sua volta un errore.
+/// Legge il contesto attivo, a cui l'analisi resta fissata, e nomina il motore di un contesto
+/// già letto quando il suo daemon non risponde.
 public struct DockerContextReader: Sendable {
     private let cli: any DockerCommandRunning
     private let homeDirectory: String
@@ -58,15 +58,37 @@ public struct DockerContextReader: Sendable {
         self.homeDirectory = homeDirectory
     }
 
-    public func activeContext() async -> DockerContext? {
-        do {
-            return try DockerJson.parseContext(try await cli.runChecked(["context", "inspect", "--format", "{{json .}}"]))
-        } catch {
-            return nil
-        }
+    /// Lancia: senza un contesto non si può fissare l'analisi. «Non installato» risale com'è.
+    public func activeContext() async throws -> DockerContext {
+        try DockerJson.parseContext(try await cli.runChecked(["context", "inspect", "--format", "{{json .}}"]))
     }
 
-    public func notRunningMessage() async -> String {
-        DockerUnavailableError.notRunningMessage(await activeContext(), homeDirectory: homeDirectory)
+    /// Il testo per un daemon che non risponde, per il contesto su cui si lavora: non quello attivo
+    /// in quel momento, che può essere già un altro.
+    public func notRunningMessage(for context: DockerContext) -> String {
+        DockerUnavailableError.notRunningMessage(context, homeDirectory: homeDirectory)
+    }
+}
+
+/// Ogni comando va al daemon del contesto `name`, qualunque sia il contesto attivo. `--context`
+/// vale per il singolo comando e non cambia il contesto dell'utente: analisi ed esecuzione restano
+/// così sul motore analizzato anche se nel frattempo il contesto attivo cambia (OrbStack lo
+/// reimposta quando si avvia).
+struct DockerContextCli: DockerCommandRunning {
+    private let base: any DockerCommandRunning
+    private let name: String
+
+    /// Lancia per un nome fuori dalla forma `[A-Za-z0-9][A-Za-z0-9_.+-]*`: vuoto, con spazi, segni
+    /// o lettere non ASCII, oppure che comincia con «-» e verrebbe letto come un'opzione.
+    init(_ base: any DockerCommandRunning, context name: String) throws {
+        guard name.firstMatch(of: /^[A-Za-z0-9][A-Za-z0-9_.+\-]*$/.matchingSemantics(.unicodeScalar)) != nil else {
+            throw DockerOutputError(String(localized: "Nome del contesto Docker non valido: «\(name)».", bundle: .module))
+        }
+        self.base = base
+        self.name = name
+    }
+
+    func run(_ arguments: [String], timeout: Duration?) async throws -> ProcessResult {
+        try await base.run(["--context", name] + arguments, timeout: timeout)
     }
 }

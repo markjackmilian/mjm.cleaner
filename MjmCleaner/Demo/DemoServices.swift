@@ -108,7 +108,7 @@ private struct DemoDocker: DockerCleanupServing {
         return DemoData.dockerAnalysis
     }
 
-    func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
+    func execute(_ selected: [DockerCandidate], on target: DockerTarget, progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
         DemoData.dockerResult
     }
 

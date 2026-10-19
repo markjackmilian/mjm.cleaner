@@ -31,9 +31,23 @@ public struct DockerCleanResult: Sendable, Equatable {
     }
 }
 
+/// Il daemon del contesto analizzato non è più quello dell'analisi: non si è eliminato nulla.
+public struct DockerEngineChangedError: Error, Equatable, Sendable, LocalizedError {
+    public let message: String
+
+    public init(context: String) {
+        message = String(
+            localized: "Il motore Docker del contesto «\(context)» non è più quello analizzato: non è stato eliminato nulla. Premi Riprova per analizzarlo di nuovo.",
+            bundle: .module)
+    }
+
+    public var errorDescription: String? { message }
+}
+
 /// Esegue le sole cancellazioni confermate. Ogni garanzia di sicurezza è verificata qui, sul
 /// singolo elemento, anche se l'interfaccia l'ha già applicata: la selezione arriva dall'interfaccia
 /// e non va fidata, come in `CleanEngine`.
+/// - ogni comando va al contesto dell'analisi, e solo se lì risponde ancora lo stesso daemon;
 /// - immagini solo per ID completo (`docker rmi sha256:…`), mai per tag;
 /// - mai `-f`/`--force`, mai `docker system prune`;
 /// - le voci KEEP non arrivano mai a un comando.
@@ -51,16 +65,27 @@ public struct DockerCleanExecutor: Sendable {
         self.clock = clock
     }
 
-    /// Lancia solo se la misura iniziale fallisce (nulla è stato cancellato) o per un errore fuori
-    /// contratto della CLI, come il C#. L'annullamento ferma la pulizia fra un elemento e l'altro e
-    /// restituisce il resoconto parziale.
+    /// Lancia prima di cancellare qualunque cosa se il nome del contesto non è valido, se lì
+    /// risponde un daemon diverso da quello dell'analisi (`DockerEngineChangedError`), se non
+    /// risponde nessun daemon (`DockerUnavailableError`) o se la misura iniziale fallisce; poi solo
+    /// per un errore fuori contratto della CLI, come il C#. L'annullamento ferma la pulizia fra un
+    /// elemento e l'altro e restituisce il resoconto parziale.
     @concurrent
     public func execute(
         _ selected: [DockerCandidate],
+        on target: DockerTarget,
         progress: (@Sendable (CleanProgress) -> Void)?
     ) async throws -> DockerCleanResult {
         let startedAt = clock.now
         let start = ContinuousClock.now
+
+        // Ogni comando va al contesto dell'analisi, anche se nel frattempo il contesto attivo è
+        // cambiato. Prima di cancellare, lì deve rispondere lo stesso daemon: `default` segue
+        // `/var/run/docker.sock`, che il motore avviato per ultimo riscrive.
+        let cli = try DockerContextCli(self.cli, context: target.context.name)
+        guard try await DockerInventoryCollector.readEngine(cli) == target.engine else {
+            throw DockerEngineChangedError(context: target.context.name)
+        }
 
         // Senza la misura iniziale non si può dire quanto si è recuperato: se il daemon non
         // risponde nemmeno a questa, non si è cancellato nulla e l'errore risale all'interfaccia.
@@ -96,7 +121,7 @@ public struct DockerCleanExecutor: Sendable {
             } else {
                 let result: ProcessResult
                 do {
-                    result = try await shielded(Self.command(candidate))
+                    result = try await Self.shielded(cli, Self.command(candidate))
                 } catch let error as DockerUnavailableError {
                     daemonLost = true
                     handled.insert(entry.offset)
@@ -152,7 +177,7 @@ public struct DockerCleanExecutor: Sendable {
             }
         }
 
-        let after = daemonLost ? nil : try await tryReadDf()
+        let after = daemonLost ? nil : try await Self.tryReadDf(cli)
 
         let categories = deletedByCategory.map { entry in
             CategoryCleanResult(
@@ -177,13 +202,11 @@ public struct DockerCleanExecutor: Sendable {
     /// Come `CancellationToken.None` nel C#: un comando avviato non viene interrotto dall'annullamento
     /// del chiamante (si fermerebbe a metà una cancellazione che il daemon porta comunque a termine).
     /// Un task non strutturato non eredita l'annullamento del task che ne attende il risultato.
-    private func shielded(_ arguments: [String]) async throws -> ProcessResult {
-        let cli = self.cli
-        return try await Task { try await cli.run(arguments, timeout: Self.deleteTimeout) }.value
+    private static func shielded(_ cli: any DockerCommandRunning, _ arguments: [String]) async throws -> ProcessResult {
+        try await Task { try await cli.run(arguments, timeout: deleteTimeout) }.value
     }
 
-    private func tryReadDf() async throws -> DockerDfSummary? {
-        let cli = self.cli
+    private static func tryReadDf(_ cli: any DockerCommandRunning) async throws -> DockerDfSummary? {
         do {
             return try await Task { try await DockerInventoryCollector.readDf(cli) }.value
         } catch is DockerUnavailableError {

@@ -1,16 +1,36 @@
-/// `engine`: il motore che ha risposto. `disk`: il suo disco virtuale, `nil` per un motore che non
-/// ne ha uno da misurare (`DiskUsageProbe.measure(for:)`).
+/// Il motore su cui si è fatta l'analisi: il contesto letto al suo inizio e il daemon che ha
+/// risposto lì. L'esecuzione resta su quel contesto e rifiuta un daemon diverso.
+public struct DockerTarget: Sendable, Equatable {
+    public let context: DockerContext
+    public let engine: DockerEngine
+
+    public init(context: DockerContext, engine: DockerEngine) {
+        self.context = context
+        self.engine = engine
+    }
+}
+
+/// `engine`: il motore che ha risposto. `context`: il contesto a cui l'analisi è rimasta fissata.
+/// `disk`: il disco virtuale del motore, `nil` per un motore che non ne ha uno da misurare
+/// (`DiskUsageProbe.measure(for:)`).
 public struct DockerAnalysis: Sendable, Equatable {
     public let engine: DockerEngine
+    public let context: DockerContext
     public let snapshot: DockerSnapshot
     public let candidates: [DockerCandidate]
     public let disk: DockerDiskUsage?
 
-    public init(engine: DockerEngine, snapshot: DockerSnapshot, candidates: [DockerCandidate], disk: DockerDiskUsage?) {
+    public init(engine: DockerEngine, context: DockerContext, snapshot: DockerSnapshot, candidates: [DockerCandidate], disk: DockerDiskUsage?) {
         self.engine = engine
+        self.context = context
         self.snapshot = snapshot
         self.candidates = candidates
         self.disk = disk
+    }
+
+    /// Il bersaglio da consegnare all'esecuzione.
+    public var target: DockerTarget {
+        DockerTarget(context: context, engine: engine)
     }
 }
 
@@ -36,19 +56,35 @@ public struct DockerCleanupService: Sendable {
         self.contexts = contexts
     }
 
-    /// Un daemon che non risponde diventa un errore che nomina il motore del contesto attivo:
-    /// l'utente sa quale avviare. «Non installato» resta com'è.
+    /// L'analisi resta sul contesto attivo al suo inizio: ogni comando porta `--context`, e un
+    /// cambio di contesto a metà non mescola due motori. «Non installato» e un contesto illeggibile
+    /// risalgono così come sono; un daemon che non risponde diventa un errore che nomina il motore
+    /// di quel contesto: l'utente sa quale avviare.
     @concurrent
     public func analyze(_ projectRoots: [String]) async throws -> DockerAnalysis {
+        let context = try await contexts.activeContext()
+        let pinned = try collector.pinned(to: context.name)
+
         do {
-            return try await analyzeRunningDaemon(projectRoots)
+            return try await analyzeRunningDaemon(projectRoots, pinned, context)
         } catch let error as DockerUnavailableError where error.reason == .notRunning {
-            throw DockerUnavailableError(await contexts.notRunningMessage())
+            throw DockerUnavailableError(contexts.notRunningMessage(for: context))
         }
     }
 
-    public func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
-        try await executor.execute(selected, progress: progress)
+    /// L'esecuzione resta sul bersaglio dell'analisi. Un daemon che non risponde prima di ogni
+    /// cancellazione (quello perso a metà finisce nel resoconto) diventa l'errore che nomina il
+    /// motore del contesto analizzato, anche se il contesto attivo ora è un altro.
+    public func execute(
+        _ selected: [DockerCandidate],
+        on target: DockerTarget,
+        progress: (@Sendable (CleanProgress) -> Void)?
+    ) async throws -> DockerCleanResult {
+        do {
+            return try await executor.execute(selected, on: target, progress: progress)
+        } catch let error as DockerUnavailableError where error.reason == .notRunning {
+            throw DockerUnavailableError(contexts.notRunningMessage(for: target.context))
+        }
     }
 
     /// Il disco del motore dell'analisi dopo la pulizia; `nil` se quel motore non ne ha uno da misurare.
@@ -60,15 +96,20 @@ public struct DockerCleanupService: Sendable {
     /// seconda attraversa il disco mentre la prima attende la CLI. Le attività figlie di `async let`
     /// girano sull'executor globale, mai su quello del chiamante (`Task.Run` nel C#).
     @concurrent
-    private func analyzeRunningDaemon(_ projectRoots: [String]) async throws -> DockerAnalysis {
-        let engine = try await collector.checkDaemon()
+    private func analyzeRunningDaemon(
+        _ projectRoots: [String],
+        _ pinned: DockerInventoryCollector,
+        _ context: DockerContext
+    ) async throws -> DockerAnalysis {
+        let engine = try await pinned.checkDaemon()
 
         async let references = scanner.scan(projectRoots)
         async let usage = disk.measure(for: engine)
-        let snapshot = try await collector.collect()
+        let snapshot = try await pinned.collect()
 
         return DockerAnalysis(
             engine: engine,
+            context: context,
             snapshot: snapshot,
             candidates: try DockerClassifier.classify(snapshot, try await references),
             disk: try await usage)

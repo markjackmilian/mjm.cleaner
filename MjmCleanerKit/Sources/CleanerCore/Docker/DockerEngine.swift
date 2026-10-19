@@ -1,7 +1,7 @@
 /// Il motore che risponde dietro la CLI `docker`, riconosciuto dall'`OperatingSystem` del daemon
 /// («Docker Desktop», «OrbStack»; Colima, per esempio, riporta la distribuzione della sua macchina
-/// virtuale). Quale motore si pulisce lo decide il contesto attivo della CLI: qui lo si riconosce
-/// soltanto, per i testi e per il disco virtuale.
+/// virtuale). Quale motore si pulisce lo decide il contesto attivo all'inizio dell'analisi: qui lo
+/// si riconosce, per i testi e per il disco virtuale, e se ne conserva l'identità.
 public enum DockerEngineKind: Sendable, Equatable {
     case dockerDesktop
     case orbStack
@@ -15,12 +15,17 @@ public struct DockerEngine: Sendable, Equatable {
     /// L'`OperatingSystem` del daemon così com'è; può essere vuoto.
     public let operatingSystem: String
     public let serverVersion: String
+    /// L'`ID` del daemon, persistente per `dockerd`: distingue due daemon dello stesso tipo dietro
+    /// lo stesso contesto (`default` segue `/var/run/docker.sock`, che il motore avviato per ultimo
+    /// riscrive). Vuoto se il daemon non lo riporta.
+    public let id: String
 
-    public init(serverVersion: String, operatingSystem: String) {
+    public init(serverVersion: String, operatingSystem: String, id: String = "") {
         let kind = Self.kind(named: operatingSystem)
         self.kind = kind
         self.serverVersion = serverVersion
         self.operatingSystem = operatingSystem
+        self.id = id
         displayName = switch kind {
         case .dockerDesktop: "Docker Desktop"
         case .orbStack: "OrbStack"

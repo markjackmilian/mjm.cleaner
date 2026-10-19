@@ -116,6 +116,7 @@ struct UpdateDownloaderTests {
         let downloader = UpdateDownloader(http: FakeHTTP(payload: Self.payload), updatesDirectory: temp.path)
         let downloaded = try await downloader.download(try Self.release()) { _ in }
         #expect(downloader.cached(newerThan: AppVersion(major: 0, minor: 1, patch: 0)) == downloaded)
+        #expect(try UpdateDownloader.sha256(of: downloaded.zipPath) == Self.payloadDigest)
     }
 
     @Test func cachedDropsReleasesThatAreNoLongerNewer() async throws {
@@ -150,5 +151,39 @@ struct UpdateDownloaderTests {
         let temp = try TemporaryDirectory()
         defer { temp.remove() }
         #expect(UpdateDownloader(http: FakeHTTP(), updatesDirectory: temp.path + "/manca").cached(newerThan: AppVersion(major: 0, minor: 1, patch: 0)) == nil)
+    }
+
+    @Test func cachedRejectsAnAssetNameOutsideItsTag() async throws {
+        let temp = try TemporaryDirectory()
+        defer { temp.remove() }
+        let downloader = UpdateDownloader(http: FakeHTTP(payload: Self.payload), updatesDirectory: temp.path)
+        let downloaded = try await downloader.download(try Self.release()) { _ in }
+        let renamed = AvailableRelease(
+            version: try #require(AppVersion("v0.2.0")),
+            pageURL: downloaded.release.pageURL,
+            assetName: "altro.zip",
+            assetURL: downloaded.release.assetURL,
+            size: downloaded.release.size,
+            sha256: downloaded.release.sha256)
+        try JSONEncoder().encode(renamed).write(to: URL(fileURLWithPath: downloaded.directory + "/release.json"))
+        try Self.payload.write(to: URL(fileURLWithPath: downloaded.directory + "/altro.zip"))
+        #expect(downloader.cached(newerThan: AppVersion(major: 0, minor: 1, patch: 0)) == nil)
+    }
+
+    @Test func cachedRejectsAReleaseFileWhoseTagDiffersFromItsFolder() throws {
+        let temp = try TemporaryDirectory()
+        defer { temp.remove() }
+        let name = AvailableRelease.assetName(for: "v0.3.0")
+        try temp.file("v0.3.0/\(name)", contents: "contenuto dello zip")
+        let base = try Self.release()
+        let mismatched = AvailableRelease(
+            version: try #require(AppVersion("v0.2.0")),
+            pageURL: base.pageURL,
+            assetName: name,
+            assetURL: base.assetURL,
+            size: base.size,
+            sha256: Self.payloadDigest)
+        try JSONEncoder().encode(mismatched).write(to: URL(fileURLWithPath: temp.path + "/v0.3.0/release.json"))
+        #expect(UpdateDownloader(http: FakeHTTP(), updatesDirectory: temp.path).cached(newerThan: AppVersion(major: 0, minor: 1, patch: 0)) == nil)
     }
 }

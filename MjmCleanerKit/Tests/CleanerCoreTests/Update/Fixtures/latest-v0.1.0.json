@@ -1,0 +1,32 @@
+{
+  "url": "https://api.github.com/repos/markjackmilian/mjm.cleaner/releases/416658184",
+  "html_url": "https://github.com/markjackmilian/mjm.cleaner/releases/tag/v0.1.0",
+  "id": 416658184,
+  "tag_name": "v0.1.0",
+  "target_commitish": "main",
+  "name": "v0.1.0",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-18T19:27:15Z",
+  "published_at": "2026-10-18T19:34:02Z",
+  "assets": [
+    {
+      "url": "https://api.github.com/repos/markjackmilian/mjm.cleaner/releases/assets/654300809",
+      "id": 654300809,
+      "node_id": "RA_kwDOUcI_H84m_9aJ",
+      "name": "mjm.cleaner-v0.1.0-macos-universal.zip",
+      "label": "",
+      "content_type": "application/zip",
+      "state": "uploaded",
+      "size": 3188840,
+      "digest": "sha256:6c1dfc5c886b1cbc8a0849770fe66c4da07247f1e82094aeaa29cddf48154d07",
+      "download_count": 1,
+      "created_at": "2026-10-18T19:34:01Z",
+      "updated_at": "2026-10-18T19:34:01Z",
+      "browser_download_url": "https://github.com/markjackmilian/mjm.cleaner/releases/download/v0.1.0/mjm.cleaner-v0.1.0-macos-universal.zip"
+    }
+  ],
+  "tarball_url": "https://api.github.com/repos/markjackmilian/mjm.cleaner/tarball/v0.1.0",
+  "zipball_url": "https://api.github.com/repos/markjackmilian/mjm.cleaner/zipball/v0.1.0",
+  "body": "**Full Changelog**: https://github.com/markjackmilian/mjm.cleaner/compare/v0.0.4...v0.1.0"
+}

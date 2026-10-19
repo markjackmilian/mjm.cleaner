@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-19-docker-engines-design.md`
 
-Stato di partenza: `main` a `6fecad9` più il commit di questo piano (nessun push). `(cd MjmCleanerKit && swift test -Xswiftc -warnings-as-errors)` dà **536** test in 48 suite (`CleanerCoreTests`) e **173** in 21 (`CleanerFeaturesTests`). Il controller crea il branch `feat/docker-engines` da `main` prima del Task 1.
+Stato di partenza: `main` con questo piano (nessun push). Il codice è quello di `6fecad9`: fra la spec e il piano `3fb55de` aggiunge solo la spec della localizzazione. `(cd MjmCleanerKit && swift test -Xswiftc -warnings-as-errors)` dà **536** test in 48 suite (`CleanerCoreTests`) e **173** in 21 (`CleanerFeaturesTests`). Il controller crea il branch `feat/docker-engines` da `main` prima del Task 1.
 
 Decisioni dell'utente (2026-10-19, nella spec):
 
@@ -29,6 +29,7 @@ Decisioni prese durante la stesura, verificate rieseguendo il piano in una copia
 - **`DockerBinaryLocator.find` riceve un predicato** `isExecutable` invece del `FileSystem`. Il predicato predefinito, `isExecutableFile`, usa `stat` (segue i collegamenti) più `access(X_OK)`. Il filesystem in memoria dei test non ha collegamenti: il caso del collegamento orfano si prova sul disco vero.
 - **Due task per Features.** Il Task 4 porta il motore alla pagina e rende opzionale `diskAfter`, senza cambiare i testi del resoconto. Il Task 5 aggiunge il motore al resoconto. Ogni task lascia verdi package e app.
 - **Stringhe.** Le nuove stringhe sono in italiano con `String(localized:bundle: .module)`, come le esistenti. I `Localizable.xcstrings` non si toccano: `String(localized:)` ricade sulla chiave, e in `main` i cataloghi sono modificati da Xcode e non vanno in stage.
+- **Localizzazione.** La spec `docs/superpowers/specs/2026-10-19-localization-design.md` porta i cataloghi all'inglese come lingua sorgente e rifà i conteggi delle stringhe sul codice quando si scrive il suo piano. Questo piano va eseguito **prima** di quello della localizzazione, così le sue stringhe entrano nel conteggio. Se la localizzazione arriva prima, le stringhe nuove di questo piano vanno convertite secondo quella spec, prima dell'esecuzione.
 
 ## Global Constraints
 

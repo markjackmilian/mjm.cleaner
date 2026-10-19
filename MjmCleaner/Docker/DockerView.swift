@@ -14,7 +14,7 @@ struct DockerView: View {
             .toolbar {
                 if model.hasError {
                     ToolbarItem(placement: .primaryAction) {
-                        Label("Motore non raggiungibile", systemImage: "circle.fill")
+                        Label(model.errorBadgeText, systemImage: "circle.fill")
                             .labelStyle(StatusPillLabelStyle())
                     }
                 }
@@ -182,7 +182,7 @@ private struct DockerRowView: View {
     }
 }
 
-/// La pill di stato della toolbar («Motore non raggiungibile»): pallino grigio e testo.
+/// La pill di stato della toolbar (la causa dell'errore, da `errorBadgeText`): pallino grigio e testo.
 struct StatusPillLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 6) {

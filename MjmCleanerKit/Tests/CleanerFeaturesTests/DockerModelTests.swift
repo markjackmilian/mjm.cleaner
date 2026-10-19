@@ -180,6 +180,20 @@ struct DockerModelTests {
         #expect(model.errorText == "Analisi di Docker non riuscita: JSON non valido")
     }
 
+    /// L'etichetta di stato della pagina d'errore dice perché non c'è un'analisi da mostrare.
+    @Test(arguments: [
+        (DockerUnavailableError(DockerUnavailableError.notRunning) as any Error, "Motore non raggiungibile"),
+        (DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled) as any Error, "Motore non raggiungibile"),
+        (UnexpectedTestError(description: "JSON non valido") as any Error, "Analisi non riuscita"),
+    ])
+    func theErrorBadgeNamesWhyThereIsNoAnalysis(error: any Error, badge: String) async throws {
+        let docker = FakeDocker()
+        docker.enqueue(.failure(error))
+        let model = try await opened(docker: docker)
+
+        #expect(model.errorBadgeText == badge)
+    }
+
     @Test func deleteExecutesTheSelectionAndShowsTheReport() async throws {
         let docker = FakeDocker()
         let result = DockerCleanResult(report: makeReport(itemsDeleted: 1), before: .empty, after: nil, daemonLost: false)
@@ -232,6 +246,7 @@ struct DockerModelTests {
 
         #expect(model.errorText == "Il motore Docker del contesto «desktop-linux» non è più quello analizzato: non è stato eliminato nulla. Premi Riprova per analizzarlo di nuovo.")
         #expect(model.hasError)
+        #expect(model.errorBadgeText == "Motore cambiato")
         #expect(!model.isReady)
         #expect(model.groups.isEmpty)
         #expect(!model.canDelete)
@@ -245,6 +260,7 @@ struct DockerModelTests {
         #expect(docker.analyzedRoots.count == 2)
         #expect(model.isReady)
         #expect(!model.hasError)
+        #expect(model.errorBadgeText == "")
         #expect(!model.groups.isEmpty)
     }
 

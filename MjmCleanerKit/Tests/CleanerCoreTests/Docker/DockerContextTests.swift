@@ -51,4 +51,18 @@ struct DockerContextTests {
     func notRunningMessageNamesTheEngineOfTheContext(context: DockerContext?, expected: String) {
         #expect(DockerUnavailableError.notRunningMessage(context, homeDirectory: Self.home) == expected)
     }
+
+    /// All'avvio di «Elimina» l'analisi resta valida: avviato il motore, basta premere di nuovo
+    /// «Elimina». Nello stato pronto della pagina «Riprova» non c'è.
+    @Test(arguments: [
+        (DockerContext(name: "desktop-linux", description: "Docker Desktop", host: "unix:///Users/tester/.docker/run/docker.sock"),
+         "Docker Desktop non è in esecuzione (contesto «desktop-linux»). Avvialo e premi di nuovo «Elimina»."),
+        (DockerContext(name: "orbstack", description: "", host: "unix:///Users/tester/.orbstack/run/docker.sock"),
+         "OrbStack non è in esecuzione (contesto «orbstack»). Avvialo e premi di nuovo «Elimina»."),
+        (DockerContext(name: "default", description: "", host: "unix:///var/run/docker.sock"),
+         "Il motore Docker del contesto «default» non risponde. Avvialo e premi di nuovo «Elimina»."),
+    ])
+    func theDeletionMessageAsksToPressDeleteAgain(context: DockerContext, expected: String) {
+        #expect(DockerUnavailableError.notRunningForDeletionMessage(context, homeDirectory: Self.home) == expected)
+    }
 }

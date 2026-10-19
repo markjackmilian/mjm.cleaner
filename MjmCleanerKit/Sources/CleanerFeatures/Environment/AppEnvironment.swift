@@ -81,7 +81,8 @@ public struct AppEnvironment: Sendable {
             collector: DockerInventoryCollector(cli: dockerCli, fileSystem: fileSystem),
             scanner: ProjectReferenceScanner(fileSystem: fileSystem),
             disk: DiskUsageProbe(runner: processes, fileSystem: fileSystem, diskImagePath: DiskUsageProbe.defaultPath(home)),
-            executor: DockerCleanExecutor(cli: dockerCli, clock: clock))
+            executor: DockerCleanExecutor(cli: dockerCli, clock: clock),
+            contexts: DockerContextReader(cli: dockerCli, homeDirectory: home))
 
         // L'esecutore Xcode usa lo stesso collettore e lo stesso PathGuard della scansione
         // (AppServices.cs): ciò che rivalida prima di eliminare è ciò che l'analisi ha mostrato.

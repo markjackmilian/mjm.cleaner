@@ -89,6 +89,16 @@ public enum DockerJson {
         return (string(root, "ServerVersion") ?? "", string(root, "OperatingSystem") ?? "")
     }
 
+    /// `docker context inspect --format {{json .}}`: nome, descrizione ed endpoint Docker. Campi
+    /// assenti valgono stringa vuota (il contesto `default` non ha descrizione).
+    public static func parseContext(_ json: String) throws -> DockerContext {
+        let root = try parse(json, "docker context inspect")
+        return DockerContext(
+            name: string(root, "Name") ?? "",
+            description: string(child(root, "Metadata"), "Description") ?? "",
+            host: string(child(child(root, "Endpoints"), "docker"), "Host") ?? "")
+    }
+
     /// Un valore per riga: `docker ps -aq`.
     public static func parseLines(_ output: String) -> [String] {
         DockerText.distinct(DockerText.lines(output))

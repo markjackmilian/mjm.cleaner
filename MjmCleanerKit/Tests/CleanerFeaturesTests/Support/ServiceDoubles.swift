@@ -255,6 +255,7 @@ final class FakeDocker: DockerCleanupServing {
         var disk = DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil)
         var analyzedRoots: [[String]] = []
         var executed: [[DockerCandidate]] = []
+        var holdsExecution = false
     }
 
     private let state = Mutex(State())
@@ -264,6 +265,12 @@ final class FakeDocker: DockerCleanupServing {
 
     func enqueue(_ analysis: Result<DockerAnalysis, any Error>) { state.withLock { $0.analyses.append(analysis) } }
     func respond(with result: Result<DockerCleanResult, any Error>) { state.withLock { $0.executeResult = result } }
+
+    /// Con `holdExecution()` l'esecuzione apre `executionStarted` e resta sospesa finché il test non
+    /// apre `executionReleased` (al massimo 5 secondi).
+    let executionStarted = Gate<Void>()
+    let executionReleased = Gate<Void>()
+    func holdExecution() { state.withLock { $0.holdsExecution = true } }
     func setDiskAfter(_ disk: DockerDiskUsage) { state.withLock { $0.disk = disk } }
 
     func analyze(_ projectRoots: [String]) async throws -> DockerAnalysis {
@@ -276,10 +283,12 @@ final class FakeDocker: DockerCleanupServing {
     }
 
     func execute(_ selected: [DockerCandidate], progress: (@Sendable (CleanProgress) -> Void)?) async throws -> DockerCleanResult {
-        let result = state.withLock { state -> Result<DockerCleanResult, any Error> in
+        let (result, holds) = state.withLock { state -> (Result<DockerCleanResult, any Error>, Bool) in
             state.executed.append(selected)
-            return state.executeResult
+            return (state.executeResult, state.holdsExecution)
         }
+        executionStarted.open()
+        if holds { _ = await executionReleased.wait(within: .seconds(5)) }
         for (index, candidate) in selected.enumerated() {
             progress?(CleanProgress(currentPath: candidate.displayName, itemsDone: index + 1, itemsTotal: selected.count, bytesFreed: 0))
         }
@@ -309,7 +318,8 @@ func makeEnvironment(
     settings: any SettingsStoring = FakeSettingsStore(),
     runningApps: any RunningAppsProbing = FakeRunningApps(),
     docker: any DockerCleanupServing = FakeDocker(),
-    xcode: any XcodeCleanupServing = IdleXcode()
+    xcode: any XcodeCleanupServing = IdleXcode(),
+    updater: (any AppUpdating)? = nil
 ) throws -> AppEnvironment {
     AppEnvironment(
         scan: scan,
@@ -322,5 +332,6 @@ func makeEnvironment(
         xcode: xcode,
         paths: AppPaths(supportDirectory: "/Users/tester/Library/Application Support/com.mjm.cleaner"),
         clock: FixedWallClock(now: Date(timeIntervalSince1970: 1_790_000_000)),
-        expander: try PathExpander(homeDirectory: "/Users/tester", tempDirectory: "/private/var/folders/zz/T"))
+        expander: try PathExpander(homeDirectory: "/Users/tester", tempDirectory: "/private/var/folders/zz/T"),
+        updater: updater)
 }

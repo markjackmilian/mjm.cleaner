@@ -42,6 +42,8 @@ public final class SettingsModel: Identifiable {
     public var downloadsMinAgeDays: Int
     public var logsMinAgeDays: Int
     public var nuGetMinAgeDays: Int
+    /// Controllo automatico degli aggiornamenti; il pulsante «Controlla ora» è di `UpdateModel`.
+    public var automaticUpdateChecks: Bool
 
     /// Vuoto finché un salvataggio non fallisce. In C# l'eccezione di scrittura chiudeva l'app; qui
     /// lo sheet resta aperto e dice perché (registro di parità).
@@ -75,6 +77,7 @@ public final class SettingsModel: Identifiable {
         downloadsMinAgeDays = settings.downloadsMinAgeDays
         logsMinAgeDays = settings.logsMinAgeDays
         nuGetMinAgeDays = settings.nuGetMinAgeDays
+        automaticUpdateChecks = settings.automaticUpdateChecks
     }
 
     public func save() {
@@ -92,6 +95,7 @@ public final class SettingsModel: Identifiable {
         settings.downloadsMinAgeDays = max(0, downloadsMinAgeDays)
         settings.logsMinAgeDays = max(0, logsMinAgeDays)
         settings.nuGetMinAgeDays = max(0, nuGetMinAgeDays)
+        settings.automaticUpdateChecks = automaticUpdateChecks
 
         do {
             try store.save(settings)

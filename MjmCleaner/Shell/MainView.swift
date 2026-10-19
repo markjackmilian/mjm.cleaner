@@ -12,10 +12,26 @@ struct MainView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 232, max: 320)
         } detail: {
             PageView(page: main.page)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if let updates = main.updates, updates.isBannerVisible {
+                        UpdateBanner(model: updates)
+                    }
+                }
         }
         .sheet(item: settingsSheet) { settings in
-            SettingsView(model: settings)
+            SettingsView(model: settings, updates: main.updates)
         }
+        .alert("Aggiornamento non riuscito", isPresented: installFailureAlert) {
+            Button("OK") { main.updates?.dismissInstallFailure() }
+        } message: {
+            Text(verbatim: main.updates?.installFailureText ?? "")
+        }
+    }
+
+    private var installFailureAlert: Binding<Bool> {
+        Binding(
+            get: { main.updates?.installFailureText != nil },
+            set: { if !$0 { main.updates?.dismissInstallFailure() } })
     }
 
     /// Se lo sheet lo chiude il sistema (Esc), vale come Annulla: torna l'aspetto di prima

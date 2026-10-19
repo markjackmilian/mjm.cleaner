@@ -15,6 +15,8 @@ public struct AppEnvironment: Sendable {
     public let xcode: any XcodeCleanupServing
     public let paths: AppPaths
     public let clock: any WallClock
+    /// `nil` per le build Debug, la demo e i test che non lo chiedono: niente aggiornamenti.
+    public let updater: (any AppUpdating)?
     private let expander: PathExpander
 
     public init(
@@ -28,7 +30,8 @@ public struct AppEnvironment: Sendable {
         xcode: any XcodeCleanupServing,
         paths: AppPaths,
         clock: any WallClock,
-        expander: PathExpander
+        expander: PathExpander,
+        updater: (any AppUpdating)? = nil
     ) {
         self.scan = scan
         self.clean = clean
@@ -41,6 +44,7 @@ public struct AppEnvironment: Sendable {
         self.paths = paths
         self.clock = clock
         self.expander = expander
+        self.updater = updater
     }
 
     /// `BuildCategories()`: il catalogo con le impostazioni correnti.
@@ -61,9 +65,11 @@ public struct AppEnvironment: Sendable {
 
     /// `AppServices.CreateAsync`: lo stesso grafo, con un'unica fonte per la home (home e cartella
     /// temporanea si sostituiscono solo nei test). Lancia se la cartella dati o lo storico non si
-    /// aprono: l'app mostra allora la vista d'errore (`StartupFailure`).
+    /// aprono: l'app mostra allora la vista d'errore (`StartupFailure`). Senza `update`, come nelle
+    /// build Debug, l'app non si aggiorna.
     public static func live(
         paths: AppPaths,
+        update: UpdateContext? = nil,
         home: String = NSHomeDirectory(),
         tempDirectory: String = NSTemporaryDirectory()
     ) async throws -> AppEnvironment {
@@ -119,6 +125,9 @@ public struct AppEnvironment: Sendable {
             xcode: xcode,
             paths: paths,
             clock: clock,
-            expander: try PathExpander(homeDirectory: home, tempDirectory: tempDirectory))
+            expander: try PathExpander(homeDirectory: home, tempDirectory: tempDirectory),
+            updater: update.map {
+                AppUpdater(context: $0, paths: paths, http: URLSessionHTTPClient(), runner: processes, launcher: DetachedProcessLauncher())
+            })
     }
 }

@@ -113,4 +113,41 @@ struct SettingsStoreTests {
         #expect(paths.settingsFile.hasSuffix("settings.json"))
         #expect(paths.logsDirectory.hasSuffix("logs"))
     }
+
+    @Test func updateChecksAreOnByDefaultWithNoPreviousCheck() {
+        let settings = CleanerSettings()
+        #expect(settings.automaticUpdateChecks)
+        #expect(settings.lastUpdateCheck == nil)
+    }
+
+    @Test func legacyFileWithoutUpdateFieldsKeepsItsValuesAndChecksUpdates() {
+        let fs = InMemoryFileSystem()
+        fs.addFile(Self.paths.settingsFile, text: #"{ "LogsMinAgeDays": 7 }"#)
+        let settings = SettingsStore(fileSystem: fs, paths: Self.paths).load()
+        #expect(settings.logsMinAgeDays == 7)
+        #expect(settings.automaticUpdateChecks)
+        #expect(settings.lastUpdateCheck == nil)
+    }
+
+    @Test func updateFieldsRoundTripUnderTheirKeys() throws {
+        let fs = InMemoryFileSystem()
+        let store = SettingsStore(fileSystem: fs, paths: Self.paths)
+        var settings = CleanerSettings()
+        settings.automaticUpdateChecks = false
+        settings.lastUpdateCheck = Date(timeIntervalSince1970: 1_790_000_000)
+        try store.save(settings)
+
+        let json = try savedJSON(fs)
+        #expect(json["AutomaticUpdateChecks"] as? Bool == false)
+        #expect(json["LastUpdateCheck"] != nil)
+        let loaded = store.load()
+        #expect(loaded.automaticUpdateChecks == false)
+        #expect(loaded.lastUpdateCheck == Date(timeIntervalSince1970: 1_790_000_000))
+    }
+
+    @Test func neverCheckedLeavesNoLastCheckKey() throws {
+        let fs = InMemoryFileSystem()
+        try SettingsStore(fileSystem: fs, paths: Self.paths).save(CleanerSettings())
+        #expect(try savedJSON(fs)["LastUpdateCheck"] == nil)
+    }
 }

@@ -1,3 +1,5 @@
+import Foundation
+
 /// Preferenze persistite in `settings.json`. Chiavi e valori predefiniti identici al C#; un campo
 /// mancante prende il valore predefinito, un campo di tipo sbagliato rende il file illeggibile
 /// (e `SettingsStore` torna ai predefiniti), tranne l'aspetto, che è tollerante.
@@ -11,6 +13,10 @@ public struct CleanerSettings: Sendable, Equatable, Codable {
     /// Selezione dell'ultimo utilizzo: riduce il costo dei quattro passi nella pulizia di routine.
     public var selectedCategoryIds = ["system-caches", "dev-caches", "project-build-output", "logs"]
     public var appearance = AppearancePreference.auto
+    /// Controllo automatico delle release su GitHub: all'avvio e ogni 24 ore.
+    public var automaticUpdateChecks = true
+    /// L'ultimo controllo riuscito (con o senza novità); `nil` finché non ce n'è stato uno.
+    public var lastUpdateCheck: Date?
 
     public init() {}
 
@@ -23,6 +29,8 @@ public struct CleanerSettings: Sendable, Equatable, Codable {
         case nuGetMinAgeDays = "NuGetMinAgeDays"
         case selectedCategoryIds = "SelectedCategoryIds"
         case appearance = "Appearance"
+        case automaticUpdateChecks = "AutomaticUpdateChecks"
+        case lastUpdateCheck = "LastUpdateCheck"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -36,5 +44,7 @@ public struct CleanerSettings: Sendable, Equatable, Codable {
         nuGetMinAgeDays = try container.decodeIfPresent(Int.self, forKey: .nuGetMinAgeDays) ?? defaults.nuGetMinAgeDays
         selectedCategoryIds = try container.decodeIfPresent([String].self, forKey: .selectedCategoryIds) ?? defaults.selectedCategoryIds
         appearance = try container.decodeIfPresent(AppearancePreference.self, forKey: .appearance) ?? defaults.appearance
+        automaticUpdateChecks = try container.decodeIfPresent(Bool.self, forKey: .automaticUpdateChecks) ?? defaults.automaticUpdateChecks
+        lastUpdateCheck = try container.decodeIfPresent(Date.self, forKey: .lastUpdateCheck) ?? defaults.lastUpdateCheck
     }
 }

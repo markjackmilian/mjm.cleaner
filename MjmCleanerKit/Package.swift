@@ -27,10 +27,10 @@ let package = Package(
         .testTarget(
             name: "CleanerCoreTests",
             dependencies: ["CleanerCore"],
-            // Le fixture JSON di Docker e di Xcode si leggono dal sorgente dei test (`#filePath`),
+            // Le fixture JSON di Docker, Xcode e aggiornamenti si leggono dal sorgente dei test (`#filePath`),
             // non da un bundle: escluderle evita che SwiftPM le rifiuti come file non gestiti, un
             // errore con -warnings-as-errors.
-            exclude: ["Docker/Fixtures", "Xcode/Fixtures"]
+            exclude: ["Docker/Fixtures", "Xcode/Fixtures", "Update/Fixtures"]
         ),
         .testTarget(
             name: "CleanerFeaturesTests",

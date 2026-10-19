@@ -36,3 +36,20 @@ struct AppKitFolderPicker: FolderPicking {
         return url.path(percentEncoded: false)
     }
 }
+
+/// Gli aggiornamenti chiedono all'app di chiudersi (lo script attende la fine del processo), di
+/// mostrare il bundle scaricato nel Finder e di aprire la pagina della release.
+@MainActor
+struct AppKitUpdateHost: UpdateHosting {
+    func terminate() {
+        NSApp.terminate(nil)
+    }
+
+    func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    func open(_ url: URL) {
+        NSWorkspace.shared.open(url)
+    }
+}

@@ -4,6 +4,7 @@ import CleanerFeatures
 @MainActor
 final class DockerNavigationSpy: NavigationSpy, DockerNavigating {
     private(set) var reportResult: DockerCleanResult?
+    private(set) var reportEngine: DockerEngine?
     private(set) var reportDiskBefore: DockerDiskUsage?
     private(set) var reportDiskAfter: DockerDiskUsage?
 
@@ -11,9 +12,10 @@ final class DockerNavigationSpy: NavigationSpy, DockerNavigating {
         record("docker")
     }
 
-    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?) {
+    func showDockerReport(_ result: DockerCleanResult, engine: DockerEngine, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?) {
         record("dockerReport")
         reportResult = result
+        reportEngine = engine
         reportDiskBefore = diskBefore
         reportDiskAfter = diskAfter
     }

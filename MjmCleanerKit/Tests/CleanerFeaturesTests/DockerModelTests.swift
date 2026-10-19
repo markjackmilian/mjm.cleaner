@@ -196,6 +196,7 @@ struct DockerModelTests {
         #expect(model.deleteProgressText == "1 / 1 · nome-dangling")
         #expect(navigation.events == ["dockerReport"])
         #expect(navigation.reportResult == result)
+        #expect(navigation.reportEngine == dockerDesktop)
         #expect(navigation.reportDiskBefore == dockerAnalysis([]).disk)
         #expect(navigation.reportDiskAfter == after)
         #expect(!model.isDeleting)
@@ -261,6 +262,7 @@ struct DockerModelTests {
 
         #expect(docker.measuredEngines == [orbStack])
         #expect(navigation.events == ["dockerReport"])
+        #expect(navigation.reportEngine == orbStack)
         #expect(navigation.reportDiskBefore == nil)
         #expect(navigation.reportDiskAfter == nil)
     }

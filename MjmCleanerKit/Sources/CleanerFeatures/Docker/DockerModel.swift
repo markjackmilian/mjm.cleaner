@@ -5,7 +5,7 @@ import Observation
 @MainActor
 public protocol DockerNavigating: Navigating {
     func showDocker()
-    func showDockerReport(_ result: DockerCleanResult, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?)
+    func showDockerReport(_ result: DockerCleanResult, engine: DockerEngine, diskBefore: DockerDiskUsage?, diskAfter: DockerDiskUsage?)
 }
 
 /// Una risorsa Docker nella schermata di conferma.
@@ -187,7 +187,7 @@ public final class DockerModel {
             // `CancellationToken.None` del C#: le voci sono già state rimosse e il resoconto va
             // comunque mostrato e salvato.
             let diskAfter = try await Task { try await docker.measureDisk(for: engine) }.value
-            navigation?.showDockerReport(result, diskBefore: diskBefore, diskAfter: diskAfter)
+            navigation?.showDockerReport(result, engine: engine, diskBefore: diskBefore, diskAfter: diskAfter)
         } catch let error as DockerUnavailableError {
             await relay.finish()
             deleteErrorText = error.message

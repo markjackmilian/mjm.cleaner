@@ -47,7 +47,7 @@ struct MainModelTests {
         #expect(main.page.kind == .done)
         main.showDockerReport(
             DockerCleanResult(report: makeReport(), before: .empty, after: nil, daemonLost: false),
-            diskBefore: nil, diskAfter: DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil))
+            engine: dockerDesktop, diskBefore: nil, diskAfter: DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil))
         #expect(main.page.kind == .dockerReport)
         #expect(main.section == .docker)
 
@@ -177,7 +177,7 @@ struct MainModelTests {
 
         main.showDockerReport(
             DockerCleanResult(report: makeReport(), before: .empty, after: nil, daemonLost: false),
-            diskBefore: nil, diskAfter: DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil))
+            engine: dockerDesktop, diskBefore: nil, diskAfter: DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil))
         let dockerReport = try #require(main.page.dockerReportModel)
         await dockerReport.persistence?.value
         dockerReport.analyzeAgain()
@@ -208,11 +208,11 @@ struct MainModelTests {
 
         main.showDockerReport(
             DockerCleanResult(report: makeReport(), before: .empty, after: nil, daemonLost: true),
-            diskBefore: DockerDiskUsage(path: "/Docker.raw", allocatedBytes: 4 * 1_073_741_824, apparentBytes: nil),
+            engine: dockerDesktop, diskBefore: DockerDiskUsage(path: "/Docker.raw", allocatedBytes: 4 * 1_073_741_824, apparentBytes: nil),
             diskAfter: DockerDiskUsage(path: "/Docker.raw", allocatedBytes: 3 * 1_073_741_824, apparentBytes: nil))
         let report = try #require(main.page.dockerReportModel)
         #expect(report.diskText == "Docker.raw sul disco: 4 GB → 3 GB")
-        #expect(report.daemonLostText == "Docker si è fermato durante la pulizia: le voci restanti non sono state eliminate.")
+        #expect(report.daemonLostText == "Docker Desktop si è fermato durante la pulizia: le voci restanti non sono state eliminate.")
         await report.persistence?.value
     }
 
@@ -340,7 +340,7 @@ struct MainModelTests {
         let result = DockerCleanResult(report: report, before: .empty, after: nil, daemonLost: false)
         let disk = DockerDiskUsage(path: "/Docker.raw", allocatedBytes: nil, apparentBytes: nil)
 
-        main.showDockerReport(result, diskBefore: nil, diskAfter: disk)
+        main.showDockerReport(result, engine: dockerDesktop, diskBefore: nil, diskAfter: disk)
 
         #expect(main.page.kind == .xcode)
         #expect(await history.totalRead.wait(within: .seconds(5)) != nil)
@@ -350,7 +350,7 @@ struct MainModelTests {
 
         service.execution.open(XcodeViewModelTests.result())
         await deleting.value
-        main.showDockerReport(result, diskBefore: nil, diskAfter: disk)
+        main.showDockerReport(result, engine: dockerDesktop, diskBefore: nil, diskAfter: disk)
         #expect(main.page.kind == .dockerReport)
     }
 

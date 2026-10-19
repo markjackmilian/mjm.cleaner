@@ -6,16 +6,24 @@ struct DockerCleanupServiceTests {
     private static let contextCommand = "context inspect --format {{json .}}"
 
     private struct NoProcess: ProcessRunning {
+        let calls = Recorder<[String]>()
+
         func run(_ executable: String, _ arguments: [String], timeout: Duration, environment: [String: String]?) async throws -> ProcessResult {
-            ProcessResult(exitCode: 0, standardOutput: "16\t" + DockerCleanupServiceTests.rawPath, standardError: "", timedOut: false)
+            calls.append([executable] + arguments)
+            return ProcessResult(exitCode: 0, standardOutput: "16\t" + DockerCleanupServiceTests.rawPath, standardError: "", timedOut: false)
         }
     }
 
-    private func service(_ fs: InMemoryFileSystem, _ cli: FakeDockerCli) -> DockerCleanupService {
+    private func service(
+        _ fs: InMemoryFileSystem,
+        _ cli: FakeDockerCli,
+        du: NoProcess = NoProcess(),
+        diskFiles: (any FileSystem)? = nil
+    ) -> DockerCleanupService {
         DockerCleanupService(
             collector: DockerInventoryCollector(cli: cli, fileSystem: fs),
             scanner: ProjectReferenceScanner(fileSystem: fs),
-            disk: DiskUsageProbe(runner: NoProcess(), fileSystem: fs, diskImagePath: Self.rawPath),
+            disk: DiskUsageProbe(runner: du, fileSystem: diskFiles ?? fs, diskImagePath: Self.rawPath),
             executor: DockerCleanExecutor(cli: cli, clock: SystemWallClock()),
             contexts: DockerContextReader(cli: cli, homeDirectory: "/Users/tester"))
     }
@@ -46,12 +54,15 @@ struct DockerCleanupServiceTests {
         #expect(analysis.snapshot.df.images == 5_840_000_000)
     }
 
-    /// Sul Mac dell'utente Docker Desktop ha lasciato un Docker.raw: con OrbStack non si misura.
+    /// Sul Mac dell'utente Docker Desktop ha lasciato un Docker.raw: con OrbStack non si misura, e
+    /// il disco non viene nemmeno guardato (né `fileExists`/`itemInfo`, né `du`).
     @Test func orbStackHasNoDiskToMeasureEvenWithADockerRawLeftBehind() async throws {
         let fs = InMemoryFileSystem()
         fs.addFile(Self.rawPath, size: 100)
+        let diskFiles = AccessLogFileSystem(fs)
+        let du = NoProcess()
         let cli = try FakeDockerCli.withRealCase().on(FakeDockerCli.infoCommand, FakeDockerCli.info("29.8.2", "OrbStack"))
-        let docker = service(fs, cli)
+        let docker = service(fs, cli, du: du, diskFiles: diskFiles)
 
         let analysis = try await docker.analyze([])
         let after = try await docker.measureDisk(for: analysis.engine)
@@ -59,6 +70,8 @@ struct DockerCleanupServiceTests {
         #expect(analysis.engine.kind == .orbStack)
         #expect(analysis.disk == nil)
         #expect(after == nil)
+        #expect(diskFiles.paths.values.isEmpty)
+        #expect(du.calls.values.isEmpty)
     }
 
     @Test func aDaemonThatDoesNotAnswerNamesTheEngineOfTheActiveContext() async {

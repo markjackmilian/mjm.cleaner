@@ -58,7 +58,8 @@ struct DiskUsageProbeTests {
         let fs = InMemoryFileSystem()
         fs.addFile(Self.rawPath, size: 4096)
         let du = DuRunner(standardOutput: "8\t" + Self.rawPath + "\n")
-        let probe = DiskUsageProbe(runner: du, fileSystem: fs, diskImagePath: Self.rawPath)
+        let files = AccessLogFileSystem(fs)
+        let probe = DiskUsageProbe(runner: du, fileSystem: files, diskImagePath: Self.rawPath)
 
         // Un Docker.raw lasciato da Docker Desktop non riguarda OrbStack né un altro motore.
         let orbStack = try await probe.measure(for: DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack"))
@@ -66,6 +67,7 @@ struct DiskUsageProbeTests {
         #expect(orbStack == nil)
         #expect(colima == nil)
         #expect(du.calls.values.isEmpty)
+        #expect(files.paths.values.isEmpty)
 
         let desktop = try await probe.measure(for: DockerEngine(serverVersion: "29.8.2", operatingSystem: "Docker Desktop"))
         #expect(desktop?.allocatedBytes == Int64(8 * 1024))

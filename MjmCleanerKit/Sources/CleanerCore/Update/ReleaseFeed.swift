@@ -78,7 +78,7 @@ public struct GitHubReleaseFeed: ReleaseFeed {
         } catch {
             throw UpdateError.invalidResponse
         }
-        guard let version = AppVersion(release.tag_name), release.tag_name.hasPrefix("v") else {
+        guard let version = AppVersion(release.tag_name), release.tag_name == version.tag else {
             throw UpdateError.invalidRelease(String(localized: "tag «\(release.tag_name)» non nel formato vX.Y.Z", bundle: .module))
         }
         guard version > current else { return nil }
@@ -90,6 +90,13 @@ public struct GitHubReleaseFeed: ReleaseFeed {
         }
         guard let assetURL = httpsURL(asset.browser_download_url), let pageURL = httpsURL(release.html_url) else {
             throw UpdateError.invalidRelease(String(localized: "indirizzo non HTTPS", bundle: .module))
+        }
+        // Solo gli indirizzi di questa release: stesso repository e stesso tag, come li produce il workflow.
+        let assetPath = "/markjackmilian/mjm.cleaner/releases/download/\(version.tag)/\(expectedName)"
+        let pagePath = "/markjackmilian/mjm.cleaner/releases/tag/\(version.tag)"
+        guard assetURL.host() == "github.com", assetURL.path(percentEncoded: false) == assetPath,
+              pageURL.host() == "github.com", pageURL.path(percentEncoded: false) == pagePath else {
+            throw UpdateError.invalidRelease(String(localized: "indirizzo non della release di mjm.cleaner", bundle: .module))
         }
         guard asset.size > 0 else {
             throw UpdateError.invalidRelease(String(localized: "asset vuoto", bundle: .module))

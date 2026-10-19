@@ -31,10 +31,10 @@ func releaseJSON(
     return (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
 }
 
-func asset(_ name: String, url: String? = nil, size: Int64 = 10, digest: String? = "sha256:" + String(repeating: "ab", count: 32)) -> [String: Any] {
+func asset(_ name: String, tag: String = "v0.2.0", url: String? = nil, size: Int64 = 10, digest: String? = "sha256:" + String(repeating: "ab", count: 32)) -> [String: Any] {
     var asset: [String: Any] = [
         "name": name,
-        "browser_download_url": url ?? "https://github.com/markjackmilian/mjm.cleaner/releases/download/x/\(name)",
+        "browser_download_url": url ?? "https://github.com/markjackmilian/mjm.cleaner/releases/download/\(tag)/\(name)",
         "size": size,
     ]
     if let digest { asset["digest"] = digest }

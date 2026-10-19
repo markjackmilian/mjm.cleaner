@@ -78,11 +78,34 @@ struct GitHubReleaseFeedTests {
         await invalidRelease(releaseJSON(tag: "v0.2.0", assets: [asset(name, url: "http://github.com/\(name)")]))
     }
 
+    @Test func plainHTTPPageIsAnInvalidRelease() async {
+        await invalidRelease(releaseJSON(tag: "v0.2.0", htmlURL: "http://github.com/markjackmilian/mjm.cleaner/releases/tag/v0.2.0"))
+    }
+
+    @Test(arguments: [
+        "https://example.com/markjackmilian/mjm.cleaner/releases/download/v0.2.0/mjm.cleaner-v0.2.0-macos-universal.zip",
+        "https://github.com/someone/else/releases/download/v0.2.0/mjm.cleaner-v0.2.0-macos-universal.zip",
+        "https://github.com/markjackmilian/mjm.cleaner/releases/download/v0.1.0/mjm.cleaner-v0.2.0-macos-universal.zip",
+    ])
+    func assetOutsideThisReleaseIsAnInvalidRelease(url: String) async {
+        let name = "mjm.cleaner-v0.2.0-macos-universal.zip"
+        await invalidRelease(releaseJSON(tag: "v0.2.0", assets: [asset(name, url: url)]))
+    }
+
+    @Test(arguments: [
+        "https://example.com/markjackmilian/mjm.cleaner/releases/tag/v0.2.0",
+        "https://github.com/someone/else/releases/tag/v0.2.0",
+        "https://github.com/markjackmilian/mjm.cleaner/releases/tag/v0.1.0",
+    ])
+    func pageOutsideThisReleaseIsAnInvalidRelease(url: String) async {
+        await invalidRelease(releaseJSON(tag: "v0.2.0", htmlURL: url))
+    }
+
     @Test func emptyAssetIsAnInvalidRelease() async {
         await invalidRelease(releaseJSON(tag: "v0.2.0", assets: [asset("mjm.cleaner-v0.2.0-macos-universal.zip", size: 0)]))
     }
 
-    @Test(arguments: ["0.2.0", "v0.2", "v0.2.0-rc1", "nightly"])
+    @Test(arguments: ["0.2.0", "v0.2", "v0.02.0", "v0.2.0-rc1", "nightly"])
     func tagOutsideTheReleaseFormatIsAnInvalidRelease(tag: String) async {
         await invalidRelease(releaseJSON(tag: tag))
     }

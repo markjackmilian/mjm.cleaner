@@ -117,4 +117,32 @@ struct DockerInventoryCollectorTests {
             try await DockerInventoryCollector(cli: cli, fileSystem: InMemoryFileSystem()).checkDaemon()
         }
     }
+
+    /// Solo Swift: l'`ID` del daemon arriva con la stessa chiamata `docker info`, nel formato misurato
+    /// con OrbStack il 2026-10-19; l'esecutore lo usa per riconoscere un daemon diverso.
+    @Test func theDaemonIdComesWithTheSameInfoCall() async throws {
+        let cli = FakeDockerCli().on(
+            FakeDockerCli.infoCommand,
+            #"{"ServerVersion":"29.8.2","OperatingSystem":"OrbStack","ID":"b2756783-e527-49e3-a6c6-cd7f4e49c9ff"}"#)
+
+        let engine = try await DockerInventoryCollector.readEngine(cli)
+
+        #expect(engine == DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack", id: "b2756783-e527-49e3-a6c6-cd7f4e49c9ff"))
+        #expect(DockerInventoryCollector.engineFormat
+            == #"{"ServerVersion":{{json .ServerVersion}},"OperatingSystem":{{json .OperatingSystem}},"ID":{{json .ID}}}"#)
+        #expect(cli.calls == [["info", "--format", DockerInventoryCollector.engineFormat]])
+    }
+
+    @Test(arguments: [
+        #"{"ServerVersion":"29.8.2","OperatingSystem":"OrbStack"}"#,
+        #"{"ServerVersion":"29.8.2","OperatingSystem":"OrbStack","ID":null}"#,
+    ])
+    func aDaemonWithoutAnIdHasAnEmptyOne(output: String) async throws {
+        let cli = FakeDockerCli().on(FakeDockerCli.infoCommand, output)
+
+        let engine = try await DockerInventoryCollector(cli: cli, fileSystem: InMemoryFileSystem()).checkDaemon()
+
+        #expect(engine.id == "")
+        #expect(engine.kind == .orbStack)
+    }
 }

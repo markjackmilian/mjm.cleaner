@@ -15,12 +15,17 @@ public struct DockerEngine: Sendable, Equatable {
     /// L'`OperatingSystem` del daemon così com'è; può essere vuoto.
     public let operatingSystem: String
     public let serverVersion: String
+    /// L'`ID` del daemon, persistente per `dockerd`: distingue due daemon dello stesso tipo dietro
+    /// lo stesso contesto (`default` segue `/var/run/docker.sock`, che il motore avviato per ultimo
+    /// riscrive). Vuoto se il daemon non lo riporta.
+    public let id: String
 
-    public init(serverVersion: String, operatingSystem: String) {
+    public init(serverVersion: String, operatingSystem: String, id: String = "") {
         let kind = Self.kind(named: operatingSystem)
         self.kind = kind
         self.serverVersion = serverVersion
         self.operatingSystem = operatingSystem
+        self.id = id
         displayName = switch kind {
         case .dockerDesktop: "Docker Desktop"
         case .orbStack: "OrbStack"

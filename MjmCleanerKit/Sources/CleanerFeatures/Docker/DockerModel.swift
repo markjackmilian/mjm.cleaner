@@ -130,6 +130,8 @@ public final class DockerModel {
 
     public private(set) var isLoading = true
     public private(set) var errorText = ""
+    /// L'etichetta di stato della pagina d'errore: perché non c'è un'analisi da mostrare.
+    public private(set) var errorBadgeText = ""
     public private(set) var isReady = false
     public private(set) var serverText = ""
     public private(set) var diskText = ""
@@ -198,6 +200,7 @@ public final class DockerModel {
             // d'errore, dove «Riprova» la rifà sul contesto attivo.
             await relay.finish()
             errorText = error.message
+            errorBadgeText = String(localized: "Motore cambiato", bundle: .module)
             isReady = false
             groups = []
         } catch {
@@ -252,6 +255,7 @@ public final class DockerModel {
         isLoading = true
         isReady = false
         errorText = ""
+        errorBadgeText = ""
         groups = []
 
         do {
@@ -267,8 +271,10 @@ public final class DockerModel {
             // Messaggio già pensato per l'utente: nessun motore viene avviato da qui, è l'utente a
             // deciderlo.
             errorText = error.message
+            errorBadgeText = String(localized: "Motore non raggiungibile", bundle: .module)
         } catch {
             errorText = String(localized: "Analisi di Docker non riuscita: \(FeatureText.message(error))", bundle: .module)
+            errorBadgeText = String(localized: "Analisi non riuscita", bundle: .module)
         }
 
         isLoading = false

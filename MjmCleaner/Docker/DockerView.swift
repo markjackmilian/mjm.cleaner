@@ -14,7 +14,7 @@ struct DockerView: View {
             .toolbar {
                 if model.hasError {
                     ToolbarItem(placement: .primaryAction) {
-                        Label("Motore non raggiungibile", systemImage: "circle.fill")
+                        Label(model.errorBadgeText, systemImage: "circle.fill")
                             .labelStyle(StatusPillLabelStyle())
                     }
                 }

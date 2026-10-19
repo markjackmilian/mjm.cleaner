@@ -23,6 +23,11 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
     /// Gli aggiornamenti: esistono solo se l'ambiente ha un updater e l'app un `UpdateHosting`.
     public let updates: UpdateModel?
 
+    /// Gli ultimi modelli del passo 3 e di Docker mostrati: la loro eliminazione continua anche
+    /// dopo un cambio di pagina, e `isCleaning` deve vederla.
+    @ObservationIgnored private weak var lastConfirm: ConfirmStepModel?
+    @ObservationIgnored private weak var lastDocker: DockerModel?
+
     public init(
         environment: AppEnvironment,
         appearance: any AppearanceApplying,
@@ -52,15 +57,12 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
 
     public var canNavigateGlobally: Bool { !isXcodeBusy }
 
-    /// Vero mentre una pulizia cancella (wizard, Docker o Xcode): l'aggiornamento non chiude l'app
-    /// a metà.
+    /// Vero mentre una pulizia cancella (wizard, Docker o Xcode), anche se nel frattempo la sidebar
+    /// ha mostrato un'altra pagina: l'eliminazione del passo 3 e quella di Docker proseguono in
+    /// background, quindi si guardano gli ultimi modelli mostrati e non solo la pagina corrente.
+    /// L'aggiornamento non chiude l'app a metà.
     public var isCleaning: Bool {
-        switch page {
-        case .confirm(let model): model.isDeleting
-        case .docker(let model): model.isDeleting
-        case .xcode(let model): model.isDeleting
-        default: false
-        }
+        isXcodeBusy || (lastConfirm?.isDeleting ?? false) || (lastDocker?.isDeleting ?? false)
     }
 
     /// ⌘, e «Impostazioni…»: disabilitati mentre Xcode elimina e mentre lo sheet è già aperto
@@ -125,7 +127,9 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
 
     public func showConfirm(_ categories: [CleanupCategory], results: [CategoryScanResult]) {
         guard canNavigateGlobally else { return }
-        page = .confirm(ConfirmStepModel(environment: environment, navigation: self, categories: categories, results: results))
+        let model = ConfirmStepModel(environment: environment, navigation: self, categories: categories, results: results)
+        lastConfirm = model
+        page = .confirm(model)
     }
 
     /// Il passo 4 si costruisce anche quando il cambio di pagina è rifiutato: il suo `init` salva
@@ -141,7 +145,9 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
     /// Docker, Xcode e Storico creano una pagina nuova a ogni selezione.
     public func showDocker() {
         guard canNavigateGlobally else { return }
-        page = .docker(DockerModel(environment: environment, navigation: self))
+        let model = DockerModel(environment: environment, navigation: self)
+        lastDocker = model
+        page = .docker(model)
     }
 
     /// Come il passo 4: il resoconto salva la pulizia già avvenuta anche se la pagina non cambia.

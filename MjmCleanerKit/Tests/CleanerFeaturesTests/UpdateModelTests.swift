@@ -404,6 +404,38 @@ struct UpdateWiringTests {
         #expect(!main.isCleaning)
     }
 
+    @Test func installWaitsForAWizardDeletionLeftOnAnotherPage() async throws {
+        let clean = FakeClean()
+        clean.waitForCancellation()
+        let updater = FakeUpdater()
+        updater.setCached(makeVerified())
+        let main = MainModel(
+            environment: try makeEnvironment(clean: clean, updater: updater), appearance: FakeAppearance(), folders: FakePicker(),
+            updateHost: FakeUpdateHost())
+        let updates = try #require(main.updates)
+        await updates.start()
+        main.showConfirm(
+            [makeCategory("logs")],
+            results: [CategoryScanResult(categoryId: "logs", items: [makeItem("/Users/tester/Library/Logs/a.log")], totalBytes: 100, errors: [], exclusions: [])])
+        guard case .confirm(let confirm) = main.page else {
+            Issue.record("Il passo 3 non si è aperto")
+            return
+        }
+
+        let deleting = Task { await confirm.delete() }
+        try await clean.started.wait()
+        main.showHistory()
+        #expect(main.page.kind == .history)
+        #expect(main.isCleaning)
+        #expect(updates.installBlockedReason != nil)
+        updates.install()
+        #expect(updater.installs.isEmpty)
+
+        confirm.cancelDelete()
+        await deleting.value
+        #expect(!main.isCleaning)
+    }
+
     @Test func installWaitsForADockerDeletionToFinish() async throws {
         let docker = FakeDocker()
         docker.enqueue(.success(dockerAnalysis([dockerCandidate(.image, "dangling", verdict: .delete)])))
@@ -427,6 +459,38 @@ struct UpdateWiringTests {
         try await docker.executionStarted.wait()
         #expect(main.isCleaning)
         #expect(updates.installBlockedReason != nil)
+
+        docker.executionReleased.open()
+        await deleting.value
+        #expect(!main.isCleaning)
+    }
+
+    @Test func installWaitsForADockerDeletionLeftOnAnotherPage() async throws {
+        let docker = FakeDocker()
+        docker.enqueue(.success(dockerAnalysis([dockerCandidate(.image, "dangling", verdict: .delete)])))
+        docker.holdExecution()
+        let updater = FakeUpdater()
+        updater.setCached(makeVerified())
+        let main = MainModel(
+            environment: try makeEnvironment(docker: docker, updater: updater), appearance: FakeAppearance(), folders: FakePicker(),
+            updateHost: FakeUpdateHost())
+        let updates = try #require(main.updates)
+        await updates.start()
+        main.showDocker()
+        guard case .docker(let page) = main.page else {
+            Issue.record("La pagina Docker non si è aperta")
+            return
+        }
+        await page.initialLoad?.value
+
+        let deleting = Task { await page.delete() }
+        try await docker.executionStarted.wait()
+        main.showHistory()
+        #expect(main.page.kind == .history)
+        #expect(main.isCleaning)
+        #expect(updates.installBlockedReason != nil)
+        updates.install()
+        #expect(updater.installs.isEmpty)
 
         docker.executionReleased.open()
         await deleting.value

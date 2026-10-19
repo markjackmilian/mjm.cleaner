@@ -37,9 +37,11 @@ Decisioni dell'utente (2026-10-19):
   cambia motore; il solo ricontrollo prima di `execute` lascia scoperta l'esecuzione,
   che può durare minuti (fino a 600 s per comando) e continua a seguire il contesto
   attivo.
-- **Rifiuto mostrato sotto «Elimina».** Se il daemon è cambiato, l'elenco resta com'è e
-  il messaggio compare nell'area degli errori di eliminazione; il modello non cambia
-  stato, e un nuovo clic viene rifiutato di nuovo.
+- **Rifiuto nello stato d'errore della pagina.** Se il daemon è cambiato, l'analisi non
+  vale più: la pagina mostra la vista d'errore con il messaggio e «Riprova», che analizza
+  di nuovo. Scelta rivista il 2026-10-19 dopo la revisione finale: la prima scelta
+  («errore sotto Elimina», con elenco e selezione intatti) rimandava a un «Riprova» che
+  nello stato pronto della pagina non c'è.
 - **Contesto illeggibile: l'analisi fallisce.** Senza un nome valido non si può fissare
   il contesto, e non si analizza.
 
@@ -50,8 +52,7 @@ dell'utente: `--context` vale per il singolo comando e non scrive
 `~/.docker/config.json`.
 
 Fuori ambito: selettore di contesto, avvio o arresto dei motori, controllo dell'identità
-prima di ogni singolo comando (vedi «Rischio residuo»), invalidare l'analisi dopo un
-rifiuto, nuove schermate o screenshot.
+prima di ogni singolo comando (vedi «Rischio residuo»), nuove schermate o screenshot.
 
 ## Identità del daemon
 
@@ -203,9 +204,10 @@ compatibili non è stato verificato.
 - `DockerModel` conserva `target` al posto del `engine` privato: il resoconto e
   `measureDisk(for:)` usano `target.engine`. `delete()` passa a `execute` esattamente il
   bersaglio dell'analisi riuscita.
-- `DockerModel.delete()` cattura `DockerEngineChangedError` e mette `error.message` in
-  `deleteErrorText` così com'è, senza «Pulizia non riuscita:»; non apre il resoconto,
-  `isDeleting` torna `false`, elenco e selezione restano.
+- `DockerModel.delete()` cattura `DockerEngineChangedError` e invalida l'analisi:
+  `errorText` riceve `error.message` così com'è, senza «Pulizia non riuscita:»,
+  `isReady` torna `false` e l'elenco si svuota. La pagina mostra la vista d'errore con
+  «Riprova»; il resoconto non si apre e `isDeleting` torna `false`.
 - Doppi dei test (`FakeDocker`, `SequencedDocker`, `SlowFirstAnalysisDocker`, l'analisi
   di `DockerNavigationSpy`) e demo (`DemoDocker`, `DemoData.dockerAnalysis` con il
   contesto `desktop-linux` di Docker Desktop) si adeguano alle firme. La demo resta su
@@ -254,8 +256,9 @@ Core (Swift Testing):
 - i test esistenti dell'esecutore passano da un doppio che pretende il prefisso
   `--context` e lo toglie, così le attese sulle righe di comando restano quelle di oggi.
 
-Features: `execute` riceve il bersaglio dell'analisi; `DockerEngineChangedError` finisce
-in `deleteErrorText` senza prefisso, senza resoconto, con elenco e selezione intatti.
+Features: `execute` riceve il bersaglio dell'analisi; `DockerEngineChangedError` porta la
+pagina nello stato d'errore con il messaggio senza prefisso, senza resoconto, e «Riprova»
+rifà l'analisi.
 
 Mutazioni, in una copia scratch, che devono essere uccise da un test:
 

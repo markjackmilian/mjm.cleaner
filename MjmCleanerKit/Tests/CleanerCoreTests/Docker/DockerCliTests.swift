@@ -153,6 +153,11 @@ struct DockerCliTests {
         #expect(!DockerBinaryLocator.isExecutableFile(plain))
         #expect(!DockerBinaryLocator.isExecutableFile(folder))
         #expect(!DockerBinaryLocator.isExecutableFile(directory.path + "/missing/docker"))
+
+        let fifo = directory.path + "/bin/fifo"
+        #expect(mkfifo(fifo, 0o755) == 0)
+        #expect(chmod(fifo, 0o755) == 0)
+        #expect(!DockerBinaryLocator.isExecutableFile(fifo))
     }
 
     /// Solo Swift: disinstallare Docker Desktop può lasciare `~/.docker/bin/docker` orfano; con il
@@ -161,6 +166,18 @@ struct DockerCliTests {
         let home = try TemporaryDirectory()
         defer { home.remove() }
         try home.symlink(".docker/bin/docker", to: "/Applications/Docker.app/Contents/Resources/bin/docker-uninstalled")
+        let orbStack = try home.file(".orbstack/bin/docker")
+        #expect(chmod(orbStack, 0o755) == 0)
+
+        #expect(DockerBinaryLocator.find(homeDirectory: home.path) == orbStack)
+    }
+
+    /// Solo Swift: una cartella dove dovrebbe stare il binario non è un binario; il locator passa a
+    /// quello di OrbStack.
+    @Test func locatorSkipsAFolderWhereTheBinaryShouldBe() throws {
+        let home = try TemporaryDirectory()
+        defer { home.remove() }
+        try home.directory(".docker/bin/docker")
         let orbStack = try home.file(".orbstack/bin/docker")
         #expect(chmod(orbStack, 0o755) == 0)
 

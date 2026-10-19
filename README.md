@@ -191,8 +191,12 @@ SHA-256 matches the digest GitHub publishes for the asset, extracts it and check
 the bundle id, the version, the signature and both architectures. A banner then
 offers **Install and Relaunch**: the app quits, a small script swaps the bundle
 in place (restoring the old one if the swap fails) and reopens it; the outcome
-is in `updates/install-result` and `updates/install.log`. If the folder that
-holds the app is not writable, the banner offers **Show in Finder** instead.
+is written to `updates/install-result`, which the next launch reads and removes,
+and `updates/install.log` keeps the detail. A failed install is reported at the
+next launch; if the script cannot even start, the app stays open and says so.
+If the app cannot be replaced in place (its folder is not writable, or macOS
+runs it from a temporary location), the banner offers **Show in Finder**
+instead.
 
 Because the bundle is ad hoc signed, **Full Disk Access must be granted again
 after every update** (see Warnings). Debug builds never check for updates.

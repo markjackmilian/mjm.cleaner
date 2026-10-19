@@ -105,8 +105,8 @@ to the cumulative history total.
 The **Docker** page cleans images, volumes, and build cache through the `docker`
 CLI only, on the engine of the active Docker context: Docker Desktop, OrbStack,
 or any other Docker-compatible engine (Colima, Rancher Desktop, …). The page
-names the engine that answered `docker info`. No file under an engine's own
-folders is ever deleted, and no engine is ever started: if the daemon is not
+names the engine that answered `docker info`. The page never deletes files
+directly, and no engine is ever started: if the daemon is not
 running, the page names the engine of the active context (read with
 `docker context inspect`) and offers **Retry**. The `docker` binary is looked up
 in `~/.docker/bin`, `~/.orbstack/bin`, `/usr/local/bin`, `/opt/homebrew/bin`, and
@@ -186,11 +186,13 @@ Swift application starts from zero.
 - **No privilege elevation:** the application never uses `sudo` or asks for a
   password. Items owned by `root` fail with an access-denied error and appear in
   the final summary in step 4.
-- **Docker engine files are never deleted:**
-  `~/Library/Containers/com.docker.docker`, `~/.docker`, and `~/.orbstack` stay on
-  the deny list (OrbStack's group container is covered by
-  `~/Library/Group Containers`). Docker space is reclaimed only from the
-  **Docker** page, through the `docker` CLI.
+- **Docker engine data is never deleted:**
+  `~/Library/Containers/com.docker.docker`, `~/.docker`, `~/.orbstack`, and
+  `~/OrbStack` (where OrbStack mounts its volumes, images, and containers) stay on
+  the deny list, and OrbStack's group container is covered by
+  `~/Library/Group Containers`. Docker space is reclaimed only from the
+  **Docker** page, through the `docker` CLI. The Caches category can still empty
+  an engine's caches under `~/Library/Caches`, like any other application's.
 
 ## Documentation
 

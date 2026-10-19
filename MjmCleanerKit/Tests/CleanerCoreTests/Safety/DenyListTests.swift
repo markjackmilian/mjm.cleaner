@@ -150,6 +150,14 @@ struct DenyListTests {
         #expect(try create().deniedReason(path) == "percorso protetto: /Users/tester/.orbstack")
     }
 
+    @Test(arguments: [
+        "/Users/tester/OrbStack",
+        "/Users/tester/OrbStack/docker/volumes/db/_data/big.bin",
+    ])
+    func deniesTheOrbStackDataMount(path: String) throws {
+        #expect(try create().deniedReason(path) == "percorso protetto: /Users/tester/OrbStack")
+    }
+
     @Test func deniesDockerContainerWithSpecificReasonBeforeGenericContainers() throws {
         let reason = try #require(try create().deniedReason("/Users/tester/Library/Containers/com.docker.docker/Data"))
         #expect(reason.lowercased().contains("docker"))

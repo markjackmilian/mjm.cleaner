@@ -49,7 +49,7 @@ public struct DiskUsageProbe: Sendable {
     /// Lancia solo `CancellationError`: una misura non disponibile non deve impedire né l'analisi né
     /// la pulizia.
     @concurrent
-    public func measure() async throws -> DockerDiskUsage {
+    func measure() async throws -> DockerDiskUsage {
         // Altre piattaforme o un disco spostato altrove: il file può non esistere, e allora non c'è
         // nulla da misurare.
         guard fileSystem.fileExists(diskImagePath) else {

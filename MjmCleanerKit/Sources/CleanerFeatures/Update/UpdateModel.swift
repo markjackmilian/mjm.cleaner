@@ -38,6 +38,8 @@ public final class UpdateModel {
     /// Vero mentre una pulizia cancella: l'installazione chiuderebbe l'app a metà. Lo imposta `MainModel`.
     @ObservationIgnored public var isCleaning: @MainActor () -> Bool = { false }
     @ObservationIgnored private var started = false
+    /// L'ultimo controllo riuscito di questa sessione: vale anche se `settings.json` non si scrive.
+    @ObservationIgnored private var lastSuccessfulCheck: Date?
 
     public private(set) var state = State.idle
     /// «Più tardi»: il banner resta nascosto fino al prossimo avvio.
@@ -129,7 +131,10 @@ public final class UpdateModel {
     public func checkIfDue() async {
         let saved = settings.load()
         guard saved.automaticUpdateChecks, !isBusy, readyUpdate == nil else { return }
-        if let last = saved.lastUpdateCheck, clock.now.timeIntervalSince(last) < Self.checkInterval { return }
+        // Il più recente fra il salvataggio e il controllo riuscito: se `settings.json` non si scrive,
+        // l'app non interroga GitHub a ogni tick orario.
+        if let last = [saved.lastUpdateCheck, lastSuccessfulCheck].compactMap({ $0 }).max(),
+           clock.now.timeIntervalSince(last) < Self.checkInterval { return }
         await run(manual: false)
     }
 
@@ -147,6 +152,7 @@ public final class UpdateModel {
         state = .checking
         do {
             let release = try await updater.check()
+            lastSuccessfulCheck = clock.now
             var saved = settings.load()
             saved.lastUpdateCheck = clock.now
             try? settings.save(saved)

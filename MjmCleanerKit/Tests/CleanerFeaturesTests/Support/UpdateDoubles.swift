@@ -17,11 +17,15 @@ final class FakeUpdater: AppUpdating {
         var checks = 0
         var installs: [VerifiedUpdate] = []
         var holdChecks = false
+        var holdPrepare = false
+        var lastProgress: (@Sendable (Double) -> Void)?
     }
 
     private let state = Mutex(State())
     let checkStarted = Gate<Void>()
     let checkReleased = Gate<Void>()
+    let prepareStarted = Gate<Void>()
+    let prepareReleased = Gate<Void>()
 
     var currentVersion: AppVersion { AppVersion(major: 0, minor: 1, patch: 0) }
 
@@ -35,6 +39,13 @@ final class FakeUpdater: AppUpdating {
     func setMode(_ mode: InstallMode) { state.withLock { $0.mode = mode } }
     func failInstalls(with error: UpdateError) { state.withLock { $0.installFailure = error } }
     func holdChecks() { state.withLock { $0.holdChecks = true } }
+    func holdPrepare() { state.withLock { $0.holdPrepare = true } }
+
+    /// Richiama l'ultima `progress` ricevuta da `prepare`, come farebbe il download in corso.
+    func sendProgress(_ fraction: Double) {
+        let progress = state.withLock { $0.lastProgress }
+        progress?(fraction)
+    }
 
     func takeInstallOutcome() -> InstallOutcome? {
         state.withLock { state in
@@ -58,8 +69,13 @@ final class FakeUpdater: AppUpdating {
     }
 
     func prepare(_ release: AvailableRelease, progress: @escaping @Sendable (Double) -> Void) async throws -> VerifiedUpdate {
+        let (result, hold) = state.withLock { state -> (Result<VerifiedUpdate, UpdateError>, Bool) in
+            state.lastProgress = progress
+            return (state.prepare ?? .success(VerifiedUpdate(release: release, bundlePath: "/tmp/updates/\(release.tag)/expanded/mjm.cleaner.app")), state.holdPrepare)
+        }
         progress(0.5)
-        let result = state.withLock { $0.prepare } ?? .success(VerifiedUpdate(release: release, bundlePath: "/tmp/updates/\(release.tag)/expanded/mjm.cleaner.app"))
+        prepareStarted.open()
+        if hold { try await prepareReleased.wait() }
         return try result.get()
     }
 
@@ -72,6 +88,21 @@ final class FakeUpdater: AppUpdating {
             if let failure = state.installFailure { throw failure }
             state.installs.append(update)
         }
+    }
+}
+
+/// Orologio che si sposta solo con `advance`, per i test che attraversano le 24 ore.
+final class SteppedClock: WallClock {
+    private let current: Mutex<Date>
+
+    init(_ start: Date) {
+        current = Mutex(start)
+    }
+
+    var now: Date { current.withLock { $0 } }
+
+    func advance(by seconds: TimeInterval) {
+        current.withLock { $0 = $0.addingTimeInterval(seconds) }
     }
 }
 

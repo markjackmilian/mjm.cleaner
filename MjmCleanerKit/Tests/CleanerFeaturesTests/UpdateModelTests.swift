@@ -32,16 +32,19 @@ struct UpdateModelTests {
     // MARK: Avvio e pianificazione
 
     @Test func firstLaunchChecksDownloadsAndProposesTheUpdate() async {
-        let fixture = create(updater: newerRelease())
+        let fixture = create({ $0.logsMinAgeDays = 99 }, updater: newerRelease())
         await fixture.model.start()
 
         #expect(fixture.model.state == .ready(makeVerified()))
         #expect(fixture.model.isBannerVisible)
         #expect(fixture.store.current.lastUpdateCheck == Self.now)
+        #expect(fixture.store.current.logsMinAgeDays == 99)
     }
 
     @Test func startRunsOnlyOnce() async {
-        let fixture = create(updater: newerRelease())
+        let updater = FakeUpdater()
+        updater.setCheck(.failure(.httpStatus(403)))
+        let fixture = create(updater: updater)
         await fixture.model.start()
         await fixture.model.start()
         #expect(fixture.updater.checks == 1)
@@ -158,6 +161,61 @@ struct UpdateModelTests {
         #expect(fixture.model.installFailureText == nil)
     }
 
+    @Test func downloadShowsProgressAndBlocksOtherChecks() async throws {
+        let updater = newerRelease()
+        updater.holdPrepare()
+        let fixture = create(updater: updater)
+        let running = Task { await fixture.model.checkNow() }
+        try await updater.prepareStarted.wait()
+
+        for _ in 0..<200 {
+            if fixture.model.statusText == "Download dell'aggiornamento: 50%" { break }
+            await Task.yield()
+        }
+        #expect(fixture.model.statusText == "Download dell'aggiornamento: 50%")
+        #expect(fixture.model.isBusy)
+
+        await fixture.model.checkNow()
+        await fixture.model.checkIfDue()
+        #expect(updater.checks == 1)
+
+        updater.prepareReleased.open()
+        await running.value
+        #expect(fixture.model.state == .ready(makeVerified()))
+    }
+
+    @Test func lateProgressDoesNotHideAReadyUpdate() async {
+        let fixture = create(updater: newerRelease())
+        await fixture.model.start()
+        fixture.updater.sendProgress(0.9)
+        for _ in 0..<50 { await Task.yield() }
+
+        #expect(fixture.model.state == .ready(makeVerified()))
+        #expect(fixture.model.isBannerVisible)
+    }
+
+    @Test func unsavedCheckIsRememberedForTheSession() async {
+        let updater = FakeUpdater()
+        updater.setCheck(.success(nil))
+        let fixture = create(updater: updater)
+        fixture.store.failSaves(with: UnexpectedTestError(description: "disco pieno"))
+        await fixture.model.checkIfDue()
+        await fixture.model.checkIfDue()
+        #expect(updater.checks == 1)
+    }
+
+    @Test func aNewDownloadShowsTheBannerAgain() async {
+        let fixture = create(updater: newerRelease())
+        await fixture.model.start()
+        fixture.model.later()
+        fixture.updater.failInstalls(with: .installFailed("x"))
+        fixture.model.install()
+        #expect(fixture.model.hasFailed)
+
+        await fixture.model.checkNow()
+        #expect(fixture.model.isBannerVisible)
+    }
+
     // MARK: Banner
 
     @Test func laterHidesTheBannerAndCheckNowShowsItAgainWithoutDownloading() async {
@@ -171,11 +229,20 @@ struct UpdateModelTests {
         #expect(fixture.updater.checks == 1)
     }
 
-    @Test func automaticChecksPauseWhileAnUpdateIsReady() async {
-        let fixture = create(updater: newerRelease())
-        await fixture.model.start()
-        await fixture.model.checkIfDue()
-        #expect(fixture.updater.checks == 1)
+    @Test func automaticChecksPauseWhileAnUpdateIsReady() async throws {
+        let clock = SteppedClock(Self.now)
+        let updater = newerRelease()
+        let store = FakeSettingsStore()
+        let model = UpdateModel(updater: updater, settings: store, clock: clock, host: FakeUpdateHost())
+        await model.start()
+        var saved = store.current
+        saved.lastUpdateCheck = Self.now.addingTimeInterval(-25 * 3600)
+        try store.save(saved)
+        clock.advance(by: 25 * 3600)
+
+        await model.checkIfDue()
+        #expect(updater.checks == 1)
+        #expect(model.state == .ready(makeVerified()))
     }
 
     @Test func installLaunchesTheScriptAndQuits() async {
@@ -185,6 +252,7 @@ struct UpdateModelTests {
 
         #expect(fixture.updater.installs == [makeVerified()])
         #expect(fixture.model.state == .installing)
+        #expect(fixture.model.isBusy)
         #expect(fixture.host.terminations == 1)
     }
 
@@ -371,6 +439,13 @@ struct UpdateWiringTests {
         model.automaticUpdateChecks = false
         model.save()
         #expect(store.current.automaticUpdateChecks == false)
+    }
+
+    @Test func settingsShowTheSavedAutomaticCheckSwitch() {
+        var settings = CleanerSettings()
+        settings.automaticUpdateChecks = false
+        let model = SettingsModel(store: FakeSettingsStore(settings), appearance: FakeAppearance(), folders: FakePicker(), onSaved: {}, onClose: {})
+        #expect(model.automaticUpdateChecks == false)
     }
 
     @Test func savingSettingsKeepsTheLastCheck() {

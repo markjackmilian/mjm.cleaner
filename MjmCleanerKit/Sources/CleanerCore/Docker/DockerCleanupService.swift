@@ -32,14 +32,14 @@ public struct DockerCleanupService: Sendable {
     /// girano sull'executor globale, mai su quello del chiamante (`Task.Run` nel C#).
     @concurrent
     public func analyze(_ projectRoots: [String]) async throws -> DockerAnalysis {
-        let version = try await collector.checkDaemon()
+        let engine = try await collector.checkDaemon()
 
         async let references = scanner.scan(projectRoots)
         async let usage = disk.measure()
         let snapshot = try await collector.collect()
 
         return DockerAnalysis(
-            serverVersion: version,
+            serverVersion: engine.serverVersion,
             snapshot: snapshot,
             candidates: try DockerClassifier.classify(snapshot, try await references),
             disk: try await usage)

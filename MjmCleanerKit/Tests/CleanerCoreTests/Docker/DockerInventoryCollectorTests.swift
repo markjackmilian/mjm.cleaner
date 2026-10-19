@@ -38,7 +38,7 @@ struct DockerInventoryCollectorTests {
 
     @Test func emptyListsAreNotInspected() async throws {
         let cli = FakeDockerCli()
-            .on("info --format {{json .ServerVersion}}", "\"29.8.0\"")
+            .on(FakeDockerCli.infoCommand, FakeDockerCli.info("29.8.0"))
             .on("ps -aq --no-trunc", "")
             .on("images --no-trunc --format {{json .}}", "")
             .on("volume ls --format {{json .}}", "")
@@ -59,7 +59,7 @@ struct DockerInventoryCollectorTests {
               "Config":{"Labels":{"com.docker.compose.project":"old","com.docker.compose.project.working_dir":"/Users/tester/projects/old"}}}]
             """
         let cli = FakeDockerCli()
-            .on("info --format {{json .ServerVersion}}", "\"29.8.0\"")
+            .on(FakeDockerCli.infoCommand, FakeDockerCli.info("29.8.0"))
             .on("ps -aq --no-trunc", "1\n2\n")
             .on("container inspect 1 2", containers)
             .on("images --no-trunc --format {{json .}}", "")
@@ -76,7 +76,7 @@ struct DockerInventoryCollectorTests {
 
     @Test func daemonThatDoesNotAnswerStopsTheCollection() async {
         let cli = FakeDockerCli()
-            .on("info --format {{json .ServerVersion}}") { throw DockerUnavailableError(DockerUnavailableError.notRunning) }
+            .on(FakeDockerCli.infoCommand) { throw DockerUnavailableError(DockerUnavailableError.notRunning) }
 
         await #expect(throws: DockerUnavailableError.self) {
             try await DockerInventoryCollector(cli: cli, fileSystem: InMemoryFileSystem()).collect()
@@ -84,12 +84,37 @@ struct DockerInventoryCollectorTests {
         #expect(cli.calls.count == 1)
     }
 
-    @Test func emptyServerVersionMeansTheDaemonIsNotRunning() async {
+    @Test(arguments: [
+        #"{"ServerVersion":"","OperatingSystem":""}"#,
+        #"{"ServerVersion":null,"OperatingSystem":"OrbStack"}"#,
+        #"{"OperatingSystem":"Docker Desktop"}"#,
+    ])
+    func emptyServerVersionMeansTheDaemonIsNotRunning(output: String) async {
         // Senza daemon, "docker info" può comunque stampare la parte client e uscire con 0.
-        let cli = FakeDockerCli().on("info --format {{json .ServerVersion}}", "\"\"")
+        let cli = FakeDockerCli().on(FakeDockerCli.infoCommand, output)
 
-        await #expect(throws: DockerUnavailableError.self) {
+        let error = await #expect(throws: DockerUnavailableError.self) {
             try await DockerInventoryCollector(cli: cli, fileSystem: InMemoryFileSystem()).collect()
+        }
+
+        #expect(error?.reason == .notRunning)
+    }
+
+    @Test func checkDaemonRecognizesTheEngineWithOneInfoCall() async throws {
+        let cli = FakeDockerCli().on(FakeDockerCli.infoCommand, FakeDockerCli.info("29.8.2", "OrbStack"))
+
+        let engine = try await DockerInventoryCollector(cli: cli, fileSystem: InMemoryFileSystem()).checkDaemon()
+
+        #expect(engine == DockerEngine(serverVersion: "29.8.2", operatingSystem: "OrbStack"))
+        #expect(engine.kind == .orbStack)
+        #expect(cli.calls == [["info", "--format", DockerInventoryCollector.engineFormat]])
+    }
+
+    @Test func unreadableInfoIsAnOutputError() async {
+        let cli = FakeDockerCli().on(FakeDockerCli.infoCommand, "29.8.2")
+
+        await #expect(throws: DockerOutputError.self) {
+            try await DockerInventoryCollector(cli: cli, fileSystem: InMemoryFileSystem()).checkDaemon()
         }
     }
 }

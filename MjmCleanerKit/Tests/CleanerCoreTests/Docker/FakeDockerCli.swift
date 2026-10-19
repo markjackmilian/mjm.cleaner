@@ -67,6 +67,14 @@ final class FakeDockerCli: DockerCommandRunning {
         ProcessResult(exitCode: 1, standardOutput: "", standardError: standardError, timedOut: false)
     }
 
+    /// La riga di `docker info` con cui `DockerInventoryCollector.checkDaemon` riconosce il motore.
+    static let infoCommand = "info --format " + DockerInventoryCollector.engineFormat
+
+    /// La risposta di `docker info` di un daemon `version` che si presenta come `operatingSystem`.
+    static func info(_ version: String, _ operatingSystem: String = "Docker Desktop") -> String {
+        #"{"ServerVersion":"\#(version)","OperatingSystem":"\#(operatingSystem)"}"# + "\n"
+    }
+
     /// Una CLI che risponde con l'intero caso reale delle fixture.
     static func withRealCase() throws -> FakeDockerCli {
         let json = "{{json .}}"
@@ -82,7 +90,7 @@ final class FakeDockerCli: DockerCommandRunning {
         let volumesJson = try DockerFixtures.read("volumes.json")
 
         return FakeDockerCli()
-            .on("info --format {{json .ServerVersion}}", "\"29.8.0\"\n")
+            .on(infoCommand, info("29.8.0"))
             .on("ps -aq --no-trunc", containerIds.joined(separator: "\n") + "\n")
             .onPrefix("container inspect ") { _ in ok(containersJson) }
             .on("images --no-trunc --format \(json)", images)

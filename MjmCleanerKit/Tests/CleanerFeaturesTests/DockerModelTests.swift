@@ -136,7 +136,7 @@ struct DockerModelTests {
         docker.enqueue(.success(dockerAnalysis(Self.mixed)))
         let model = try await opened(docker: docker)
 
-        #expect(model.errorText == "Docker non è in esecuzione. Avvia Docker Desktop e premi Riprova.")
+        #expect(model.errorText == "Docker non è in esecuzione. Avvia il motore Docker (Docker Desktop, OrbStack…) e premi Riprova.")
         #expect(model.hasError)
         #expect(!model.isReady)
         #expect(model.canRetry)

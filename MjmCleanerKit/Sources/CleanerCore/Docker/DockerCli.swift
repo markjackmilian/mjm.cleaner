@@ -3,8 +3,17 @@ import Foundation
 /// Docker non raggiungibile: binario assente, daemon spento, socket chiuso. Il messaggio è già
 /// pensato per l'utente — l'interfaccia lo mostra così com'è. Porting di `DockerUnavailableException`.
 public struct DockerUnavailableError: Error, Equatable, Sendable, LocalizedError {
+    /// Perché Docker non risponde. Solo per «non in esecuzione» ha senso nominare il motore del
+    /// contesto attivo: il motivo non si deduce più dal testo.
+    public enum Reason: Sendable, Equatable {
+        case notInstalled
+        case notRunning
+    }
+
+    /// Testo generico: quando il contesto attivo dice quale motore è, l'analisi lo sostituisce con
+    /// un testo che lo nomina.
     public static var notRunning: String {
-        String(localized: "Docker non è in esecuzione. Avvia Docker Desktop e premi Riprova.", bundle: .module)
+        String(localized: "Docker non è in esecuzione. Avvia il motore Docker (Docker Desktop, OrbStack…) e premi Riprova.", bundle: .module)
     }
 
     public static var notInstalled: String {
@@ -12,9 +21,12 @@ public struct DockerUnavailableError: Error, Equatable, Sendable, LocalizedError
     }
 
     public let message: String
+    public let reason: Reason
 
-    public init(_ message: String) {
+    /// Il motivo predefinito è «non in esecuzione»: solo `DockerCli` lancia «non installato».
+    public init(_ message: String, reason: Reason = .notRunning) {
         self.message = message
+        self.reason = reason
     }
 
     public var errorDescription: String? { message }
@@ -102,14 +114,14 @@ public struct DockerCli: DockerCommandRunning {
 
     public func run(_ arguments: [String], timeout: Duration?) async throws -> ProcessResult {
         guard let binaryPath else {
-            throw DockerUnavailableError(DockerUnavailableError.notInstalled)
+            throw DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled)
         }
 
         let result: ProcessResult
         do {
             result = try await runner.run(binaryPath, arguments, timeout: timeout ?? Self.defaultTimeout, environment: Self.environment(binaryPath))
         } catch is ProcessLaunchError {
-            throw DockerUnavailableError(DockerUnavailableError.notInstalled)
+            throw DockerUnavailableError(DockerUnavailableError.notInstalled, reason: .notInstalled)
         }
 
         // Il daemon può spegnersi in qualunque momento, anche fra un comando e l'altro di una

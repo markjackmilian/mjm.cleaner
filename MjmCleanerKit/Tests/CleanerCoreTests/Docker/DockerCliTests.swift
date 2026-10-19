@@ -65,7 +65,8 @@ struct DockerCliTests {
             try await cli.run(["info"])
         }
 
-        #expect(error?.message.contains("Docker non è in esecuzione") == true)
+        #expect(error == DockerUnavailableError(DockerUnavailableError.notRunning, reason: .notRunning))
+        #expect(error?.message.contains("Avvia il motore Docker") == true)
     }
 
     @Test func missingBinaryBecomesAReadableException() async {
@@ -76,14 +77,17 @@ struct DockerCliTests {
         }
 
         #expect(error?.message.contains("non è stato trovato") == true)
+        #expect(error?.reason == .notInstalled)
     }
 
     @Test func binaryThatCannotStartBecomesAReadableException() async {
         let cli = DockerCli(runner: FakeRunner { _, _ in throw ProcessLaunchError(executable: "/usr/local/bin/docker", code: ENOENT) }, binaryPath: "/usr/local/bin/docker")
 
-        await #expect(throws: DockerUnavailableError.self) {
+        let error = await #expect(throws: DockerUnavailableError.self) {
             try await cli.run(["info"])
         }
+
+        #expect(error?.reason == .notInstalled)
     }
 
     @Test func checkedRunFailsWithTheDockerErrorText() async {

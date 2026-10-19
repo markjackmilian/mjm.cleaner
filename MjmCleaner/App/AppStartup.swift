@@ -27,6 +27,15 @@ final class AppStartup {
         AppEnvironment.defaultPaths(bundleIdentifier: Bundle.main.bundleIdentifier)
     }
 
+    /// L'app in esecuzione per l'updater: `nil` per le build Debug (`com.mjm.cleaner.debug`).
+    static var updateContext: UpdateContext? {
+        UpdateContext.make(
+            bundleIdentifier: Bundle.main.bundleIdentifier,
+            shortVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+            bundlePath: Bundle.main.bundleURL.path(percentEncoded: false),
+            processIdentifier: ProcessInfo.processInfo.processIdentifier)
+    }
+
     /// La stessa lettura di `environment.settings.load()`, fatta prima che l'ambiente esista.
     static func savedAppearance() -> AppearancePreference {
         #if DEBUG
@@ -55,8 +64,10 @@ final class AppStartup {
 
         let paths = Self.paths
         do {
-            let environment = try await AppEnvironment.live(paths: paths)
-            show(MainModel(environment: environment, appearance: AppKitAppearance(), folders: AppKitFolderPicker()))
+            let environment = try await AppEnvironment.live(paths: paths, update: Self.updateContext)
+            show(MainModel(
+                environment: environment, appearance: AppKitAppearance(), folders: AppKitFolderPicker(),
+                updateHost: AppKitUpdateHost()))
         } catch {
             fail(StartupFailure.message(paths: paths, error: error))
         }
@@ -67,6 +78,16 @@ final class AppStartup {
     func show(_ main: MainModel) {
         state = .ready(main)
         Task { try? await main.refreshTotal() }
+        // Aggiornamenti: all'avvio, poi un tick all'ora; il modello decide se il controllo è dovuto.
+        if let updates = main.updates {
+            Task {
+                await updates.start()
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(3600))
+                    await updates.checkIfDue()
+                }
+            }
+        }
     }
 
     func fail(_ message: String) {

@@ -7,6 +7,8 @@ import SwiftUI
 /// ripristina.
 struct SettingsView: View {
     @Bindable var model: SettingsModel
+    /// `nil` nelle build Debug e nella demo: la sezione «Aggiornamenti» non compare.
+    var updates: UpdateModel?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -85,6 +87,10 @@ struct SettingsView: View {
                         Text("I file più recenti restano esclusi dall'analisi.")
                         Text("L'età dei pacchetti NuGet si basa sull'ultimo accesso registrato dal filesystem: è un'euristica, non una certezza.")
                     }
+                }
+
+                if let updates {
+                    UpdateSettingsSection(settings: model, model: updates)
                 }
             }
             .formStyle(.grouped)

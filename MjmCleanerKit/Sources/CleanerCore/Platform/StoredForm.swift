@@ -8,12 +8,11 @@ private let climbableStoredPathErrors: Set<Int32> = [ENOENT, ENOTDIR, EACCES, EP
 
 extension FileSystem {
     /// Il percorso come lo registra il filesystem: quello dell'antenato più profondo che esiste,
-    /// `path` compreso, seguito dai componenti che mancano, presi dal testo. Un elemento sparito
-    /// dopo la scansione resta verificabile, e la cancellazione che segue lo segnala «non
-    /// trovato» come prima. Si risale solo con `climbableStoredPathErrors`: ogni altro errore, o la
-    /// radice raggiunta senza successo, è il risultato. Un errore che non viene dal filesystem vale
-    /// `EIO` sul percorso dove è avvenuto. Condivisa da `PathGuard` ed `ExcludedFolders`; `path` è
-    /// canonico.
+    /// `path` compreso, seguito dai componenti che mancano, presi dal testo. Un percorso che non
+    /// esiste, o non esiste più, resta verificabile. Si risale solo con
+    /// `climbableStoredPathErrors`: ogni altro errore, o la radice raggiunta senza successo, è il
+    /// risultato. Un errore che non viene dal filesystem vale `EIO` sul percorso dove è avvenuto.
+    /// Condivisa da `PathGuard` ed `ExcludedFolders`; `path` è canonico.
     func storedForm(_ path: String) -> Result<String, FileSystemError> {
         var existing = path
         var missing: [String] = []

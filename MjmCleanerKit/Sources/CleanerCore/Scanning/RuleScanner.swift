@@ -41,8 +41,9 @@ public struct RuleScanner: Sendable {
         }
 
         // Le cartelle escluse nelle Impostazioni si confrontano anche con la root risolta e nella
-        // grafia del disco. Un'esclusione non valida o non verificabile ferma la regola, come la
-        // root esclusa o sotto un'esclusione: la regola non produce nulla.
+        // grafia del disco. Un'esclusione non valida o non verificabile, o la root non
+        // verificabile, ferma la regola, come la root esclusa o sotto un'esclusione: la regola non
+        // produce nulla.
         let excluded: ExcludedFolders
         switch ExcludedFolders.resolve(
             rule.excludedPaths, root: rule.root, resolvedRoot: rootVerdict.canonicalPathValidated, fileSystem: fileSystem, links: links) {

@@ -3,12 +3,14 @@ import Darwin
 /// Le cartelle escluse nelle Impostazioni, viste da una regola (spec
 /// `2026-10-20-excluded-folders-canonical-design.md`). Un'esclusione si confronta in più forme: il
 /// testo com'è scritto, la grafia del disco (`FileSystem.storedForm`) e, se questa è un
-/// collegamento, la grafia del disco della sua destinazione finale. Anche il percorso di un
-/// elemento ha più forme: com'è, sotto la root risolta da `validateRoot` e sotto la grafia del
-/// disco della root. Lo scanner non segue mai i collegamenti e `readdir` dà i nomi come stanno sul
-/// disco, quindi sotto la root la grafia del disco di un elemento è quella della root seguita dal
-/// suffisso. Così un'esclusione vale anche scritta attraverso un collegamento, sotto "/var" con una
-/// root "/private/var/…", in un'altra normalizzazione Unicode o con un'equivalenza di APFS (U+212A,
+/// collegamento, la grafia del disco della sua destinazione finale, anche come la segue il kernel
+/// (`resolveLinkTarget` lavora sul testo, e un «..» relativo oltre una cartella collegata lo porta
+/// altrove). Anche il percorso di un elemento ha più forme: com'è, sotto la root risolta da
+/// `validateRoot`, sotto la grafia del disco della root e sotto la root seguita dal kernel. Lo
+/// scanner non segue mai i collegamenti e `readdir` dà i nomi come stanno sul disco, quindi sotto
+/// la root la grafia del disco di un elemento è quella della root seguita dal suffisso. Così
+/// un'esclusione vale anche scritta attraverso un collegamento, sotto "/var" con una root
+/// "/private/var/…", in un'altra normalizzazione Unicode o con un'equivalenza di APFS (U+212A,
 /// "ß"). Il confronto ignora le maiuscole, come la deny-list: aggiungere forme può solo escludere
 /// di più.
 ///
@@ -24,7 +26,8 @@ struct ExcludedFolders: Sendable {
     /// Le forme di tutte le esclusioni.
     private let folders: [String]
     private let root: String
-    /// Le forme della root diverse da quella dichiarata: la root risolta e la grafia del disco.
+    /// Le forme della root diverse da quella dichiarata: la root risolta, la grafia del disco e la
+    /// root seguita dal kernel.
     private let alternativeRoots: [String]
 
     private init(folders: [String], root: String, alternativeRoots: [String]) {
@@ -59,8 +62,15 @@ struct ExcludedFolders: Sendable {
             return .failure(Rejection(reason: String(localized: "root non verificabile sul filesystem: \(error.description)", bundle: .module)))
         }
 
+        // La root seguita dal kernel: `validateRoot` risolve i collegamenti sul testo, e una catena
+        // con un ".." relativo oltre una cartella collegata porta altrove. Forma in più, se si ricava.
+        var candidates = [resolvedRoot, storedRoot]
+        if let followed = try? fileSystem.storedPath(root + "/") {
+            candidates.append(followed)
+        }
+
         var roots = [root]
-        for candidate in [resolvedRoot, storedRoot].map(PathText.trimmingTrailingSlashes)
+        for candidate in candidates.map(PathText.trimmingTrailingSlashes)
         where !candidate.isEmpty && !roots.contains(where: { PathText.equalsIgnoringCase($0, candidate) }) {
             roots.append(candidate)
         }
@@ -95,8 +105,10 @@ struct ExcludedFolders: Sendable {
     }
 
     /// Le forme di un'esclusione, tutte senza «/» finali: il testo, la grafia del disco e, se
-    /// questa è un collegamento, la grafia del disco della destinazione finale. Un testo che non è
-    /// un percorso assoluto canonico, o una forma che non si riesce a ricavare, rifiuta la regola.
+    /// questa è un collegamento, la grafia del disco della destinazione finale (anche come la segue
+    /// il kernel). Un testo che non è un percorso assoluto canonico, o una forma che non si riesce
+    /// a ricavare, rifiuta la regola. La forma seguita dal kernel, invece, è in più: se non si
+    /// ricava restano le altre.
     private static func forms(of excluded: String, _ fileSystem: any FileSystem, _ links: any LinkInspecting) -> Result<[String], Rejection> {
         guard let canonical = CanonicalPath.canonical(excluded) else {
             return .failure(Rejection(reason: String(localized: "cartella esclusa con un percorso non valido: «\(excluded)»", bundle: .module)))
@@ -120,6 +132,13 @@ struct ExcludedFolders: Sendable {
         switch fileSystem.storedForm(target) {
         case .success(let path): forms.append(PathText.trimmingTrailingSlashes(path))
         case .failure(let error): return .failure(unverifiable(error))
+        }
+
+        // Il kernel segue la catena anche dove `resolveLinkTarget`, che lavora sul testo, sbaglia:
+        // un ".." relativo oltre una cartella collegata. È una forma in più: se non si ricava
+        // (collegamento orfano, o verso un file) restano le altre.
+        if let followed = try? fileSystem.storedPath(stored + "/") {
+            forms.append(PathText.trimmingTrailingSlashes(followed))
         }
         return .success(forms)
     }

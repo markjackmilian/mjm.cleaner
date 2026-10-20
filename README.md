@@ -86,15 +86,15 @@ In Downloads, large files, and logs, macOS packages, such as apps, Photos
 libraries, and Parallels, VMware Fusion, or UTM virtual machines, are listed as
 a single item and never entered: deleting a file inside one would break it.
 Folders excluded in Settings are never scanned or proposed. A folder that would
-be deleted as a whole, such as a cache subfolder, a `bin` or `obj` directory,
-or a macOS package, is not proposed if it contains an excluded folder. An
-exclusion also matches the same folder reached through a symbolic link, written
-under `/var` instead of `/private/var`, or spelled differently but naming the
-same folder on disk (another Unicode normalization, an APFS case equivalence).
-An excluded folder that is a symbolic link also excludes its target. An excluded
-folder that is not an absolute path, or that cannot be checked on disk, stops
-every cleanup rule, and step 3 shows why. The Xcode and Docker pages do not use
-excluded folders.
+be deleted as a whole, such as a cache subfolder, a `bin` or `obj` directory, or
+a macOS package, is not proposed if it contains an excluded folder. An exclusion
+also matches the same folder reached through a symbolic link, written under
+`/var` instead of `/private/var`, or spelled differently but naming the same
+folder on disk (another Unicode normalization, an APFS case equivalence). An
+excluded folder that is a symbolic link also excludes its target. An excluded
+folder that is not a plain absolute path (relative, or containing `//`, `.` or
+`..`), or that cannot be checked on disk, stops every cleanup rule, and step 3
+shows why. The Xcode and Docker pages do not use excluded folders.
 
 ### Xcode
 

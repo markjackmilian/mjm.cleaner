@@ -90,10 +90,16 @@ static func resolve(
    (`links.resolveLinkTarget`) e poi la `storedForm` di quella. Una destinazione non
    determinabile vale come `FileSystemError(code: ELOOP, path:)` sulla forma del disco, e porta
    allo stesso rifiuto di un `storedForm` fallito.
+5. se la forma del disco è un collegamento, anche la destinazione come la segue il kernel:
+   `storedPath` della forma del disco seguita da «/». `resolveLinkTarget` lavora sul testo, e un
+   «..» relativo oltre una cartella collegata lo porta altrove. Se questa forma non si ricava
+   (collegamento orfano, o verso un file) restano le altre: è una forma in più, non un controllo.
 
 **Forme della root**: la root dichiarata, la root risolta (come oggi) e `storedForm` della root
-risolta. Se quest'ultima fallisce la fabbrica rifiuta. Una forma alternativa entra solo se non
-coincide, senza distinzione di maiuscole, con una forma già presente.
+risolta. Si aggiunge la root seguita dal kernel (`storedPath` della root dichiarata seguita da «/»),
+se si ricava: `validateRoot` risolve i collegamenti sul testo. Se `storedForm` della root risolta
+fallisce la fabbrica rifiuta. Una forma alternativa entra solo se non coincide, senza distinzione di
+maiuscole, con una forma già presente.
 
 **Forme di un elemento**: il percorso com'è e, per ogni forma alternativa della root, la stessa
 forma seguita dal suffisso dell'elemento rispetto alla root dichiarata. È esatto perché lo
@@ -135,8 +141,9 @@ della root è in pratica una gara, perché `validateRoot` ha appena calcolato la
   l'analisi non si vede.
 - Alla cancellazione le esclusioni non si ricontrollano, come oggi: lì decide solo `PathGuard`.
   La finestra fra analisi e conferma è quella che il modello di minaccia già dichiara.
-- La destinazione di un'esclusione-collegamento si segue fino alla fine della catena, come fa
-  `resolveLinkTarget`; una destinazione fuori dalla root non tocca la regola.
+- Una destinazione fuori dalla root non tocca la regola. `PathGuard.validateRoot` continua a
+  risolvere i collegamenti della root sul testo; la protezione degli elementi resta nel `validate`
+  del guard, che usa la grafia del disco.
 
 ## Test
 

@@ -125,4 +125,42 @@ struct ExcludedFoldersRealFileSystemTests {
         #expect(outcome.items.map(\.path) == [declared + "/nuovo/disco.iso"])
         #expect(outcome.exclusions == [GuardExclusion(path: declared + "/archivio", reason: Self.excludedReason)])
     }
+
+    /// Una catena di collegamenti con un ".." relativo che esce da una cartella collegata:
+    /// `keep` → `work/a/b`, con `a` → `work/real/deep` e `deep/b` → `../target`. Il kernel arriva a
+    /// `work/real/target`, mentre `resolveLinkTarget`, che segue la catena sul testo, darebbe
+    /// `work/target`. L'esclusione vale per la cartella a cui arriva il kernel.
+    @Test func anExclusionThatIsALinkThroughARelativeChainExcludesWhatTheKernelReaches() throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        try fixture.tmp.file("home/Lavoro/real/target/disco.iso", contents: Self.big)
+        try fixture.tmp.file("home/Lavoro/real/nuovo/disco.iso", contents: Self.big)
+        try fixture.tmp.directory("home/Lavoro/real/deep")
+        try fixture.tmp.symlink("home/Lavoro/real/deep/b", to: "../target")
+        try fixture.tmp.symlink("home/Lavoro/a", to: fixture.work + "/real/deep")
+        try fixture.tmp.symlink("home/Lavoro/keep", to: fixture.work + "/a/b")
+
+        let outcome = try fixture.scanLargeFiles(fixture.work + "/real", excluding: [fixture.work + "/keep"])
+
+        #expect(outcome.items.map(\.path) == [fixture.work + "/real/nuovo/disco.iso"])
+        #expect(outcome.exclusions == [GuardExclusion(path: fixture.work + "/real/target", reason: Self.excludedReason)])
+    }
+
+    /// La root è un collegamento alla stessa catena: `validateRoot` la risolve sul testo in un
+    /// percorso che non esiste, e l'esclusione nella grafia del disco della cartella vera vale
+    /// lo stesso, perché alla root si aggiunge la forma seguita dal kernel.
+    @Test func aRootLinkedThroughARelativeChainMatchesAnExclusionInTheDiskSpelling() throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        try fixture.tmp.file("home/Lavoro/real/target/keep/disco.iso", contents: Self.big)
+        try fixture.tmp.file("home/Lavoro/real/target/nuovo/disco.iso", contents: Self.big)
+        try fixture.tmp.directory("home/Lavoro/real/deep")
+        try fixture.tmp.symlink("home/Lavoro/real/deep/b", to: "../target")
+        try fixture.tmp.symlink("home/Lavoro/a", to: fixture.work + "/real/deep")
+        try fixture.tmp.symlink("home/Lavoro/root", to: fixture.work + "/a/b")
+        let exclusion = try LocalFileSystem().storedPath(fixture.work + "/real/target/keep")
+
+        let outcome = try fixture.scanLargeFiles(fixture.work + "/root", excluding: [exclusion])
+
+        #expect(outcome.items.map(\.path) == [fixture.work + "/root/nuovo/disco.iso"])
+        #expect(outcome.exclusions == [GuardExclusion(path: fixture.work + "/root/keep", reason: Self.excludedReason)])
+    }
 }

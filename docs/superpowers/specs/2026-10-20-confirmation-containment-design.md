@@ -221,8 +221,11 @@ Swift Testing; `swift test -Xswiftc -warnings-as-errors` in `MjmCleanerKit`.
   voci da inviare omessi;
 - una posizione di `container` che non esiste: la riga non si invia;
 - la garanzia su ogni combinazione di sei righe (una catena di tre, una cartella sorella con un
-  file dentro, un file libero; 64 combinazioni): nessuna voce inviata sta sotto un'altra inviata, e ogni voce selezionata è
-  inviata o sta sotto una voce inviata;
+  file dentro, un file libero; 64 combinazioni): ogni voce inviata è selezionata, nessuna voce
+  inviata sta sotto un'altra inviata, e ogni voce selezionata è inviata o sta sotto una voce
+  inviata;
+- più voci sotto la stessa root collegata; un segmento che comincia con un segno combinante;
+  l'ordine dei gruppi e delle righe in `selections`;
 - i sette test esistenti, invariati nelle asserzioni.
 
 **Core, garanzia completa con `InMemoryFileSystem`:** un vero `PathGuard` con

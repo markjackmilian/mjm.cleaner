@@ -172,6 +172,30 @@ struct ConfirmationRowsTests {
         #expect(build(results).map { $0.rows.map(\.container) } == [[nil], [nil]])
     }
 
+    /// Più voci sotto la stessa root collegata, con la cartella che contiene in seconda posizione: la
+    /// root risolta vale per ogni voce, non solo per la prima.
+    @Test func everyItemUnderALinkedRootIsComparedWhereItLeads() {
+        let built = build(
+            [
+                result(
+                    "dev-caches",
+                    item("/Users/tester/.cache/pip", directory: true, root: "/Users/tester/.cache"),
+                    item("/Users/tester/.cache/huggingface", directory: true, root: "/Users/tester/.cache")),
+                result("large-files", item("/Users/tester/Dati/cache/huggingface/model.bin", root: "/Users/tester/Dati")),
+            ],
+            roots: ["/Users/tester/.cache": "/Users/tester/Dati/cache"])
+
+        #expect(built.map { $0.rows.map(\.container) } == [[nil, nil], [position(0, 1)]])
+    }
+
+    /// Un segmento che comincia con un segno combinante forma un solo carattere con la «/» che lo
+    /// precede: la risalita degli antenati taglia per scalari, non per caratteri.
+    @Test func aSegmentStartingWithACombiningMarkStillHasItsFolder() {
+        let built = build([result("cat-a", item("/x/dir", directory: true)), result("cat-b", item("/x/dir/\u{301}f.bin"))])
+
+        #expect(built.map { $0.rows.map(\.container) } == [[nil], [position(0, 0)]])
+    }
+
     @Test func twoSpellingsThatLeadToTheSameFolderAreOneRow() {
         let built = build(
             [
@@ -220,6 +244,12 @@ struct ConfirmationRowsTests {
         #expect(selections(cacheAndModel, selected: [position(1, 0)]) == [["/u/.cache/huggingface/model.bin"]])
     }
 
+    @Test func selectionsKeepTheOrderOfGroupsAndRows() {
+        let categories = build([result("cat-a", item("/x/3"), item("/x/1"), item("/x/2")), result("cat-b", item("/x/0"))])
+
+        #expect(ConfirmationRows.selections(categories) { _ in true }.map { $0.items.map(\.path) } == [["/x/3", "/x/1", "/x/2"], ["/x/0"]])
+    }
+
     @Test func aGroupWithNothingToSendIsOmitted() {
         let sent = ConfirmationRows.selections(cacheAndModel) { $0 != position(1, 1) }
 
@@ -246,12 +276,13 @@ struct ConfirmationRowsTests {
         ])]
 
         #expect(ConfirmationRows.selections(forged) { _ in false }.isEmpty)
-        #expect(ConfirmationRows.selections(forged) { $0.category == 0 }.isEmpty)
+        // Le due righe selezionate, i loro contenitori no: decide la guardia sugli indici.
+        #expect(ConfirmationRows.selections(forged) { $0.category == 0 && $0.row < 2 }.isEmpty)
     }
 
     /// La garanzia, su ogni combinazione di una catena, di una cartella sorella e di un file libero:
-    /// nessuna voce inviata sta sotto un'altra voce inviata, e ogni voce selezionata è inviata o sta
-    /// sotto una voce inviata.
+    /// ogni voce inviata è selezionata, nessuna voce inviata sta sotto un'altra voce inviata, e ogni
+    /// voce selezionata è inviata o sta sotto una voce inviata.
     @Test func everySelectionSendsNoNestedRowsAndLosesNoSelectedRow() {
         let categories = build([
             result("cat-a", item("/x/a/b/c.bin"), item("/x/libero.iso")),
@@ -271,6 +302,7 @@ struct ConfirmationRowsTests {
             let sent = ConfirmationRows.selections(categories) { selected.contains($0) }.flatMap { $0.items.map(\.path) }
 
             for one in sent {
+                #expect(selected.map(path).contains(one), "maschera \(mask): \(one) inviata senza casella")
                 #expect(!sent.contains { isUnder(one, $0) }, "maschera \(mask): \(one) inviata sotto un'altra voce inviata")
             }
             for chosen in selected.map(path) {

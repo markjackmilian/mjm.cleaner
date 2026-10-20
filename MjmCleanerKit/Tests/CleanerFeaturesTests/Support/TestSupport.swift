@@ -134,6 +134,6 @@ func makeCategory(
         selectedByDefault: false, parentId: parent, rules: [], itemsSelectedByDefault: itemsSelectedByDefault)
 }
 
-func makeItem(_ path: String, size: Int64 = 100, root: String = "/Users/tester/Library/Caches") -> ScanItem {
-    ScanItem(path: path, sizeBytes: size, isDirectory: false, declaredRoot: root)
+func makeItem(_ path: String, size: Int64 = 100, root: String = "/Users/tester/Library/Caches", directory: Bool = false) -> ScanItem {
+    ScanItem(path: path, sizeBytes: size, isDirectory: directory, declaredRoot: root)
 }

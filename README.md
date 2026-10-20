@@ -53,7 +53,7 @@ The application uses a four-step wizard, always in the same order:
 
 | Step | What it does |
 |---|---|
-| **1 · Choose** | Select the categories to clean. Each category declares its risk level; high-risk categories are never preselected. |
+| **1 · Choose** | Select the categories to clean. Each category declares its risk level; high-risk categories are never preselected. Project bin and obj directories and Large files stay unavailable, with a shortcut to Settings, until a directory is chosen there. |
 | **2 · Analyze** | Performs a read-only scan, processing categories in parallel. Nothing is deleted. |
 | **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard` and by the excluded folders. Each group has a «Select all» checkbox; Downloads and large-file items start deselected. This is the final point at which the operation can be abandoned. |
 | **4 · Done** | Summarizes the disk space recovered and any items that could not be deleted. |

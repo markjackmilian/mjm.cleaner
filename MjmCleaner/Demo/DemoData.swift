@@ -26,6 +26,7 @@ enum DemoData {
         result("dev-caches", [
             item("/Users/demo/Library/Caches/org.swift.swiftpm", 1_100 * megabyte),
             item("/Users/demo/.npm/_cacache", 730 * megabyte),
+            item("/Users/demo/.cache/huggingface", 5_900 * megabyte),
         ]),
         result("nuget-packages", [
             item("/Users/demo/.nuget/packages/newtonsoft.json/12.0.3", 18 * megabyte),
@@ -34,9 +35,12 @@ enum DemoData {
             item("/Users/demo/Library/Logs/DiagnosticReports", 96 * megabyte),
         ]),
         // Al passo 3 le voci dei file grandi partono deselezionate: una macchina virtuale è un'unica voce.
+        // Il modello sta nella cache di Hugging Face che «Cache di sviluppo» propone: compare spuntato
+        // e bloccato, con la nota «Inclusa in …».
         result("large-files", [
             item("/Users/demo/Macchine virtuali/Windows 11.pvm", 64 * gigabyte),
             item("/Users/demo/Downloads/Xcode_26.xip", 9 * gigabyte),
+            item("/Users/demo/.cache/huggingface/hub/models--mistral-7b/model.safetensors", 4_900 * megabyte),
         ]),
     ]
 

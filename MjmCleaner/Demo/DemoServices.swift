@@ -13,7 +13,7 @@ enum DemoServices {
         var settings = CleanerSettings()
         settings.appearance = appearance
         settings.projectRoots = ["~/Progetti", "~/Lavoro/clienti"]
-        settings.largeFileRoots = ["~/Downloads", "~/Macchine virtuali"]
+        settings.largeFileRoots = ["~"]
         settings.excludedFolders = ["~/Lavoro/archivio"]
         return AppEnvironment(
             scan: DemoScan(),

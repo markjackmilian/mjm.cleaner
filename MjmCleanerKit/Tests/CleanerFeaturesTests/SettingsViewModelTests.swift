@@ -8,6 +8,7 @@ struct SettingsViewModelTests {
         let model: SettingsModel
         let store: FakeSettingsStore
         let appearance: FakeAppearance
+        let picker: FakePicker
         let events: Recorder<String>
     }
 
@@ -15,13 +16,14 @@ struct SettingsViewModelTests {
         let store = FakeSettingsStore(settings)
         let appearance = FakeAppearance()
         let events = Recorder<String>()
+        let picker = FakePicker(picked)
         let model = SettingsModel(
             store: store,
             appearance: appearance,
-            folders: FakePicker(picked),
+            folders: picker,
             onSaved: { events.append("saved") },
             onClose: { events.append("close") })
-        return Fixture(model: model, store: store, appearance: appearance, events: events)
+        return Fixture(model: model, store: store, appearance: appearance, picker: picker, events: events)
     }
 
     private func settings(_ change: (inout CleanerSettings) -> Void) -> CleanerSettings {
@@ -191,6 +193,44 @@ struct SettingsViewModelTests {
         fixture.model.save()
 
         #expect(fixture.store.current.selectedCategoryIds == ["trash"])
+    }
+
+    @Test func excludedFoldersAreLoadedAddedRemovedAndSaved() async {
+        let fixture = create(settings { $0.excludedFolders = ["/Users/tester/Parallels"] }, picked: "/Volumes/Archivio")
+        #expect(fixture.model.excludedFolders == ["/Users/tester/Parallels"])
+        #expect(!fixture.model.canRemoveExcludedFolder)
+
+        await fixture.model.addExcludedFolder()
+        #expect(fixture.picker.titles == ["Scegli una cartella da escludere"])
+        #expect(fixture.model.excludedFolders == ["/Users/tester/Parallels", "/Volumes/Archivio"])
+        #expect(fixture.model.selectedExcludedFolder == "/Volumes/Archivio")
+        #expect(fixture.model.canRemoveExcludedFolder)
+
+        // La stessa cartella scelta di nuovo non si ripete.
+        await fixture.model.addExcludedFolder()
+        #expect(fixture.model.excludedFolders == ["/Users/tester/Parallels", "/Volumes/Archivio"])
+
+        fixture.model.selectedExcludedFolder = "/Users/tester/Parallels"
+        fixture.model.removeExcludedFolder()
+        #expect(fixture.model.excludedFolders == ["/Volumes/Archivio"])
+        #expect(!fixture.model.canRemoveExcludedFolder)
+
+        fixture.model.save()
+        #expect(fixture.store.current.excludedFolders == ["/Volumes/Archivio"])
+    }
+
+    @Test func cancelDiscardsTheExcludedFolders() async {
+        let fixture = create(settings { $0.excludedFolders = ["/a"] }, picked: "/b")
+        await fixture.model.addExcludedFolder()
+        fixture.model.cancel()
+        #expect(fixture.store.current.excludedFolders == ["/a"])
+        #expect(fixture.store.saves == 0)
+    }
+
+    @Test func removingAnExcludedFolderWithoutSelectionKeepsTheList() {
+        let fixture = create(settings { $0.excludedFolders = ["/a", "/b"] })
+        fixture.model.removeExcludedFolder()
+        #expect(fixture.model.excludedFolders == ["/a", "/b"])
     }
 
     @Test func cancelledPickerKeepsTheCurrentSelection() async {

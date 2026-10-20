@@ -38,6 +38,9 @@ public final class SettingsModel: Identifiable {
     public var largeFileRoots: [String]
     public var selectedProjectRoot: String?
     public var selectedLargeFileRoot: String?
+    /// Cartelle mai analizzate né proposte, in nessuna categoria della pulizia guidata.
+    public var excludedFolders: [String]
+    public var selectedExcludedFolder: String?
     public var largeFileThresholdMegabytes: Int
     public var downloadsMinAgeDays: Int
     public var logsMinAgeDays: Int
@@ -52,6 +55,7 @@ public final class SettingsModel: Identifiable {
     public var hasSaveError: Bool { !saveErrorText.isEmpty }
     public var canRemoveProjectRoot: Bool { selectedProjectRoot != nil }
     public var canRemoveLargeFileRoot: Bool { selectedLargeFileRoot != nil }
+    public var canRemoveExcludedFolder: Bool { selectedExcludedFolder != nil }
 
     public init(
         store: any SettingsStoring,
@@ -71,6 +75,7 @@ public final class SettingsModel: Identifiable {
         self.appearance = settings.appearance
         projectRoots = settings.projectRoots
         largeFileRoots = settings.largeFileRoots
+        excludedFolders = settings.excludedFolders
         loadedThresholdBytes = settings.largeFileThresholdBytes
         loadedThresholdMegabytes = Int(settings.largeFileThresholdBytes / (1024 * 1024))
         largeFileThresholdMegabytes = loadedThresholdMegabytes
@@ -91,6 +96,7 @@ public final class SettingsModel: Identifiable {
         settings.appearance = appearance
         settings.projectRoots = projectRoots
         settings.largeFileRoots = largeFileRoots
+        settings.excludedFolders = excludedFolders
         settings.largeFileThresholdBytes = thresholdBytes
         settings.downloadsMinAgeDays = max(0, downloadsMinAgeDays)
         settings.logsMinAgeDays = max(0, logsMinAgeDays)
@@ -148,6 +154,20 @@ public final class SettingsModel: Identifiable {
             remove(root, from: \.largeFileRoots)
         }
         selectedLargeFileRoot = nil
+    }
+
+    public func addExcludedFolder() async {
+        let title = String(localized: "Scegli una cartella da escludere", bundle: .module)
+        if let path = await addFolder(to: \.excludedFolders, title: title) {
+            selectedExcludedFolder = path
+        }
+    }
+
+    public func removeExcludedFolder() {
+        if let folder = selectedExcludedFolder {
+            remove(folder, from: \.excludedFolders)
+        }
+        selectedExcludedFolder = nil
     }
 
     private func addFolder(to list: ReferenceWritableKeyPath<SettingsModel, [String]>, title: String) async -> String? {

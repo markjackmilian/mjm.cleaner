@@ -102,8 +102,10 @@ Comportamento di `RuleScanner.scan`:
   ottenere la root risolta.
 - **Ramo escluso.** In `matchingFiles` e `matchingDirs`, una cartella incontrata nella discesa
   che coincide con un'esclusione viene potata per intero, con una sola esclusione e lo stesso
-  motivo. Non si rivelano i nomi dei file al suo interno. Il controllo segue quelli su
-  `.git`/`.hg`/`.svn` e sulla deny-list, già presenti.
+  motivo. Non si rivelano i nomi dei file al suo interno. In `matchingFiles` il controllo
+  segue quelli su `.git`/`.hg`/`.svn` e sulla deny-list, già presenti. In `matchingDirs` segue
+  `.git` e precede il controllo sui nomi: una cartella esclusa non si propone anche se si chiama
+  `bin`, e il motivo mostrato è quello dell'utente anche dove la deny-list la proteggerebbe.
 - **Candidato che contiene un'esclusione.** Una cartella candidata, cioè un figlio in
   `clearContents`, un `bin`/`obj` in `matchingDirs` o un pacchetto in `matchingFiles`, sotto la
   quale sta una cartella esclusa non viene proposta: eliminarla cancellerebbe anche la parte
@@ -159,9 +161,10 @@ pacchetto, la si attraversa come oggi: l'utente l'ha scelta esplicitamente.
   la stessa `FolderList` a «+/−» e la didascalia «Non vengono mai analizzate né proposte, in
   nessuna categoria della pulizia. Le pagine Xcode e Docker non le usano.». Il foglio resta
   700×560, e il `Form` scorre.
-- «Salva» chiama già `startOver()`, che ricostruisce il catalogo con `environment.categories()`.
-  Le esclusioni valgono dalla scansione successiva, e nessun passo 3 resta calcolato con le
-  impostazioni precedenti.
+- «Salva» chiama `startOver()`, che ricostruisce il catalogo con `environment.categories()` e
+  abbandona l'analisi in corso, anche se l'utente è passato a un'altra pagina: i suoi risultati
+  non portano più al passo 3. Le esclusioni valgono dalla scansione successiva, e nessun passo 3
+  resta calcolato con le impostazioni precedenti.
 
 ## Passo 3: preselezione e «Seleziona tutte le voci»
 

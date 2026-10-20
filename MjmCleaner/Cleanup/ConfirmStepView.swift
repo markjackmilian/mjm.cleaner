@@ -75,30 +75,45 @@ private struct CategoryNodeView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+            OptionalText(text: node.coveredText)
             Toggle("Seleziona tutte le voci", isOn: $node.allSelected)
                 .toggleStyle(.checkbox)
                 .accessibilityLabel(node.selectAllAccessibilityLabel)
+                .disabled(!node.canSelectAll)
         } row: { path in
             PathRow(path: path)
         }
     }
 }
 
+/// Una voce dentro una cartella spuntata altrove appare spuntata e bloccata, con la nota «Inclusa
+/// in …»: si cancella con la cartella, e si sblocca togliendo la spunta a quella.
 private struct PathRow: View {
-    @Bindable var path: PathNode
+    let path: PathNode
 
     var body: some View {
-        HStack(spacing: 8) {
-            Toggle(path.path, isOn: $path.isSelected)
+        // Letto nel corpo, non dentro il Binding: così Observation registra la casella della voce e
+        // quelle della sua catena di cartelle, e la riga si ridisegna quando una di loro cambia.
+        let isChecked = path.isChecked
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Toggle(path.path, isOn: Binding(get: { isChecked }, set: { path.isSelected = $0 }))
                 .toggleStyle(.checkbox)
                 .labelsHidden()
-            Text(path.path)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 12)
-            Text(path.sizeText)
-                .fontWeight(.semibold)
-                .monospacedDigit()
+                .disabled(path.isCovered)
+                .accessibilityHint(path.containmentText)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text(path.path)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 12)
+                    Text(path.sizeText)
+                        .fontWeight(.semibold)
+                        .monospacedDigit()
+                }
+                OptionalText(text: path.containmentText)
+                OptionalText(text: path.containsText)
+            }
         }
     }
 }

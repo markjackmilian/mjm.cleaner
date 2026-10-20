@@ -13,11 +13,12 @@ enum DemoServices {
         var settings = CleanerSettings()
         settings.appearance = appearance
         settings.projectRoots = ["~/Progetti", "~/Lavoro/clienti"]
-        settings.largeFileRoots = ["~/Downloads", "~/Macchine virtuali"]
+        settings.largeFileRoots = ["~"]
         settings.excludedFolders = ["~/Lavoro/archivio"]
         return AppEnvironment(
             scan: DemoScan(),
             clean: DemoClean(),
+            roots: DemoRoots(),
             history: DemoHistory(),
             sessionLog: DemoSessionLog(),
             settings: DemoSettings(settings),
@@ -40,6 +41,11 @@ private struct DemoScan: ScanPerforming {
         try await Task.sleep(for: .seconds(3600))
         return DemoData.scanResults
     }
+}
+
+/// La demo non tocca il disco: ogni root resta quella dichiarata.
+private struct DemoRoots: RootResolving {
+    func resolvedRoot(_ declaredRoot: String) -> String { declaredRoot }
 }
 
 private struct DemoClean: CleanPerforming {

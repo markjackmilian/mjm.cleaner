@@ -317,10 +317,20 @@ struct IdleXcode: XcodeCleanupServing {
     }
 }
 
+/// Risolve le root con una mappa: una root assente resta com'è dichiarata.
+struct FakeRootResolver: RootResolving {
+    var targets: [String: String] = [:]
+
+    func resolvedRoot(_ declaredRoot: String) -> String {
+        targets[declaredRoot] ?? declaredRoot
+    }
+}
+
 /// Un `AppEnvironment` di soli doppi, con la home finta `/Users/tester`.
 func makeEnvironment(
     scan: any ScanPerforming = FakeScan(),
     clean: any CleanPerforming = FakeClean(),
+    roots: any RootResolving = FakeRootResolver(),
     history: any HistoryStoring = FakeHistory(),
     sessionLog: any SessionLogWriting = FakeSessionLog(),
     settings: any SettingsStoring = FakeSettingsStore(),
@@ -332,6 +342,7 @@ func makeEnvironment(
     AppEnvironment(
         scan: scan,
         clean: clean,
+        roots: roots,
         history: history,
         sessionLog: sessionLog,
         settings: settings,

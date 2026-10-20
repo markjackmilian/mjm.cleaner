@@ -11,7 +11,19 @@ import Observation
 @Observable
 public final class PathNode: Identifiable {
     public let item: ScanItem
+
+    /// La scelta della voce stessa. Ciò che parte davvero dipende anche dalla cartella che la
+    /// contiene: vedi `isCovered`.
     public var isSelected: Bool
+
+    /// La riga-cartella più vicina che contiene questa voce, in qualunque gruppo, e il nome di quel
+    /// gruppo. Le imposta il modello dopo aver creato tutti i nodi (spec
+    /// `2026-10-20-confirmation-containment-design.md`).
+    public internal(set) var container: PathNode?
+    public internal(set) var containerGroupName = ""
+
+    /// Sulla riga di una cartella: quante voci, e di quali gruppi, contiene direttamente.
+    public internal(set) var containsText = ""
 
     init(item: ScanItem, isSelected: Bool) {
         self.item = item
@@ -21,6 +33,31 @@ public final class PathNode: Identifiable {
     public var path: String { item.path }
     public var sizeBytes: Int64 { item.sizeBytes }
     public var sizeText: String { Formatting.bytes(item.sizeBytes) }
+
+    /// Vero se una cartella della catena che contiene questa voce è selezionata: la voce si cancella
+    /// con quella, qualunque sia la sua casella. È la regola di `ConfirmationRows.selections`.
+    public var isCovered: Bool {
+        var next = container
+        while let node = next {
+            if node.isSelected { return true }
+            next = node.container
+        }
+        return false
+    }
+
+    /// Ciò che mostra la casella: spuntata se la voce parte da sola o con la sua cartella.
+    public var isChecked: Bool { isSelected || isCovered }
+
+    /// La voce arriva al motore da sola: selezionata e non già compresa in una cartella che parte.
+    var isSentOnItsOwn: Bool { isSelected && !isCovered }
+
+    /// La nota sotto il percorso di una voce contenuta, e il suggerimento per VoiceOver.
+    public var containmentText: String {
+        guard let container else { return "" }
+        return isCovered
+            ? String(localized: "Inclusa in \(container.path) (\(containerGroupName)): si elimina con la cartella.", bundle: .module)
+            : String(localized: "Inclusa in \(container.path) (\(containerGroupName)).", bundle: .module)
+    }
 }
 
 @MainActor
@@ -46,15 +83,41 @@ public final class CategoryNode: Identifiable {
         summaryText = "\(Formatting.integer(items.count)) \(noun) · \(Formatting.bytes(SafeSum.total(items.map(\.sizeBytes))))"
     }
 
-    /// La casella «Seleziona tutte le voci»: vera se il gruppo ha voci e sono tutte selezionate;
-    /// impostarla seleziona o deseleziona ogni voce. È calcolata, quindi resta allineata alle
-    /// caselle delle singole voci senza stato da sincronizzare.
+    /// La casella «Seleziona tutte le voci»: vera se il gruppo ha voci e ogni casella appare
+    /// spuntata; impostarla cambia solo le voci libere, perché una voce coperta la decide la sua
+    /// cartella. È calcolata, quindi resta allineata alle caselle delle singole voci senza stato da
+    /// sincronizzare.
     public var allSelected: Bool {
-        get { !paths.isEmpty && paths.allSatisfy(\.isSelected) }
+        get { !paths.isEmpty && paths.allSatisfy(\.isChecked) }
         set {
-            for path in paths {
-                path.isSelected = newValue
+            // Deselezionare una cartella del gruppo libera le voci che conteneva, anche se vengono
+            // prima nell'elenco: si ripete finché nessuna voce libera cambia. Ogni passata ne
+            // cambia almeno una verso `newValue` e nessuna torna indietro.
+            var changed = true
+            while changed {
+                changed = false
+                for path in paths where !path.isCovered && path.isSelected != newValue {
+                    path.isSelected = newValue
+                    changed = true
+                }
             }
+        }
+    }
+
+    /// Falso se ogni voce del gruppo è coperta da una cartella spuntata: la casella di gruppo non
+    /// avrebbe nulla da cambiare.
+    public var canSelectAll: Bool { paths.contains { !$0.isCovered } }
+
+    /// La riga sotto l'avviso del gruppo quando alcune voci si cancellano con una cartella.
+    public var coveredText: String {
+        let count = paths.count(where: \.isCovered)
+        switch count {
+        case 0:
+            return ""
+        case 1:
+            return String(localized: "1 voce è dentro una cartella spuntata e si elimina con quella.", bundle: .module)
+        default:
+            return String(localized: "\(Formatting.integer(count)) voci sono dentro cartelle spuntate e si eliminano con quelle.", bundle: .module)
         }
     }
 
@@ -74,6 +137,9 @@ public final class ConfirmStepModel {
     @ObservationIgnored private let environment: AppEnvironment
     @ObservationIgnored private weak var navigation: (any CleanupNavigating)?
     @ObservationIgnored private var deleteTask: Task<CleanReport, Never>?
+
+    /// Le righe del Core, allineate per indice a `nodes`: `delete()` ne ricava la selezione.
+    @ObservationIgnored private let rows: [ConfirmationCategory]
 
     public let nodes: [CategoryNode]
 
@@ -103,9 +169,12 @@ public final class ConfirmStepModel {
         self.navigation = navigation
 
         // Una riga per PERCORSO, non per ScanItem, e la deduplicazione è GLOBALE a tutto il passo:
-        // due regole, anche di categorie diverse, possono coprire lo stesso file. La logica vive
-        // nel Core (ConfirmationRows), pura e testata; qui si trasforma in nodi.
-        nodes = ConfirmationRows.build(results).map { row in
+        // due regole, anche di categorie diverse, possono coprire lo stesso file. Ogni riga sa quale
+        // cartella proposta la contiene, confrontando le root come le risolve il motore. La logica
+        // vive nel Core (ConfirmationRows), pura e testata; qui si trasforma in nodi.
+        let rows = ConfirmationRows.build(results, resolveRoot: environment.roots.resolvedRoot)
+        self.rows = rows
+        nodes = rows.map { row in
             let category = categories.first { FeatureText.same($0.id, row.categoryId) }
             // Una categoria assente dal catalogo oggi non capita; se capitasse, le sue voci partono
             // deselezionate: è la direzione sicura.
@@ -113,6 +182,7 @@ public final class ConfirmStepModel {
                 categoryId: row.categoryId, displayName: category?.displayName ?? row.categoryId, items: row.items,
                 itemsSelectedByDefault: category?.itemsSelectedByDefault ?? false)
         }
+        Self.link(nodes, rows)
 
         let exclusions = results.flatMap(\.exclusions)
         if exclusions.isEmpty {
@@ -131,8 +201,9 @@ public final class ConfirmStepModel {
         runningAppsCheck = Task { await self.computeRunningAppsWarning(scannedPaths) }
     }
 
+    /// Le voci che arrivano al motore da sole: una voce coperta è già nei byte della sua cartella.
     private var selectedNodes: [PathNode] {
-        nodes.flatMap { $0.paths.filter(\.isSelected) }
+        nodes.flatMap { $0.paths.filter(\.isSentOnItsOwn) }
     }
 
     public var totalText: String {
@@ -151,9 +222,10 @@ public final class ConfirmStepModel {
         guard canDelete else { return }
         isDeleting = true
 
-        let selections = nodes
-            .map { CategorySelection(categoryId: $0.categoryId, items: $0.paths.filter(\.isSelected).map(\.item)) }
-            .filter { !$0.items.isEmpty }
+        // La regola che decide cosa parte è una sola, nel Core: una voce coperta da una cartella
+        // selezionata non parte da sola.
+        let nodes = nodes
+        let selections = ConfirmationRows.selections(rows) { Self.node(at: $0, in: nodes)?.isSelected ?? false }
 
         // Il diario si apre prima della pulizia e passa al passo 4, che lo scarta solo dopo aver
         // scritto il log di sessione (spec §8.2): dopo un arresto resta leggibile in logs/.
@@ -185,6 +257,41 @@ public final class ConfirmStepModel {
     public func restart() {
         guard !isDeleting else { return }
         navigation?.startOver()
+    }
+
+    private static func node(at position: ConfirmationPosition, in nodes: [CategoryNode]) -> PathNode? {
+        guard nodes.indices.contains(position.category) else { return nil }
+        let paths = nodes[position.category].paths
+        return paths.indices.contains(position.row) ? paths[position.row] : nil
+    }
+
+    /// Lega ogni nodo alla cartella che lo contiene e scrive, sulla riga della cartella, quante voci
+    /// di ciascun gruppo contiene direttamente («Contiene anche 1 voce di File grandi.»).
+    private static func link(_ nodes: [CategoryNode], _ rows: [ConfirmationCategory]) {
+        var contained: [ObjectIdentifier: [Int: Int]] = [:]
+        for (categoryIndex, category) in rows.enumerated() {
+            for (rowIndex, row) in category.rows.enumerated() {
+                guard let position = row.container,
+                      let child = node(at: ConfirmationPosition(category: categoryIndex, row: rowIndex), in: nodes),
+                      let container = node(at: position, in: nodes),
+                      nodes.indices.contains(position.category) else { continue }
+                child.container = container
+                child.containerGroupName = nodes[position.category].displayName
+                contained[ObjectIdentifier(container), default: [:]][categoryIndex, default: 0] += 1
+            }
+        }
+
+        for category in nodes {
+            for path in category.paths {
+                guard let counts = contained[ObjectIdentifier(path)] else { continue }
+                path.containsText = counts.keys.sorted().compactMap { groupIndex -> String? in
+                    guard let count = counts[groupIndex], nodes.indices.contains(groupIndex) else { return nil }
+                    let noun = Formatting.plural(count, String(localized: "voce", bundle: .module), String(localized: "voci", bundle: .module))
+                    return String(localized: "Contiene anche \(Formatting.integer(count)) \(noun) di \(nodes[groupIndex].displayName).", bundle: .module)
+                }
+                .joined(separator: " ")
+            }
+        }
     }
 
     private func applyDeleteProgress(_ progress: CleanProgress) {

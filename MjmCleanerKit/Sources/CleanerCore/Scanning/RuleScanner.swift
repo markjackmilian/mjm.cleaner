@@ -40,13 +40,21 @@ public struct RuleScanner: Sendable {
             return accumulator.outcome
         }
 
+        // Le cartelle escluse nelle Impostazioni si confrontano anche con la root risolta. Se la
+        // root stessa è esclusa, o sta sotto un'esclusione, la regola non produce nulla.
+        let excluded = ExcludedFolders(rule.excludedPaths, root: rule.root, resolvedRoot: rootVerdict.canonicalPathValidated)
+        if let reason = excluded.excludedReason(rule.root) {
+            accumulator.exclusions.append(GuardExclusion(path: rule.root, reason: reason))
+            return accumulator.outcome
+        }
+
         switch rule.mode {
         case .clearContents:
-            try scanContents(rule, &accumulator)
+            try scanContents(rule, excluded, &accumulator)
         case .matchingFiles:
-            try scanFiles(rule, &accumulator)
+            try scanFiles(rule, excluded, &accumulator)
         case .matchingDirs:
-            try scanDirectories(rule, &accumulator)
+            try scanDirectories(rule, excluded, &accumulator)
         }
 
         return accumulator.outcome
@@ -80,7 +88,7 @@ public struct RuleScanner: Sendable {
 
     // MARK: - Modalità
 
-    private func scanContents(_ rule: CleanupRule, _ accumulator: inout Accumulator) throws {
+    private func scanContents(_ rule: CleanupRule, _ excluded: ExcludedFolders, _ accumulator: inout Accumulator) throws {
         for entry in enumerate(rule.root, &accumulator.errors) {
             try Task.checkCancellation()
 
@@ -93,6 +101,13 @@ public struct RuleScanner: Sendable {
             let verdict = pathGuard.validate(entry, declaredRoot: rule.root)
             guard verdict.isAllowed else {
                 accumulator.exclusions.append(GuardExclusion(path: entry, reason: verdict.reason))
+                continue
+            }
+
+            // Anche le esclusioni dell'utente precedono le statistiche: un figlio escluso, o che
+            // contiene una cartella esclusa, non si attraversa nemmeno per misurarlo.
+            if let reason = excluded.candidateReason(entry) {
+                accumulator.exclusions.append(GuardExclusion(path: entry, reason: reason))
                 continue
             }
 
@@ -129,7 +144,7 @@ public struct RuleScanner: Sendable {
         }
     }
 
-    private func scanFiles(_ rule: CleanupRule, _ accumulator: inout Accumulator) throws {
+    private func scanFiles(_ rule: CleanupRule, _ excluded: ExcludedFolders, _ accumulator: inout Accumulator) throws {
         var open = OpenDirectories()
         enter(rule.root, depth: 0, rule, &open, &accumulator.errors)
 
@@ -155,6 +170,12 @@ public struct RuleScanner: Sendable {
                     continue
                 }
 
+                // Le cartelle escluse nelle Impostazioni si potano come quelle della deny-list.
+                if let reason = excluded.excludedReason(entry) {
+                    accumulator.exclusions.append(GuardExclusion(path: entry, reason: reason))
+                    continue
+                }
+
                 enter(entry, depth: depth + 1, rule, &open, &accumulator.errors)
                 continue
             }
@@ -175,7 +196,7 @@ public struct RuleScanner: Sendable {
 
     /// Cerca in profondità cartelle il cui nome corrisponde ai pattern (bin/obj, pacchetti NuGet).
     /// Una cartella trovata non viene mai attraversata oltre: sarà eliminata per intero.
-    private func scanDirectories(_ rule: CleanupRule, _ accumulator: inout Accumulator) throws {
+    private func scanDirectories(_ rule: CleanupRule, _ excluded: ExcludedFolders, _ accumulator: inout Accumulator) throws {
         var open = OpenDirectories()
         enter(rule.root, depth: 0, rule, &open, &accumulator.errors)
 
@@ -193,6 +214,13 @@ public struct RuleScanner: Sendable {
                 continue
             }
 
+            // Una cartella esclusa nelle Impostazioni non si propone e non si attraversa, anche se
+            // si chiama "bin" o "obj".
+            if let reason = excluded.excludedReason(entry) {
+                accumulator.exclusions.append(GuardExclusion(path: entry, reason: reason))
+                continue
+            }
+
             // Un'esclusione è un rifiuto esplicito, non un "continua a cercare più in basso":
             // scendervi proporrebbe una singola versione di un pacchetto escluso.
             if Self.matchesAnyGlob(name, rule.excludeGlobs) { continue }
@@ -207,6 +235,12 @@ public struct RuleScanner: Sendable {
                 let verdict = pathGuard.validate(entry, declaredRoot: rule.root)
                 guard verdict.isAllowed else {
                     accumulator.exclusions.append(GuardExclusion(path: entry, reason: verdict.reason))
+                    continue
+                }
+
+                // Eliminare la cartella trovata cancellerebbe anche una cartella esclusa al suo interno.
+                if let reason = excluded.candidateReason(entry) {
+                    accumulator.exclusions.append(GuardExclusion(path: entry, reason: reason))
                     continue
                 }
 

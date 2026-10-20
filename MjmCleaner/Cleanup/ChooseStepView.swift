@@ -1,8 +1,8 @@
 import CleanerFeatures
 import SwiftUI
 
-/// Passo 1 (`ChooseStepView`): le categorie da analizzare. Tutta la riga commuta la casella;
-/// «Pacchetti NuGet inutilizzati» è una riga figlia indentata.
+/// Passo 1 (`ChooseStepView`): le categorie da analizzare. Tutta la riga commuta la casella, se la
+/// categoria è disponibile; «Pacchetti NuGet inutilizzati» è una riga figlia indentata.
 struct ChooseStepView: View {
     let model: ChooseStepModel
 
@@ -61,6 +61,8 @@ private struct ChoiceRow: View {
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .disabled(!choice.isAvailable)
+                // VoiceOver dice perché la casella è disattivata; il testo è vuoto per una categoria disponibile.
+                .accessibilityHint(Text(choice.unavailableText))
             CategoryTile(visual: choice.visual)
                 .opacity(choice.isAvailable ? 1 : 0.5)
             VStack(alignment: .leading, spacing: 2) {
@@ -104,6 +106,7 @@ private struct MissingFoldersNote: View {
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
             Text(text)
+                .fixedSize(horizontal: false, vertical: true)
             Button("Apri Impostazioni…", action: openSettings)
                 .buttonStyle(.link)
         }

@@ -17,9 +17,10 @@ struct AppKitAppearance: AppearanceApplying {
 ///
 /// Di norma solo cartelle: un pacchetto (`.app`, `.pvm`, `.logarchive`…) compare come un file
 /// grigio. Con `allowsPackages` il pacchetto si sceglie intero, senza entrarci, e i file normali
-/// restano grigi: lo scanner tratta i pacchetti come unità, e un pezzo interno escluso non
-/// servirebbe a nulla. `.utm` e `.vmwarevm` senza le loro app sono cartelle comuni e si scelgono
-/// comunque (verificato il 2026-10-20).
+/// restano grigi: lo scanner tratta i pacchetti come unità, e al passo 3 il pacchetto escluso
+/// compare con il suo nome e il motivo «cartella esclusa nelle Impostazioni». `.utm` e
+/// `.vmwarevm` senza le loro app risultano `public.folder` (sonda dei tipi del 2026-10-20) e si
+/// scelgono come cartelle.
 @MainActor
 struct AppKitFolderPicker: FolderPicking {
     func pickFolder(title: String, allowsPackages: Bool) async -> String? {

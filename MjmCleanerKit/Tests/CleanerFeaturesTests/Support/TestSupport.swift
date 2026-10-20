@@ -126,6 +126,8 @@ func makeReport(
         deletedPaths: deletedPaths)
 }
 
+/// La categoria non ha regole: un `CategoryChoice` costruito con essa non è disponibile al passo 1
+/// e non risulta mai selezionato.
 func makeCategory(
     _ id: String, name: String? = nil, parent: String? = nil, risk: RiskLevel = .low, itemsSelectedByDefault: Bool = true
 ) -> CleanupCategory {

@@ -38,7 +38,7 @@ public final class SettingsModel: Identifiable {
     public var largeFileRoots: [String]
     public var selectedProjectRoot: String?
     public var selectedLargeFileRoot: String?
-    /// Cartelle mai analizzate né proposte, in nessuna categoria della pulizia guidata.
+    /// Cartelle e pacchetti mai analizzati né proposti, in nessuna categoria della pulizia guidata.
     public var excludedFolders: [String]
     public var selectedExcludedFolder: String?
     public var largeFileThresholdMegabytes: Int

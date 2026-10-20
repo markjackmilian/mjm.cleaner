@@ -138,6 +138,21 @@ struct ExcludedFoldersDiskSpellingTests {
         #expect(outcome.exclusions == [GuardExclusion(path: "\(Self.src)/app/bin", reason: Self.containsReason)])
     }
 
+    /// Un'esclusione scritta attraverso un collegamento il cui ultimo componente è a sua volta un
+    /// collegamento: si riconosce e si risolve sulla grafia del disco, non sul testo.
+    @Test func anExclusionWrittenThroughALinkThatIsItselfALinkAlsoExcludesItsTarget() throws {
+        let memory = InMemoryFileSystem()
+        projects(memory)
+        memory.addFile("\(Self.src)/app/bin/tieni/firma.p12", size: 5)
+        let fs = AliasingFileSystem(memory, aliases: [("\(Self.src)/collegamento", "\(Self.src)/archivio")])
+        let links = FakeLinkInspector(targets: ["\(Self.src)/archivio/tieni": "\(Self.src)/app/bin/tieni"])
+
+        let outcome = try create(fs, links: links).scan(binAndObj(excluded: "\(Self.src)/collegamento/tieni"))
+
+        #expect(outcome.items.map(\.path) == ["\(Self.src)/vecchio/bin"])
+        #expect(outcome.exclusions == [GuardExclusion(path: "\(Self.src)/app/bin", reason: Self.containsReason)])
+    }
+
     // MARK: - Grafie diverse dello stesso percorso
 
     /// Una root dichiarata "/private/var/…" non ha collegamenti da risolvere: un'esclusione scritta
@@ -193,19 +208,38 @@ struct ExcludedFoldersDiskSpellingTests {
 
     /// La root dichiarata in NFD, il disco e l'esclusione presa dal pannello in NFC: gli elementi
     /// arrivano sotto la root dichiarata, e l'esclusione vale solo sotto la grafia del disco della
-    /// root.
-    @Test func anExclusionInTheDiskSpellingMatchesARootDeclaredInAnotherNormalization() throws {
+    /// root. `contains` prova il caso «contiene».
+    @Test(arguments: [("/tieni", false), ("/tieni/sotto", true)])
+    func anExclusionInTheDiskSpellingMatchesARootDeclaredInAnotherNormalization(suffix: String, contains: Bool) throws {
         let declared = "/Users/tester/Lavoro/Cafe\u{0301}"
         let onDisk = "/Users/tester/Lavoro/Caf\u{00E9}"
         let memory = InMemoryFileSystem()
-        memory.addFile("\(declared)/tieni/dati.bin", size: 100)
+        memory.addFile("\(declared)/tieni/sotto/dati.bin", size: 100)
         memory.addFile("\(declared)/via/dati.bin", size: 100)
         let fs = AliasingFileSystem(memory, aliases: [(declared, onDisk)])
 
-        let outcome = try create(fs).scan(CleanupRule(declared, .clearContents, include: Self.all, exclude: [], excludedPaths: ["\(onDisk)/tieni"]))
+        let outcome = try create(fs).scan(CleanupRule(declared, .clearContents, include: Self.all, exclude: [], excludedPaths: ["\(onDisk)\(suffix)"]))
 
         #expect(outcome.items.map(\.path) == ["\(declared)/via"])
-        #expect(outcome.exclusions == [GuardExclusion(path: "\(declared)/tieni", reason: Self.excludedReason)])
+        #expect(outcome.exclusions == [GuardExclusion(path: "\(declared)/tieni", reason: contains ? Self.containsReason : Self.excludedReason)])
+    }
+
+    /// La root dichiarata è un collegamento: `storedPath` non segue l'ultimo componente, quindi la
+    /// grafia del disco va presa dalla root risolta, la destinazione, non dal collegamento.
+    @Test func anExclusionInTheDiskSpellingOfALinkedRootMatches() throws {
+        let target = "/Users/tester/Archivio/Cafe\u{0301}"
+        let onDisk = "/Users/tester/Archivio/Caf\u{00E9}"
+        let memory = InMemoryFileSystem()
+        memory.addFile("\(Self.caches)/tieni/dati.bin", size: 100)
+        memory.addFile("\(Self.caches)/via/dati.bin", size: 100)
+        let fs = AliasingFileSystem(memory, aliases: [(target, onDisk)])
+        let links = FakeLinkInspector(targets: [Self.caches: target])
+
+        let outcome = try create(fs, links: links).scan(CleanupRule(
+            Self.caches, .clearContents, include: Self.all, exclude: [], excludedPaths: ["\(onDisk)/tieni"]))
+
+        #expect(outcome.items.map(\.path) == ["\(Self.caches)/via"])
+        #expect(outcome.exclusions == [GuardExclusion(path: "\(Self.caches)/tieni", reason: Self.excludedReason)])
     }
 
     // MARK: - Rifiuti

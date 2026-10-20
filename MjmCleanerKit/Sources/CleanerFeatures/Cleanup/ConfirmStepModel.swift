@@ -11,10 +11,11 @@ import Observation
 @Observable
 public final class PathNode: Identifiable {
     public let item: ScanItem
-    public var isSelected = true
+    public var isSelected: Bool
 
-    init(item: ScanItem) {
+    init(item: ScanItem, isSelected: Bool) {
         self.item = item
+        self.isSelected = isSelected
     }
 
     public var path: String { item.path }
@@ -33,12 +34,33 @@ public final class CategoryNode: Identifiable {
     /// dimensione di tutte le righe trovate, selezionate o no.
     public let summaryText: String
 
-    init(categoryId: String, displayName: String, items: [ScanItem]) {
+    /// Vero per i gruppi di dati reali (Download, File grandi): le voci partono deselezionate.
+    public let itemsStartDeselected: Bool
+
+    init(categoryId: String, displayName: String, items: [ScanItem], itemsSelectedByDefault: Bool) {
         self.categoryId = categoryId
         self.displayName = displayName
-        paths = items.map(PathNode.init)
+        paths = items.map { PathNode(item: $0, isSelected: itemsSelectedByDefault) }
+        itemsStartDeselected = !itemsSelectedByDefault
         let noun = Formatting.plural(items.count, String(localized: "elemento", bundle: .module), String(localized: "elementi", bundle: .module))
         summaryText = "\(Formatting.integer(items.count)) \(noun) · \(Formatting.bytes(SafeSum.total(items.map(\.sizeBytes))))"
+    }
+
+    /// La casella «Seleziona tutte le voci»: vera se il gruppo ha voci e sono tutte selezionate;
+    /// impostarla seleziona o deseleziona ogni voce. È calcolata, quindi resta allineata alle
+    /// caselle delle singole voci senza stato da sincronizzare.
+    public var allSelected: Bool {
+        get { !paths.isEmpty && paths.allSatisfy(\.isSelected) }
+        set {
+            for path in paths {
+                path.isSelected = newValue
+            }
+        }
+    }
+
+    /// Il nome della casella di gruppo per VoiceOver, che altrimenti non saprebbe di quale gruppo.
+    public var selectAllAccessibilityLabel: String {
+        String(localized: "Seleziona tutte le voci di \(displayName)", bundle: .module)
     }
 }
 
@@ -84,8 +106,12 @@ public final class ConfirmStepModel {
         // due regole, anche di categorie diverse, possono coprire lo stesso file. La logica vive
         // nel Core (ConfirmationRows), pura e testata; qui si trasforma in nodi.
         nodes = ConfirmationRows.build(results).map { row in
-            let name = categories.first { FeatureText.same($0.id, row.categoryId) }?.displayName ?? row.categoryId
-            return CategoryNode(categoryId: row.categoryId, displayName: name, items: row.items)
+            let category = categories.first { FeatureText.same($0.id, row.categoryId) }
+            // Una categoria assente dal catalogo oggi non capita; se capitasse, le sue voci partono
+            // deselezionate: è la direzione sicura.
+            return CategoryNode(
+                categoryId: row.categoryId, displayName: category?.displayName ?? row.categoryId, items: row.items,
+                itemsSelectedByDefault: category?.itemsSelectedByDefault ?? false)
         }
 
         let exclusions = results.flatMap(\.exclusions)

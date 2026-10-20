@@ -195,6 +195,33 @@ struct LocalFileSystemTests {
         #expect(fs.directoryExists(tmp.path + "/a/b/c"))
     }
 
+    /// `.app` è un pacchetto per ogni Mac; `.utm` e `.VMwareVM` lo sono grazie al ripiego per
+    /// estensione anche dove UTM e VMware Fusion non sono installati. Una cartella qualunque, un file
+    /// con estensione da pacchetto, un collegamento a un pacchetto e un percorso assente no.
+    /// Un collegamento con estensione da macchina virtuale non è un pacchetto, e la lista del ripiego è fissata.
+    @Test func isPackageRecognisesBundlesAndVirtualMachines() throws {
+        let tmp = try TemporaryDirectory(); defer { tmp.remove() }
+        let app = try tmp.directory("Strumento.app")
+        let utm = try tmp.directory("Linux.utm")
+        let vmware = try tmp.directory("Windows.VMwareVM")
+        let pvm = try tmp.directory("Windows 11.pvm")
+        let plain = try tmp.directory("cartella")
+        let file = try tmp.file("finto.pvm", contents: "x")
+        let link = try tmp.symlink("collegamento.app", to: app)
+        let vmLink = try tmp.symlink("collegamento.utm", to: utm)
+
+        #expect(fs.isPackage(app))
+        #expect(fs.isPackage(utm))
+        #expect(fs.isPackage(vmware))
+        #expect(fs.isPackage(pvm))
+        #expect(!fs.isPackage(plain))
+        #expect(!fs.isPackage(file))
+        #expect(!fs.isPackage(link))
+        #expect(!fs.isPackage(vmLink))
+        #expect(!fs.isPackage(tmp.path + "/assente.app"))
+        #expect(Set(LocalFileSystem.virtualMachinePackageExtensions) == ["pvm", "vmwarevm", "utm"])
+    }
+
     @Test(.enabled(if: TemporaryDirectory.volumeIsCaseInsensitive))
     func defaultApfsVolumeIsCaseInsensitive() throws {
         let tmp = try TemporaryDirectory(); defer { tmp.remove() }

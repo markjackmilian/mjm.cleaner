@@ -71,6 +71,19 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    FolderList(
+                        roots: model.excludedFolders,
+                        selection: $model.selectedExcludedFolder,
+                        canRemove: model.canRemoveExcludedFolder,
+                        add: model.addExcludedFolder,
+                        remove: model.removeExcludedFolder)
+                } header: {
+                    Text("Cartelle escluse")
+                } footer: {
+                    Text("Non vengono mai analizzate né proposte, in nessuna categoria della pulizia. Le pagine Xcode e Docker non le usano.")
+                }
+
+                Section {
                     NumberRow(
                         title: "Download", accessibilityName: "Età minima dei download", unit: "giorni",
                         value: $model.downloadsMinAgeDays, range: SettingsModel.minAgeDaysRange)

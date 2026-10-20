@@ -30,7 +30,7 @@ struct AppEnvironmentTests {
 
         #expect(environment.expandedProjectRoots() == ["/Users/tester/src", "/Volumes/Dati/progetti"])
         #expect(environment.categories().map(\.id) == [
-            "system-caches", "dev-caches", "nuget-packages", "project-build-output", "logs", "trash", "downloads-large",
+            "system-caches", "dev-caches", "nuget-packages", "project-build-output", "logs", "trash", "downloads", "large-files",
         ])
         #expect(environment.categories().first { $0.id == "project-build-output" }?.rules.map(\.root)
             == ["/Users/tester/src", "/Volumes/Dati/progetti"])

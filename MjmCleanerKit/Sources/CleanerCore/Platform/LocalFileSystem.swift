@@ -166,6 +166,25 @@ public struct LocalFileSystem: FileSystem {
         return try Self.parseStoredPathResponse(buffer, path: path)
     }
 
+    /// Le estensioni dei pacchetti di macchine virtuali: macOS li riconosce come pacchetti solo se
+    /// il loro programma è installato (sul Mac dell'utente, il 2026-10-19, `.pvm` sì perché c'è
+    /// Parallels Desktop, `.vmwarevm` e `.utm` no). Senza il programma una macchina copiata o
+    /// archiviata sembrerebbe una cartella qualunque, e lo scanner ne proporrebbe i dischi interni.
+    static let virtualMachinePackageExtensions = ["pvm", "vmwarevm", "utm"]
+
+    /// `lstat` prima di tutto: un collegamento non è mai un pacchetto, anche se punta a uno. Poi le
+    /// estensioni delle macchine virtuali, poi `URLResourceValues.isPackage` (circa 20 µs per
+    /// cartella, misurati il 2026-10-19 su 10.000 cartelle).
+    public func isPackage(_ path: String) -> Bool {
+        var status = stat()
+        guard lstat(path, &status) == 0, (status.st_mode & S_IFMT) == S_IFDIR else { return false }
+        let url = URL(filePath: path, directoryHint: .isDirectory)
+        if Self.virtualMachinePackageExtensions.contains(where: { PathText.equalsIgnoringCase($0, url.pathExtension) }) {
+            return true
+        }
+        return (try? url.resourceValues(forKeys: [.isPackageKey]).isPackage) ?? false
+    }
+
     static func parseStoredPathResponse(_ buffer: [UInt8], path: String) throws -> String {
         let headerSize = MemoryLayout<UInt32>.size
         let referenceSize = MemoryLayout<attrreference_t>.size

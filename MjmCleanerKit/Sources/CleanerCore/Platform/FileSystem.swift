@@ -91,6 +91,10 @@ public protocol FileSystem: Sendable {
     /// "Des\u{212A}top", "De\u{017F}ktop" e "DESKTOP" danno "Desktop". Un percorso inesistente
     /// lancia `ENOENT`; ogni altro errore lancia il suo errno.
     func storedPath(_ path: String) throws -> String
+    /// Vero se `path` è una cartella che macOS tratta come un documento unico, cioè un pacchetto
+    /// (`.app`, `.pvm`, `.photoslibrary`, `.logarchive`…), senza equivalente .NET. Un file, un
+    /// collegamento simbolico o un percorso inesistente valgono falso.
+    func isPackage(_ path: String) -> Bool
 }
 
 extension FileSystem {

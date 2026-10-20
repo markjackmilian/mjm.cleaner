@@ -33,9 +33,13 @@ struct HistoryTests {
 
     @Test func categoriesShowReadableNames() throws {
         let row = HistoryRow(
-            session: try Self.session("system-caches", "docker-images", "xcode-derived-data", "trash-downloads-large", "sconosciuta"),
+            session: try Self.session(
+                "system-caches", "docker-images", "xcode-derived-data", "trash-downloads-large", "downloads-large", "sconosciuta"),
             names: Self.names)
-        #expect(row.categoryNames == ["Cache utente e di sistema", "Immagini Docker", "DerivedData", "Cestino, Download e file grandi", "sconosciuta"])
+        #expect(row.categoryNames == [
+            "Cache utente e di sistema", "Immagini Docker", "DerivedData", "Cestino, Download e file grandi", "Download e file grandi",
+            "sconosciuta",
+        ])
     }
 
     @Test(arguments: [(0, "nessuna pulizia"), (1, "in 1 pulizia"), (4, "in 4 pulizie")])

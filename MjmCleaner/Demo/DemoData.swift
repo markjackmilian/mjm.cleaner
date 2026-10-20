@@ -10,7 +10,7 @@ enum DemoData {
 
     // MARK: Pulizia
 
-    static let analyzedCategoryIds = ["system-caches", "dev-caches", "nuget-packages", "logs"]
+    static let analyzedCategoryIds = ["system-caches", "dev-caches", "nuget-packages", "logs", "large-files"]
 
     static let scanProgress = [
         ScanProgress(categoryId: "system-caches", currentPath: "/Users/demo/Library/Caches/com.apple.Safari", itemsFound: 214, bytesFound: 3 * gigabyte),
@@ -32,6 +32,11 @@ enum DemoData {
         ]),
         result("logs", [
             item("/Users/demo/Library/Logs/DiagnosticReports", 96 * megabyte),
+        ]),
+        // Al passo 3 le voci dei file grandi partono deselezionate: una macchina virtuale è un'unica voce.
+        result("large-files", [
+            item("/Users/demo/Macchine virtuali/Windows 11.pvm", 64 * gigabyte),
+            item("/Users/demo/Downloads/Xcode_26.xip", 9 * gigabyte),
         ]),
     ]
 

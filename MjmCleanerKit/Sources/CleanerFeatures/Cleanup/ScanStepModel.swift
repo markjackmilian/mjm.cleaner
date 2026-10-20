@@ -35,6 +35,11 @@ public final class ScanStepModel {
     /// L'analisi parte alla creazione della pagina; Annulla annulla questo task.
     @ObservationIgnored public private(set) var run: Task<Void, Never>?
 
+    /// Vero quando la finestra ha lasciato questa analisi (per esempio con Salva nelle
+    /// Impostazioni): i suoi risultati non portano più al passo 3, perché potrebbero non
+    /// rispettare le impostazioni appena salvate, come una cartella appena esclusa.
+    @ObservationIgnored private var abandoned = false
+
     public init(environment: AppEnvironment, navigation: (any CleanupNavigating)?, categories: [CleanupCategory]) {
         self.environment = environment
         self.navigation = navigation
@@ -44,6 +49,12 @@ public final class ScanStepModel {
     }
 
     public func cancel() {
+        run?.cancel()
+    }
+
+    /// La finestra lascia questa analisi: si ferma e, finita o annullata, non naviga più.
+    func abandon() {
+        abandoned = true
         run?.cancel()
     }
 
@@ -58,10 +69,12 @@ public final class ScanStepModel {
             let results = try await environment.scan.scan(categories, progress: relay.report)
             await relay.finish()
             isRunning = false
+            guard !abandoned else { return }
             navigation?.showConfirm(categories, results: results)
         } catch is CancellationError {
             await relay.finish()
             isRunning = false
+            guard !abandoned else { return }
             navigation?.startOver()
         } catch {
             await relay.finish()

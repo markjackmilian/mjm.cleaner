@@ -6,7 +6,7 @@ import Testing
 /// Solo Swift: il C# non aveva prove per il passo 3. Il diario (spec §8.2) è nuovo.
 @MainActor
 struct ConfirmStepModelTests {
-    private let categories = [makeCategory("logs", name: "Log e crash report"), makeCategory("downloads-large", name: "Download e file grandi")]
+    private let categories = [makeCategory("logs", name: "Log e crash report"), makeCategory("archive", name: "Archivio")]
 
     private var results: [CategoryScanResult] {
         [
@@ -16,7 +16,7 @@ struct ConfirmStepModelTests {
                 totalBytes: 3072, errors: [], exclusions: []),
             // Lo stesso file proposto anche dai file grandi: una sola riga, nella prima categoria.
             CategoryScanResult(
-                categoryId: "downloads-large",
+                categoryId: "archive",
                 items: [makeItem("/Users/tester/Library/Logs/b.log", size: 2048), makeItem("/Users/tester/Downloads/big.iso", size: 1_048_576)],
                 totalBytes: 1_050_624, errors: [], exclusions: []),
         ]
@@ -25,7 +25,7 @@ struct ConfirmStepModelTests {
     @Test func rowsArePerPathAcrossCategoriesWithSummariesAndTotal() throws {
         let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: categories, results: results)
 
-        #expect(model.nodes.map(\.displayName) == ["Log e crash report", "Download e file grandi"])
+        #expect(model.nodes.map(\.displayName) == ["Log e crash report", "Archivio"])
         #expect(model.nodes.map { $0.paths.map(\.path) } == [
             ["/Users/tester/Library/Logs/a.log", "/Users/tester/Library/Logs/b.log"],
             ["/Users/tester/Downloads/big.iso"],
@@ -183,8 +183,91 @@ struct ConfirmStepModelTests {
 
         await model.delete()
 
-        #expect(clean.selections.map { $0.map(\.categoryId) } == [["logs", "downloads-large"]])
+        #expect(clean.selections.map { $0.map(\.categoryId) } == [["logs", "archive"]])
         #expect(clean.selections.first?.map { $0.items.map(\.path) } == [["/Users/tester/Library/Logs/b.log"], ["/Users/tester/Downloads/big.iso"]])
+    }
+
+    // Download e File grandi (spec `2026-10-19-large-files-exclusions-design.md`).
+
+    private let realData = [
+        makeCategory("logs", name: "Log e crash report"),
+        makeCategory("downloads", name: "Download", itemsSelectedByDefault: false),
+        makeCategory("large-files", name: "File grandi", itemsSelectedByDefault: false),
+    ]
+
+    private var realDataResults: [CategoryScanResult] {
+        [
+            CategoryScanResult(
+                categoryId: "logs", items: [makeItem("/Users/tester/Library/Logs/a.log", size: 1024)],
+                totalBytes: 1024, errors: [], exclusions: []),
+            CategoryScanResult(
+                categoryId: "downloads", items: [makeItem("/Users/tester/Downloads/vecchio.dmg", size: 2048)],
+                totalBytes: 2048, errors: [], exclusions: []),
+            CategoryScanResult(
+                categoryId: "large-files",
+                items: [makeItem("/Users/tester/Parallels/Windows 11.pvm", size: 4096), makeItem("/Users/tester/Lavoro/immagine.iso", size: 8192)],
+                totalBytes: 12_288, errors: [], exclusions: []),
+        ]
+    }
+
+    @Test func downloadsAndLargeFilesStartDeselected() throws {
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: realData, results: realDataResults)
+
+        #expect(model.nodes.map { $0.paths.map(\.isSelected) } == [[true], [false], [false, false]])
+        #expect(model.nodes.map(\.itemsStartDeselected) == [false, true, true])
+        #expect(model.totalText == "1 KB · 1 elemento")
+    }
+
+    @Test func withOnlyRealDataNothingIsDeletedUntilAnItemIsTicked() throws {
+        let model = ConfirmStepModel(
+            environment: try makeEnvironment(), navigation: nil,
+            categories: Array(realData.dropFirst()), results: Array(realDataResults.dropFirst()))
+
+        #expect(model.totalText == "0 B · 0 elementi")
+        #expect(!model.canDelete)
+
+        model.nodes[1].paths[1].isSelected = true
+
+        #expect(model.totalText == "8 KB · 1 elemento")
+        #expect(model.canDelete)
+    }
+
+    @Test func selectAllReadsAndWritesTheWholeGroup() throws {
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: realData, results: realDataResults)
+        let large = model.nodes[2]
+
+        #expect(!large.allSelected)
+        large.paths[0].isSelected = true
+        #expect(!large.allSelected)
+
+        large.allSelected = true
+        #expect(large.paths.map(\.isSelected) == [true, true])
+        #expect(large.allSelected)
+
+        large.allSelected = false
+        #expect(large.paths.map(\.isSelected) == [false, false])
+        #expect(model.nodes[0].allSelected)
+        #expect(large.selectAllAccessibilityLabel == "Seleziona tutte le voci di File grandi")
+    }
+
+    @Test func aCategoryMissingFromTheCatalogStartsDeselected() throws {
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: [], results: [realDataResults[0]])
+
+        #expect(model.nodes.map { $0.paths.map(\.isSelected) } == [[false]])
+        #expect(!model.canDelete)
+    }
+
+    @Test func deleteHandsOverOnlyTheTickedRealData() async throws {
+        let clean = FakeClean()
+        let model = ConfirmStepModel(environment: try makeEnvironment(clean: clean), navigation: nil, categories: realData, results: realDataResults)
+        model.nodes[2].paths[1].isSelected = true
+
+        await model.delete()
+
+        #expect(clean.selections.first?.map(\.categoryId) == ["logs", "large-files"])
+        #expect(clean.selections.first?.map { $0.items.map(\.path) } == [
+            ["/Users/tester/Library/Logs/a.log"], ["/Users/tester/Lavoro/immagine.iso"],
+        ])
     }
 
     @Test func deleteWithNothingSelectedDoesNothing() async throws {

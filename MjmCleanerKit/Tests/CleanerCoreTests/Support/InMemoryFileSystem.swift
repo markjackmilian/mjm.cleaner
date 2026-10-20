@@ -23,6 +23,7 @@ final class InMemoryFileSystem: FileSystem {
     }
 
     private let nodes = Mutex<[String: Node]>(["/": .directory(Date())])
+    private let packages = Mutex<Set<String>>([])
     private let freeSpace = Mutex<Int64>(0)
 
     init() {}
@@ -49,6 +50,13 @@ final class InMemoryFileSystem: FileSystem {
             Self.ensureParents(of: key, in: &nodes)
             if nodes[key] == nil { nodes[key] = .directory(Date()) }
         }
+    }
+
+    /// Dichiara `path` un pacchetto macOS, creandolo come cartella se manca: il riconoscimento
+    /// reale dipende dai tipi registrati nel sistema, qui basta la dichiarazione del test.
+    func addPackage(_ path: String) {
+        addDirectory(path)
+        packages.withLock { _ = $0.insert(Self.key(path)) }
     }
 
     func setTimes(_ path: String, lastWrite: Date, lastAccess: Date) {
@@ -150,6 +158,12 @@ final class InMemoryFileSystem: FileSystem {
         let key = Self.key(path)
         guard nodes.withLock({ $0[key] != nil }) else { throw FileSystemError(code: ENOENT, path: path) }
         return key
+    }
+
+    /// Vero solo per le cartelle dichiarate con `addPackage` e ancora presenti.
+    func isPackage(_ path: String) -> Bool {
+        let key = Self.key(path)
+        return packages.withLock { $0.contains(key) } && directoryExists(path)
     }
 
     // MARK: - Privati

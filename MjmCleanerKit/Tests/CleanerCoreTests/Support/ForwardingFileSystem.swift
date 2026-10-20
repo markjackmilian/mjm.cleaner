@@ -24,4 +24,5 @@ class ForwardingFileSystem: FileSystem, @unchecked Sendable {
         try inner.availableFreeSpace(forVolumeContaining: path)
     }
     func storedPath(_ path: String) throws -> String { try inner.storedPath(path) }
+    func isPackage(_ path: String) -> Bool { inner.isPackage(path) }
 }

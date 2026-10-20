@@ -25,6 +25,9 @@ public struct CleanupRule: Sendable, Equatable {
     public let minSizeBytes: Int64?
     public let maxDepth: Int
     public let requiresProjectMarker: Bool
+    /// Le cartelle escluse nelle Impostazioni, già espanse: mai attraversate né proposte, e nemmeno
+    /// una cartella che ne contiene una (spec `2026-10-19-large-files-exclusions-design.md`).
+    public let excludedPaths: [String]
 
     public init(
         _ root: String,
@@ -34,7 +37,8 @@ public struct CleanupRule: Sendable, Equatable {
         minAge: TimeInterval? = nil,
         minSizeBytes: Int64? = nil,
         maxDepth: Int = .max,
-        requiresProjectMarker: Bool = false
+        requiresProjectMarker: Bool = false,
+        excludedPaths: [String] = []
     ) {
         self.root = root
         self.mode = mode
@@ -44,5 +48,13 @@ public struct CleanupRule: Sendable, Equatable {
         self.minSizeBytes = minSizeBytes
         self.maxDepth = maxDepth
         self.requiresProjectMarker = requiresProjectMarker
+        self.excludedPaths = excludedPaths
+    }
+
+    /// La stessa regola con le cartelle escluse nelle Impostazioni.
+    public func excluding(_ excludedPaths: [String]) -> CleanupRule {
+        CleanupRule(
+            root, mode, include: includeGlobs, exclude: excludeGlobs, minAge: minAge, minSizeBytes: minSizeBytes,
+            maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths)
     }
 }

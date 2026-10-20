@@ -55,7 +55,7 @@ The application uses a four-step wizard, always in the same order:
 |---|---|
 | **1 · Choose** | Select the categories to clean. Each category declares its risk level; high-risk categories are never preselected. |
 | **2 · Analyze** | Performs a read-only scan, processing categories in parallel. Nothing is deleted. |
-| **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard`. This is the final point at which the operation can be abandoned. |
+| **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard` and by the excluded folders. Each group has a «Select all» checkbox; Downloads and large-file items start deselected. This is the final point at which the operation can be abandoned. |
 | **4 · Done** | Summarizes the disk space recovered and any items that could not be deleted. |
 
 In the sidebar, **Docker** opens the Docker cleanup page, **Xcode** opens the
@@ -63,8 +63,8 @@ Xcode cache and simulator page (see below), and **History** shows previous
 cleanup sessions and the cumulative space recovered. **Settings**, at the bottom
 of the sidebar and in the app menu (<kbd>⌘,</kbd>), configures the project
 directories searched for `bin` and `obj`, the directories searched for large
-files, the large-file size threshold, and the minimum ages for Downloads, logs,
-and NuGet packages.
+files, the large-file size threshold, the folders excluded from every cleanup
+category, and the minimum ages for Downloads, logs, and NuGet packages.
 
 ### Categories
 
@@ -75,7 +75,20 @@ and NuGet packages.
 - **Project bin and obj directories** — only when a project file (`.csproj`,
   `.sln`, …) exists next to the directory
 - **Logs and crash reports** — `~/Library/Logs`, `/Library/Logs`
-- **Trash, Downloads, and large files** — high risk, never preselected
+- **Trash** — high risk, never preselected
+- **Downloads** — files in `~/Downloads` older than the minimum age; high risk,
+  never preselected, and every item starts deselected in the preview
+- **Large files** — files and packages above the threshold in the directories
+  chosen in Settings; high risk, never preselected, and every item starts
+  deselected in the preview
+
+In Downloads, large files, and logs, macOS packages, such as apps, Photos
+libraries, and Parallels, VMware Fusion, or UTM virtual machines, are listed as
+a single item and never entered: deleting a file inside one would break it.
+Folders excluded in Settings are never scanned or proposed. A folder that would
+be deleted as a whole, such as a cache subfolder, a `bin` or `obj` directory,
+or a macOS package, is not proposed if it contains an excluded folder. The Xcode
+and Docker pages do not use excluded folders.
 
 ### Xcode
 

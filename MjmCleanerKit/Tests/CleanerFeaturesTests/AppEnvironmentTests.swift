@@ -84,6 +84,26 @@ struct AppEnvironmentTests {
         #expect(report.itemsDeleted == 1)
     }
 
+    /// Spec `2026-10-20-confirmation-containment-design.md`: in `live` il passo 3 risolve le root con
+    /// lo stesso `PathGuard` del motore, quindi un collegamento reale porta dove porta.
+    @Test func liveRootsFollowARealLink() async throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        guard let resolved = realpath(directory.path, nil) else {
+            throw UnexpectedTestError(description: "realpath non riuscito")
+        }
+        defer { free(resolved) }
+        let home = String(cString: resolved) + "/home"
+        try FileManager.default.createDirectory(atPath: home + "/Dati/cache", withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: home + "/.cache", withDestinationPath: home + "/Dati/cache")
+
+        let environment = try await AppEnvironment.live(
+            paths: AppPaths(supportDirectory: directory.path + "/dati"), home: home, tempDirectory: directory.path + "/tmp")
+
+        #expect(environment.roots.resolvedRoot(home + "/.cache") == home + "/Dati/cache")
+        #expect(environment.roots.resolvedRoot(home + "/Dati") == home + "/Dati")
+    }
+
     @Test func defaultPathsIsolatesDebugDataFromRelease() {
         let debug = AppEnvironment.defaultPaths(bundleIdentifier: "com.mjm.cleaner.debug")
         let release = AppEnvironment.defaultPaths(bundleIdentifier: "com.mjm.cleaner")

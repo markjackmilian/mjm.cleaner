@@ -7,6 +7,9 @@ import Foundation
 public struct AppEnvironment: Sendable {
     public let scan: any ScanPerforming
     public let clean: any CleanPerforming
+    /// Le root come le risolve il motore: il passo 3 le usa per riconoscere le voci contenute in
+    /// una cartella proposta da un'altra voce.
+    public let roots: any RootResolving
     public let history: any HistoryStoring
     public let sessionLog: any SessionLogWriting
     public let settings: any SettingsStoring
@@ -22,6 +25,7 @@ public struct AppEnvironment: Sendable {
     public init(
         scan: any ScanPerforming,
         clean: any CleanPerforming,
+        roots: any RootResolving,
         history: any HistoryStoring,
         sessionLog: any SessionLogWriting,
         settings: any SettingsStoring,
@@ -35,6 +39,7 @@ public struct AppEnvironment: Sendable {
     ) {
         self.scan = scan
         self.clean = clean
+        self.roots = roots
         self.history = history
         self.sessionLog = sessionLog
         self.settings = settings
@@ -117,6 +122,7 @@ public struct AppEnvironment: Sendable {
         return AppEnvironment(
             scan: ScanEngine(scanner: scanner),
             clean: CleanEngine(fileSystem: fileSystem, pathGuard: pathGuard, clock: clock),
+            roots: pathGuard,
             history: history,
             sessionLog: SessionLogWriter(fileSystem: fileSystem, paths: paths),
             settings: SettingsStore(fileSystem: fileSystem, paths: paths),

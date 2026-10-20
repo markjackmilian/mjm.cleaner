@@ -28,6 +28,10 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
     @ObservationIgnored private weak var lastConfirm: ConfirmStepModel?
     @ObservationIgnored private weak var lastDocker: DockerModel?
 
+    /// L'ultima analisi avviata: `startOver()` la abbandona, anche se nel frattempo la sidebar ha
+    /// mostrato un'altra pagina.
+    @ObservationIgnored private weak var lastScan: ScanStepModel?
+
     public init(
         environment: AppEnvironment,
         appearance: any AppearanceApplying,
@@ -108,7 +112,10 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
     // MARK: Navigating
 
     /// Torna al passo 1 del wizard: all'avvio e ogni volta che un ciclo si conclude o viene annullato.
+    /// L'analisi in corso viene abbandonata anche se il cambio di pagina è rifiutato: dopo Salva nelle
+    /// Impostazioni i suoi risultati potrebbero non rispettare le cartelle appena escluse.
     public func startOver() {
+        lastScan?.abandon()
         guard canNavigateGlobally else { return }
         page = .choose(ChooseStepModel(environment: environment, navigation: self))
     }
@@ -122,7 +129,9 @@ public final class MainModel: CleanupNavigating, DockerNavigating, XcodeNavigati
 
     public func showScan(_ categories: [CleanupCategory]) {
         guard canNavigateGlobally else { return }
-        page = .scan(ScanStepModel(environment: environment, navigation: self, categories: categories))
+        let model = ScanStepModel(environment: environment, navigation: self, categories: categories)
+        lastScan = model
+        page = .scan(model)
     }
 
     public func showConfirm(_ categories: [CleanupCategory], results: [CategoryScanResult]) {

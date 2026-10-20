@@ -300,6 +300,44 @@ struct MainModelTests {
         #expect(main.page.kind == .xcodeReport)
     }
 
+    /// Revisione finale: Salva nelle Impostazioni durante l'analisi riporta al passo 1, e l'analisi
+    /// vecchia non porta più al passo 3, che sarebbe calcolato senza la cartella appena esclusa.
+    @Test func savingSettingsDuringTheScanDropsItsResults() async throws {
+        let scan = GatedScan()
+        let main = MainModel(environment: try makeEnvironment(scan: scan), appearance: FakeAppearance(), folders: FakePicker())
+        main.showScan([makeCategory("logs")])
+        let step = try #require(main.page.scanStep)
+        try await scan.started.wait()
+
+        main.showSettings()
+        try #require(main.settings).save()
+        #expect(main.page.kind == .choose)
+
+        scan.release.open()
+        await step.run?.value
+
+        #expect(main.page.kind == .choose)
+    }
+
+    /// La stessa garanzia quando l'utente è passato a un'altra pagina prima di salvare: l'analisi
+    /// continua in background, ma dopo Salva non porta più al passo 3.
+    @Test func savingSettingsFromAnotherPageDropsABackgroundScan() async throws {
+        let scan = GatedScan()
+        let main = MainModel(environment: try makeEnvironment(scan: scan), appearance: FakeAppearance(), folders: FakePicker())
+        main.showScan([makeCategory("logs")])
+        let step = try #require(main.page.scanStep)
+        try await scan.started.wait()
+
+        main.showHistory()
+        main.showSettings()
+        try #require(main.settings).save()
+
+        scan.release.open()
+        await step.run?.value
+
+        #expect(main.page.kind == .choose)
+    }
+
     @Test func startOverIsRefusedWhileXcodeDeletes() async throws {
         try await Self.expectRefusedWhileXcodeDeletes(opening: .choose) { $0.startOver() }
     }

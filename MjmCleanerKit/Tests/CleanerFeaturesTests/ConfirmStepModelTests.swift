@@ -6,7 +6,7 @@ import Testing
 /// Solo Swift: il C# non aveva prove per il passo 3. Il diario (spec §8.2) è nuovo.
 @MainActor
 struct ConfirmStepModelTests {
-    private let categories = [makeCategory("logs", name: "Log e crash report"), makeCategory("downloads-large", name: "Download e file grandi")]
+    private let categories = [makeCategory("logs", name: "Log e crash report"), makeCategory("archive", name: "Archivio")]
 
     private var results: [CategoryScanResult] {
         [
@@ -16,7 +16,7 @@ struct ConfirmStepModelTests {
                 totalBytes: 3072, errors: [], exclusions: []),
             // Lo stesso file proposto anche dai file grandi: una sola riga, nella prima categoria.
             CategoryScanResult(
-                categoryId: "downloads-large",
+                categoryId: "archive",
                 items: [makeItem("/Users/tester/Library/Logs/b.log", size: 2048), makeItem("/Users/tester/Downloads/big.iso", size: 1_048_576)],
                 totalBytes: 1_050_624, errors: [], exclusions: []),
         ]
@@ -25,7 +25,7 @@ struct ConfirmStepModelTests {
     @Test func rowsArePerPathAcrossCategoriesWithSummariesAndTotal() throws {
         let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: categories, results: results)
 
-        #expect(model.nodes.map(\.displayName) == ["Log e crash report", "Download e file grandi"])
+        #expect(model.nodes.map(\.displayName) == ["Log e crash report", "Archivio"])
         #expect(model.nodes.map { $0.paths.map(\.path) } == [
             ["/Users/tester/Library/Logs/a.log", "/Users/tester/Library/Logs/b.log"],
             ["/Users/tester/Downloads/big.iso"],
@@ -183,7 +183,7 @@ struct ConfirmStepModelTests {
 
         await model.delete()
 
-        #expect(clean.selections.map { $0.map(\.categoryId) } == [["logs", "downloads-large"]])
+        #expect(clean.selections.map { $0.map(\.categoryId) } == [["logs", "archive"]])
         #expect(clean.selections.first?.map { $0.items.map(\.path) } == [["/Users/tester/Library/Logs/b.log"], ["/Users/tester/Downloads/big.iso"]])
     }
 

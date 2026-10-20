@@ -40,9 +40,18 @@ public struct RuleScanner: Sendable {
             return accumulator.outcome
         }
 
-        // Le cartelle escluse nelle Impostazioni si confrontano anche con la root risolta. Se la
-        // root stessa è esclusa, o sta sotto un'esclusione, la regola non produce nulla.
-        let excluded = ExcludedFolders(rule.excludedPaths, root: rule.root, resolvedRoot: rootVerdict.canonicalPathValidated)
+        // Le cartelle escluse nelle Impostazioni si confrontano anche con la root risolta e nella
+        // grafia del disco. Un'esclusione non valida o non verificabile, o la root non
+        // verificabile, ferma la regola, come la root esclusa o sotto un'esclusione: la regola non
+        // produce nulla.
+        let excluded: ExcludedFolders
+        switch ExcludedFolders.resolve(
+            rule.excludedPaths, root: rule.root, resolvedRoot: rootVerdict.canonicalPathValidated, fileSystem: fileSystem, links: links) {
+        case .success(let folders): excluded = folders
+        case .failure(let rejection):
+            accumulator.exclusions.append(GuardExclusion(path: rule.root, reason: rejection.reason))
+            return accumulator.outcome
+        }
         if let reason = excluded.excludedReason(rule.root) {
             accumulator.exclusions.append(GuardExclusion(path: rule.root, reason: reason))
             return accumulator.outcome

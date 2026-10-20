@@ -50,21 +50,15 @@ public protocol PathGuarding: Sendable {
 /// è imposta dalla firma: `validate` e `validateRoot` non sono `throws`.
 ///
 /// Solo Swift (piano APFS, spec §12): la deny-list e la profondità minima si applicano anche al
-/// percorso come lo registra il filesystem (`FileSystem.storedPath`), dopo ogni controllo
-/// testuale. APFS case-insensitive ripiega più di OrdinalIgnoreCase (U+212A per "k", "ſ" per
-/// "s", "ß" per "ss", NFC e NFD): un elemento scritto "~/Des\u{212A}top/x" supera i confronti
-/// testuali e il kernel lo risolve in "~/Desktop/x".
+/// percorso come lo registra il filesystem (`FileSystem.storedForm`, condivisa con
+/// `ExcludedFolders`), dopo ogni controllo testuale. APFS case-insensitive ripiega più di
+/// OrdinalIgnoreCase (U+212A per "k", "ſ" per "s", "ß" per "ss", NFC e NFD): un elemento scritto
+/// "~/Des\u{212A}top/x" supera i confronti testuali e il kernel lo risolve in "~/Desktop/x".
 public struct PathGuard: PathGuarding {
     /// Limite di sostituzioni successive durante la risoluzione dei collegamenti di una root:
     /// una catena più lunga è quasi certamente un ciclo nel doppio di test, non uno scenario
     /// reale — nega invece di girare all'infinito.
     private static let maxSymlinkResolutions = 32
-
-    /// Gli errori di `storedPath` per cui si risale all'antenato: il componente non esiste
-    /// (ENOENT, ENOTDIR) o il suo genitore non si attraversa (EACCES, EPERM). In entrambi i casi
-    /// nemmeno l'eliminazione raggiunge l'oggetto, perché la ricerca del kernel è la stessa. Ogni
-    /// altro errore rende il percorso non verificabile, e il percorso viene negato.
-    private static let climbableErrors: Set<Int32> = [ENOENT, ENOTDIR, EACCES, EPERM]
 
     private let denyList: DenyList
     private let fileSystem: any FileSystem
@@ -88,7 +82,7 @@ public struct PathGuard: PathGuarding {
         }
 
         let stored: String
-        switch Self.storedForm(home, in: fileSystem) {
+        switch fileSystem.storedForm(home) {
         case .success(let path): stored = path
         case .failure(let error):
             throw InvalidConfiguration("La home directory non è verificabile sul filesystem: \(error.description)")
@@ -136,7 +130,7 @@ public struct PathGuard: PathGuarding {
 
         // Come il punto 7 di validate: la root risolta si confronta anche nella grafia del disco,
         // con le sole voci ricorsive.
-        switch storedForm(canonicalResolved) {
+        switch fileSystem.storedForm(canonicalResolved) {
         case .failure(let error):
             return .deny(String(localized: "root non verificabile sul filesystem: \(error.description)", bundle: .module), canonicalResolved)
         case .success(let stored):
@@ -213,7 +207,7 @@ public struct PathGuard: PathGuarding {
         //    si ripetono sulla grafia del disco. Sono gli ultimi controlli, così i motivi dei
         //    rifiuti testuali restano quelli di prima. Si elimina comunque il percorso testuale:
         //    il kernel lo risolve nello stesso oggetto appena verificato.
-        switch storedForm(path) {
+        switch fileSystem.storedForm(path) {
         case .failure(let error):
             return .deny(String(localized: "percorso non verificabile sul filesystem: \(error.description)", bundle: .module), path)
         case .success(let stored):
@@ -236,7 +230,7 @@ public struct PathGuard: PathGuarding {
             return reason
         }
         // Come il punto 7 di validate.
-        switch storedForm(path) {
+        switch fileSystem.storedForm(path) {
         case .failure(let error):
             return String(localized: "percorso non verificabile sul filesystem: \(error.description)", bundle: .module)
         case .success(let stored):
@@ -291,33 +285,6 @@ public struct PathGuard: PathGuarding {
         }
 
         return .failure(.deny(String(localized: "troppi collegamenti simbolici annidati mentre si risolveva la root: \(root)", bundle: .module)))
-    }
-
-    private func storedForm(_ path: String) -> Result<String, FileSystemError> {
-        Self.storedForm(path, in: fileSystem)
-    }
-
-    /// Il percorso come lo registra il filesystem: quello dell'antenato più profondo che esiste,
-    /// `path` compreso, seguito dai componenti che mancano, presi dal testo. Un elemento sparito
-    /// dopo la scansione resta verificabile, e la cancellazione che segue lo segnala «non
-    /// trovato» come prima. Si risale solo con `climbableErrors`. `path` è canonico.
-    private static func storedForm(_ path: String, in fileSystem: any FileSystem) -> Result<String, FileSystemError> {
-        var existing = path
-        var missing: [String] = []
-        while true {
-            do {
-                let stored = try fileSystem.storedPath(existing)
-                return .success(missing.reversed().reduce(stored) { PathText.join($0, $1) })
-            } catch let error as FileSystemError {
-                guard climbableErrors.contains(error.code), let parent = PathText.parent(existing), !parent.isEmpty else {
-                    return .failure(error)
-                }
-                missing.append(PathText.fileName(existing))
-                existing = parent
-            } catch {
-                return .failure(FileSystemError(code: EIO, path: existing))
-            }
-        }
     }
 
     private static func isHomeOrDirectChild(_ path: String, of home: String) -> Bool {

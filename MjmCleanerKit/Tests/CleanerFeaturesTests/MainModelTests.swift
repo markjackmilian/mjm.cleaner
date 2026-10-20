@@ -1,5 +1,6 @@
 import CleanerCore
 import Foundation
+import Synchronization
 import Testing
 @testable import CleanerFeatures
 
@@ -338,6 +339,31 @@ struct MainModelTests {
         #expect(main.page.kind == .choose)
     }
 
+    /// Il ramo dell'annullamento: un'analisi abbandonata che termina con `CancellationError` non
+    /// chiama più `startOver()`, che abbandonerebbe la nuova analisi e tornerebbe al passo 1.
+    @Test func anAbandonedScanEndingInCancellationLeavesTheNewScanAlone() async throws {
+        let scan = CancellableGatedScan()
+        let main = MainModel(environment: try makeEnvironment(scan: scan), appearance: FakeAppearance(), folders: FakePicker())
+        main.showScan([makeCategory("logs")])
+        let abandoned = try #require(main.page.scanStep)
+        try await scan.started.wait()
+
+        main.showSettings()
+        try #require(main.settings).save()
+        main.showScan([makeCategory("logs")])
+        let current = try #require(main.page.scanStep)
+
+        scan.release.open()
+        await abandoned.run?.value
+
+        #expect(scan.threwCancellation)
+        #expect(main.page.scanStep === current)
+        #expect(current.isRunning)
+
+        scan.later.open()
+        await current.run?.value
+    }
+
     @Test func startOverIsRefusedWhileXcodeDeletes() async throws {
         try await Self.expectRefusedWhileXcodeDeletes(opening: .choose) { $0.startOver() }
     }
@@ -472,6 +498,37 @@ private final class GatedScan: ScanPerforming {
     func scan(_ categories: [CleanupCategory], progress: (@Sendable (ScanProgress) -> Void)?) async throws -> [CategoryScanResult] {
         started.open()
         try? await release.wait()
+        return []
+    }
+}
+
+/// Come `GatedScan`, ma la prima analisi si ferma come `ScanEngine`: aspetta `release` anche se
+/// annullata, poi lancia `CancellationError` se il suo task è stato annullato. Le analisi successive
+/// aspettano `later` e restituiscono un risultato vuoto.
+private final class CancellableGatedScan: ScanPerforming {
+    let started = Gate<Void>()
+    let release = Gate<Void>()
+    let later = Gate<Void>()
+    private let calls = Mutex(0)
+    private let cancellation = Mutex(false)
+
+    var threwCancellation: Bool { cancellation.withLock { $0 } }
+
+    func scan(_ categories: [CleanupCategory], progress: (@Sendable (ScanProgress) -> Void)?) async throws -> [CategoryScanResult] {
+        let call = calls.withLock { count -> Int in
+            count += 1
+            return count
+        }
+        guard call == 1 else {
+            try? await later.wait()
+            return []
+        }
+        started.open()
+        try? await release.wait()
+        if Task.isCancelled {
+            cancellation.withLock { $0 = true }
+            throw CancellationError()
+        }
         return []
     }
 }

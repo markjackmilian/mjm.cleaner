@@ -126,10 +126,12 @@ func makeReport(
         deletedPaths: deletedPaths)
 }
 
-func makeCategory(_ id: String, name: String? = nil, parent: String? = nil, risk: RiskLevel = .low) -> CleanupCategory {
+func makeCategory(
+    _ id: String, name: String? = nil, parent: String? = nil, risk: RiskLevel = .low, itemsSelectedByDefault: Bool = true
+) -> CleanupCategory {
     CleanupCategory(
         id: id, displayName: name ?? id, description: "descrizione", risk: risk,
-        selectedByDefault: false, parentId: parent, rules: [])
+        selectedByDefault: false, parentId: parent, rules: [], itemsSelectedByDefault: itemsSelectedByDefault)
 }
 
 func makeItem(_ path: String, size: Int64 = 100, root: String = "/Users/tester/Library/Caches") -> ScanItem {

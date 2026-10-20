@@ -57,7 +57,7 @@ struct ConfirmStepView: View {
 }
 
 private struct CategoryNodeView: View {
-    let node: CategoryNode
+    @Bindable var node: CategoryNode
     @State private var isExpanded = true
 
     var body: some View {
@@ -70,7 +70,14 @@ private struct CategoryNodeView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            EmptyView()
+            if node.itemsStartDeselected {
+                Text("Dati reali: le voci partono deselezionate. Spunta solo ciò che vuoi eliminare.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            Toggle("Seleziona tutte le voci", isOn: $node.allSelected)
+                .toggleStyle(.checkbox)
+                .accessibilityLabel(node.selectAllAccessibilityLabel)
         } row: { path in
             PathRow(path: path)
         }

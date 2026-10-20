@@ -143,4 +143,5 @@ private final class SnapshotNavigation: CleanupNavigating {
     func showScan(_ categories: [CleanupCategory]) {}
     func showConfirm(_ categories: [CleanupCategory], results: [CategoryScanResult]) { snapshot() }
     func showDone(_ report: CleanReport, journal: PendingJournal?) {}
+    func showSettings() {}
 }

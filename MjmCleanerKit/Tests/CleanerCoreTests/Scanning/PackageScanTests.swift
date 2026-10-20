@@ -142,6 +142,19 @@ struct PackageScanTests {
         #expect(outcome.exclusions == [GuardExclusion(path: "\(Self.work)/macchine", reason: "cartella esclusa nelle Impostazioni")])
     }
 
+    /// Un pacchetto scelto nel pannello delle esclusioni, con la barra finale che il pannello può
+    /// restituire, non si propone: compare fra le esclusioni con il motivo di una cartella esclusa
+    /// (spec `2026-10-20-package-exclusions-folder-warning-design.md`).
+    @Test func anExcludedPackageIsSkippedWithTheExcludedFolderReason() throws {
+        let fs = InMemoryFileSystem()
+        makePackage(fs, "\(Self.work)/Windows 11.pvm", files: [("disco.hds", 80 * Self.gigabyte)])
+
+        let outcome = try create(fs).scan(largeFiles(Self.work, excluded: ["\(Self.work)/Windows 11.pvm/"]))
+
+        #expect(outcome.items.isEmpty)
+        #expect(outcome.exclusions == [GuardExclusion(path: "\(Self.work)/Windows 11.pvm", reason: "cartella esclusa nelle Impostazioni")])
+    }
+
     @Test func aPackageContainingAnExclusionIsNotProposed() throws {
         let fs = InMemoryFileSystem()
         makePackage(fs, "\(Self.work)/Windows 11.pvm", files: [("disco.hds", 80 * Self.gigabyte), ("Snapshots/1.hds", 10 * Self.gigabyte)])

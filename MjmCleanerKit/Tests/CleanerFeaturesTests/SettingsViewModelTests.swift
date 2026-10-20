@@ -201,7 +201,7 @@ struct SettingsViewModelTests {
         #expect(!fixture.model.canRemoveExcludedFolder)
 
         await fixture.model.addExcludedFolder()
-        #expect(fixture.picker.titles == ["Scegli una cartella da escludere"])
+        #expect(fixture.picker.requests == [FakePicker.Request(title: "Scegli una cartella o un pacchetto da escludere", allowsPackages: true)])
         #expect(fixture.model.excludedFolders == ["/Users/tester/Parallels", "/Volumes/Archivio"])
         #expect(fixture.model.selectedExcludedFolder == "/Volumes/Archivio")
         #expect(fixture.model.canRemoveExcludedFolder)
@@ -217,6 +217,23 @@ struct SettingsViewModelTests {
 
         fixture.model.save()
         #expect(fixture.store.current.excludedFolders == ["/Volumes/Archivio"])
+    }
+
+    /// Solo le cartelle escluse accettano un pacchetto: una macchina virtuale si esclude da sola,
+    /// mentre le cartelle in cui cercare restano cartelle (spec
+    /// `2026-10-20-package-exclusions-folder-warning-design.md`).
+    @Test func onlyTheExcludedFoldersPanelAcceptsPackages() async {
+        let fixture = create(picked: nil)
+
+        await fixture.model.addProjectRoot()
+        await fixture.model.addLargeFileRoot()
+        await fixture.model.addExcludedFolder()
+
+        #expect(fixture.picker.requests == [
+            FakePicker.Request(title: "Scegli una cartella di progetto", allowsPackages: false),
+            FakePicker.Request(title: "Scegli una cartella in cui cercare file grandi", allowsPackages: false),
+            FakePicker.Request(title: "Scegli una cartella o un pacchetto da escludere", allowsPackages: true),
+        ])
     }
 
     @Test func cancelDiscardsTheExcludedFolders() async {

@@ -55,4 +55,19 @@ struct InMemoryFileSystemTests {
         let fs = InMemoryFileSystem()
         #expect(throws: FileSystemError.self) { try fs.writeText("/manca/x.json", "{}") }
     }
+
+    @Test func onlyDeclaredPackagesArePackages() throws {
+        let fs = InMemoryFileSystem()
+        fs.addPackage("/Users/tester/Parallels/Windows 11.pvm")
+        fs.addFile("/Users/tester/Parallels/Windows 11.pvm/disco.hds", size: 10)
+        fs.addDirectory("/Users/tester/Parallels/archivio")
+
+        #expect(fs.isPackage("/Users/tester/Parallels/Windows 11.pvm"))
+        #expect(fs.directoryExists("/Users/tester/Parallels/Windows 11.pvm"))
+        #expect(!fs.isPackage("/Users/tester/Parallels/archivio"))
+        #expect(!fs.isPackage("/Users/tester/Parallels/Windows 11.pvm/disco.hds"))
+
+        try fs.deleteDirectoryRecursively("/Users/tester/Parallels/Windows 11.pvm")
+        #expect(!fs.isPackage("/Users/tester/Parallels/Windows 11.pvm"))
+    }
 }

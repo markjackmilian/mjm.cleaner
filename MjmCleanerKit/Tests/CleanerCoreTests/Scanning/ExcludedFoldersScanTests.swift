@@ -105,15 +105,20 @@ struct ExcludedFoldersScanTests {
         #expect(outcome.exclusions == [GuardExclusion(path: "\(Self.src)/app/bin", reason: Self.excludedReason)])
     }
 
-    @Test func matchingDirsDoesNotProposeABinThatContainsAnExclusion() throws {
-        let fs = InMemoryFileSystem()
-        projects(fs)
-        fs.addFile("\(Self.src)/app/bin/tieni/firma.p12", size: 5)
+    /// Anche nel caso «contiene» il confronto ignora le maiuscole, e il `bin` non si attraversa
+    /// nemmeno per misurarlo.
+    @Test(arguments: ["/Users/tester/src/app/bin/tieni", "/users/tester/SRC/APP/Bin/tieni"])
+    func matchingDirsDoesNotProposeABinThatContainsAnExclusion(excluded: String) throws {
+        let memory = InMemoryFileSystem()
+        projects(memory)
+        memory.addFile("\(Self.src)/app/bin/tieni/firma.p12", size: 5)
+        let fs = AccessLogFileSystem(memory)
 
-        let outcome = try create(fs).scan(binAndObj(excluded: ["\(Self.src)/app/bin/tieni"]))
+        let outcome = try create(fs).scan(binAndObj(excluded: [excluded]))
 
         #expect(outcome.items.map(\.path) == ["\(Self.src)/vecchio/bin"])
         #expect(outcome.exclusions == [GuardExclusion(path: "\(Self.src)/app/bin", reason: Self.containsReason)])
+        #expect(!fs.paths.values.contains { PathText.isSameOrUnder($0, "\(Self.src)/app/bin") })
     }
 
     @Test func clearContentsSkipsAnExcludedChild() throws {
@@ -173,6 +178,21 @@ struct ExcludedFoldersScanTests {
 
         #expect(outcome.items.map(\.path) == ["\(temp)/via"])
         #expect(outcome.exclusions == [GuardExclusion(path: "\(temp)/tieni", reason: Self.excludedReason)])
+    }
+
+    /// Il caso «contiene» vale anche con l'esclusione scritta sul percorso risolto: svuotare
+    /// "com.foo" sotto `$TMPDIR` cancellerebbe "com.foo/tieni".
+    @Test func aChildContainingAnExclusionWrittenOnTheResolvedRootIsNotProposed() throws {
+        let fs = InMemoryFileSystem()
+        let temp = "/var/folders/ab/T"
+        fs.addFile("\(temp)/com.foo/tieni/dati.bin", size: 100)
+        fs.addFile("\(temp)/via/dati.bin", size: 100)
+
+        let outcome = try create(fs, targets: ["/var": "/private/var"]).scan(CleanupRule(
+            temp, .clearContents, include: Self.all, exclude: [], excludedPaths: ["/private/var/folders/ab/T/com.foo/tieni"]))
+
+        #expect(outcome.items.map(\.path) == ["\(temp)/via"])
+        #expect(outcome.exclusions == [GuardExclusion(path: "\(temp)/com.foo", reason: Self.containsReason)])
     }
 
     @Test func noExclusionsLeaveTheScanUnchanged() throws {

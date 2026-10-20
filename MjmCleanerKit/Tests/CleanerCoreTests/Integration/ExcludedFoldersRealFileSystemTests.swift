@@ -109,4 +109,20 @@ struct ExcludedFoldersRealFileSystemTests {
         #expect(outcome.items.map(\.path) == [fixture.work + "/nuovo/disco.iso"])
         #expect(outcome.exclusions == [GuardExclusion(path: fixture.work + "/archivio", reason: Self.excludedReason)])
     }
+
+    /// Come sopra, ma con la root dichiarata nella grafia del disco e il collegamento che punta al
+    /// testo "/var/…": la destinazione vale solo nella sua grafia del disco.
+    @Test func anExclusionThatIsARealLinkExcludesItsTargetInTheDiskSpelling() throws {
+        let fixture = try Fixture(); defer { fixture.tmp.remove() }
+        try fixture.tmp.file("home/Lavoro/archivio/disco.iso", contents: Self.big)
+        try fixture.tmp.file("home/Lavoro/nuovo/disco.iso", contents: Self.big)
+        try fixture.tmp.symlink("home/Lavoro/tieni", to: fixture.work + "/archivio")
+        let declared = try LocalFileSystem().storedPath(fixture.work)
+        try #require(declared.hasPrefix("/private/var/") && fixture.work.hasPrefix("/var/"))
+
+        let outcome = try fixture.scanLargeFiles(declared, excluding: [fixture.work + "/tieni"])
+
+        #expect(outcome.items.map(\.path) == [declared + "/nuovo/disco.iso"])
+        #expect(outcome.exclusions == [GuardExclusion(path: declared + "/archivio", reason: Self.excludedReason)])
+    }
 }

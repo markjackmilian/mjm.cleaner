@@ -82,11 +82,13 @@ category, and the minimum ages for Downloads, logs, and NuGet packages.
   chosen in Settings; high risk, never preselected, and every item starts
   deselected in the preview
 
-macOS packages, such as apps, Photos libraries, and Parallels, VMware Fusion, or
-UTM virtual machines, are listed as a single item and never entered: deleting a
-file inside one would break it. Folders excluded in Settings are never scanned
-or proposed, and neither is a folder that contains one; the Xcode and Docker
-pages do not use them.
+In Downloads, large files, and logs, macOS packages, such as apps, Photos
+libraries, and Parallels, VMware Fusion, or UTM virtual machines, are listed as
+a single item and never entered: deleting a file inside one would break it.
+Folders excluded in Settings are never scanned or proposed. A folder that would
+be deleted as a whole, such as a cache subfolder, a `bin` or `obj` directory,
+or a macOS package, is not proposed if it contains an excluded folder. The Xcode
+and Docker pages do not use excluded folders.
 
 ### Xcode
 

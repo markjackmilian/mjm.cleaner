@@ -4,8 +4,10 @@ import CleanerCore
 /// modello chiede solo un percorso (spec §4.1, §6.6).
 @MainActor
 public protocol FolderPicking {
-    /// Percorso locale della cartella scelta, o `nil` se l'utente annulla.
-    func pickFolder(title: String) async -> String?
+    /// Percorso locale della cartella scelta, o `nil` se l'utente annulla. Con `allowsPackages` si
+    /// può scegliere anche un pacchetto macOS intero, come una macchina virtuale o un'app: serve
+    /// alle cartelle escluse (spec `2026-10-20-package-exclusions-folder-warning-design.md`).
+    func pickFolder(title: String, allowsPackages: Bool) async -> String?
 }
 
 /// `IAppearanceController`: l'aspetto vale per tutta l'app, quindi per ogni finestra e sheet

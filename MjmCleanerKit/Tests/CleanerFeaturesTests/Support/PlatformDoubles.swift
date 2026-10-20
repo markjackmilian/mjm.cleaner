@@ -12,17 +12,23 @@ final class FakeAppearance: AppearanceApplying {
 }
 
 /// `FixedPicker` dei test C#: restituisce sempre lo stesso percorso (o `nil`, come un annullamento).
+/// Registra ogni richiesta: il titolo e se il pannello accetta i pacchetti.
 @MainActor
 final class FakePicker: FolderPicking {
+    struct Request: Equatable {
+        let title: String
+        let allowsPackages: Bool
+    }
+
     private let result: String?
-    private(set) var titles: [String] = []
+    private(set) var requests: [Request] = []
 
     init(_ result: String? = nil) {
         self.result = result
     }
 
-    func pickFolder(title: String) async -> String? {
-        titles.append(title)
+    func pickFolder(title: String, allowsPackages: Bool) async -> String? {
+        requests.append(Request(title: title, allowsPackages: allowsPackages))
         return result
     }
 }

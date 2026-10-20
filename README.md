@@ -63,8 +63,9 @@ Xcode cache and simulator page (see below), and **History** shows previous
 cleanup sessions and the cumulative space recovered. **Settings**, at the bottom
 of the sidebar and in the app menu (<kbd>⌘,</kbd>), configures the project
 directories searched for `bin` and `obj`, the directories searched for large
-files, the large-file size threshold, the folders excluded from every cleanup
-category, and the minimum ages for Downloads, logs, and NuGet packages.
+files, the large-file size threshold, the folders and packages excluded from
+every cleanup category, and the minimum ages for Downloads, logs, and NuGet
+packages.
 
 ### Categories
 
@@ -85,7 +86,9 @@ category, and the minimum ages for Downloads, logs, and NuGet packages.
 In Downloads, large files, and logs, macOS packages, such as apps, Photos
 libraries, and Parallels, VMware Fusion, or UTM virtual machines, are listed as
 a single item and never entered: deleting a file inside one would break it.
-Folders excluded in Settings are never scanned or proposed. A folder that would
+Folders excluded in Settings are never scanned or proposed. A single macOS
+package, such as a virtual machine, can be excluded on its own instead of the
+folder that contains it. A folder that would
 be deleted as a whole, such as a cache subfolder, a `bin` or `obj` directory,
 or a macOS package, is not proposed if it contains an excluded folder. The Xcode
 and Docker pages do not use excluded folders.

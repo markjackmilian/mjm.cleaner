@@ -1,6 +1,7 @@
 import AppKit
 import CleanerCore
 import CleanerFeatures
+import UniformTypeIdentifiers
 
 /// `AppearanceController`: l'aspetto vale per tutta l'app, quindi per ogni finestra e per gli
 /// sheet. Con `nil` macOS segue Impostazioni di Sistema in tempo reale (spec §6.4).
@@ -11,16 +12,26 @@ struct AppKitAppearance: AppearanceApplying {
     }
 }
 
-/// `StorageFolderPicker`: il pannello di sistema, solo cartelle. Il percorso resta testo invariato
-/// (spec §6.6); in fase 2 qui si salverà anche il bookmark.
+/// `StorageFolderPicker`: il pannello di sistema. Il percorso resta testo invariato (spec §6.6); in
+/// fase 2 qui si salverà anche il bookmark.
+///
+/// Di norma solo cartelle: un pacchetto (`.app`, `.pvm`, `.logarchive`…) compare come un file
+/// grigio. Con `allowsPackages` il pacchetto si sceglie intero, senza entrarci, e i file normali
+/// restano grigi: lo scanner tratta i pacchetti come unità, e un pezzo interno escluso non
+/// servirebbe a nulla. `.utm` e `.vmwarevm` senza le loro app sono cartelle comuni e si scelgono
+/// comunque (verificato il 2026-10-20).
 @MainActor
 struct AppKitFolderPicker: FolderPicking {
-    func pickFolder(title: String) async -> String? {
+    func pickFolder(title: String, allowsPackages: Bool) async -> String? {
         let panel = NSOpenPanel()
         panel.title = title
         panel.message = title
         panel.canChooseDirectories = true
-        panel.canChooseFiles = false
+        panel.canChooseFiles = allowsPackages
+        if allowsPackages {
+            panel.allowedContentTypes = [.package]
+        }
+        panel.treatsFilePackagesAsDirectories = false
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
         // Come `StorageFolderPicker(window)` del C#: un foglio della finestra attiva (lo sheet delle

@@ -80,7 +80,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Cartelle escluse")
                 } footer: {
-                    Text("Non vengono mai analizzate né proposte, in nessuna categoria della pulizia. Le pagine Xcode e Docker non le usano.")
+                    Text("Cartelle e pacchetti, come una macchina virtuale, mai analizzati né proposti in nessuna categoria della pulizia. Le pagine Xcode e Docker non li usano.")
                 }
 
                 Section {

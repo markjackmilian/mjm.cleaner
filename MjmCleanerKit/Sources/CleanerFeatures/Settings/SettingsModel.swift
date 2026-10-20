@@ -130,7 +130,7 @@ public final class SettingsModel: Identifiable {
 
     public func addProjectRoot() async {
         let title = String(localized: "Scegli una cartella di progetto", bundle: .module)
-        if let path = await addFolder(to: \.projectRoots, title: title) {
+        if let path = await addFolder(to: \.projectRoots, title: title, allowsPackages: false) {
             selectedProjectRoot = path
         }
     }
@@ -144,7 +144,7 @@ public final class SettingsModel: Identifiable {
 
     public func addLargeFileRoot() async {
         let title = String(localized: "Scegli una cartella in cui cercare file grandi", bundle: .module)
-        if let path = await addFolder(to: \.largeFileRoots, title: title) {
+        if let path = await addFolder(to: \.largeFileRoots, title: title, allowsPackages: false) {
             selectedLargeFileRoot = path
         }
     }
@@ -157,8 +157,10 @@ public final class SettingsModel: Identifiable {
     }
 
     public func addExcludedFolder() async {
-        let title = String(localized: "Scegli una cartella da escludere", bundle: .module)
-        if let path = await addFolder(to: \.excludedFolders, title: title) {
+        // Anche un pacchetto: escludere una macchina virtuale non deve costare l'intera cartella
+        // che la contiene.
+        let title = String(localized: "Scegli una cartella o un pacchetto da escludere", bundle: .module)
+        if let path = await addFolder(to: \.excludedFolders, title: title, allowsPackages: true) {
             selectedExcludedFolder = path
         }
     }
@@ -170,8 +172,10 @@ public final class SettingsModel: Identifiable {
         selectedExcludedFolder = nil
     }
 
-    private func addFolder(to list: ReferenceWritableKeyPath<SettingsModel, [String]>, title: String) async -> String? {
-        guard let path = await folders.pickFolder(title: title) else { return nil }
+    private func addFolder(
+        to list: ReferenceWritableKeyPath<SettingsModel, [String]>, title: String, allowsPackages: Bool
+    ) async -> String? {
+        guard let path = await folders.pickFolder(title: title, allowsPackages: allowsPackages) else { return nil }
         if !self[keyPath: list].contains(where: { FeatureText.same($0, path) }) {
             self[keyPath: list].append(path)
         }

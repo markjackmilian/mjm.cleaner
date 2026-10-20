@@ -270,7 +270,7 @@ struct MainModelTests {
         let settings = try #require(main.settings)
         await settings.addProjectRoot()
 
-        #expect(picker.titles.count == 1)
+        #expect(picker.requests.count == 1)
         #expect(settings.projectRoots.contains { FeatureText.same($0, "/Users/tester/Progetti") })
     }
 

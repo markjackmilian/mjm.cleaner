@@ -166,14 +166,15 @@ comportamento del guard.
 **Integrazione**, in `Integration/`, con `LocalFileSystem`, `FileSystemLinkInspector` e un
 `PathGuard` vero su una cartella temporanea sotto `$TMPDIR` (quindi sotto il collegamento
 `/var`): un collegamento reale sotto la root; una root dichiarata nella forma `/private/var/…`
-con l'esclusione scritta `/var/…`; un nome NFD creato con `mkdir` ed escluso in NFC; U+212A e
-«ß», solo se il volume è case-insensitive; un'esclusione che è un collegamento reale.
+con l'esclusione scritta `/var/…`; le equivalenze (NFC/NFD in entrambi i versi, con `mkdir`,
+U+212A e «ß»), solo se il volume è case-insensitive; una root dichiarata in NFD con il disco e
+l'esclusione in NFC; un'esclusione che è un collegamento reale.
 
 **Mutazioni**, provate dai revisori in una copia scratch; ognuna deve far fallire almeno un
 test: senza la forma del disco delle esclusioni; senza la forma del disco della root; senza la
 destinazione del collegamento; ciascuno dei rifiuti sostituito dal ripiego sul solo testo;
-`climbableErrors` alterato; la fabbrica chiamata dopo il controllo sulla root esclusa. Una
-mutazione che sopravvive richiede un test nuovo.
+`climbableErrors` alterato; il rifiuto ignorato da `RuleScanner`; le forme alternative della
+root mai usate. Una mutazione che sopravvive richiede un test nuovo.
 
 ## Analisi abbandonata: il ramo dell'annullamento
 

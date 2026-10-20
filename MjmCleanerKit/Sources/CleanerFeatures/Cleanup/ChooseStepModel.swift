@@ -7,6 +7,9 @@ public protocol CleanupNavigating: Navigating {
     func showScan(_ categories: [CleanupCategory])
     func showConfirm(_ categories: [CleanupCategory], results: [CategoryScanResult])
     func showDone(_ report: CleanReport, journal: PendingJournal?)
+    /// Lo sheet delle Impostazioni, dal passo 1: per scegliere le cartelle di una categoria che non
+    /// ne ha.
+    func showSettings()
 }
 
 /// Una categoria del passo 1, con la casella di selezione.
@@ -14,14 +17,35 @@ public protocol CleanupNavigating: Navigating {
 @Observable
 public final class CategoryChoice: Identifiable {
     public let category: CleanupCategory
-    public var isSelected: Bool
     /// La prima riga del gruppo non ha separatore sopra.
     public let showSeparator: Bool
 
+    /// Vero se la categoria ha qualcosa da analizzare. «Cartelle bin e obj nei progetti» e «File
+    /// grandi» prendono le regole dalle cartelle scelte nelle Impostazioni: senza cartelle non ne
+    /// hanno, e un'analisi non troverebbe nulla senza dire perché (spec
+    /// `2026-10-20-package-exclusions-folder-warning-design.md`).
+    public let isAvailable: Bool
+
+    private var selected: Bool
+
     public init(category: CleanupCategory, isSelected: Bool, showSeparator: Bool = false) {
         self.category = category
-        self.isSelected = isSelected
         self.showSeparator = showSeparator
+        isAvailable = !category.rules.isEmpty
+        selected = isSelected
+    }
+
+    /// Una categoria non disponibile non risulta mai selezionata, né dalla selezione ricordata né da
+    /// un'assegnazione: così resta fuori dal contatore, dall'analisi e dalla selezione salvata. La
+    /// casella disattivata è della vista; questa è la garanzia.
+    public var isSelected: Bool {
+        get { selected && isAvailable }
+        set { selected = newValue }
+    }
+
+    /// L'avviso del passo 1 per una categoria senza cartelle; vuoto se la categoria è disponibile.
+    public var unavailableText: String {
+        isAvailable ? "" : String(localized: "Nessuna cartella da analizzare.", bundle: .module)
     }
 
     public var displayName: String { category.displayName }
@@ -80,5 +104,11 @@ public final class ChooseStepModel {
         try? environment.settings.save(settings)
 
         navigation?.showScan(selected)
+    }
+
+    /// «Apri Impostazioni…» accanto all'avviso di una categoria senza cartelle. Dopo Salva la
+    /// finestra ricrea il passo 1, con le categorie calcolate sulle impostazioni nuove.
+    public func openSettings() {
+        navigation?.showSettings()
     }
 }

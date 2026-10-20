@@ -357,4 +357,6 @@ private final class ProgressSnapshotNavigation: CleanupNavigating {
     func showDone(_ report: CleanReport, journal: PendingJournal?) {
         progressAtDone.append(model?.deleteProgressText ?? "")
     }
+
+    func showSettings() {}
 }

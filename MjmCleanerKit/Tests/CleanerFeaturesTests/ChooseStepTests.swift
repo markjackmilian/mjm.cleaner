@@ -135,4 +135,75 @@ struct ChooseStepTests {
 
         #expect(store.current == settings)
     }
+
+    // Categorie senza cartelle (spec `2026-10-20-package-exclusions-folder-warning-design.md`).
+
+    /// Senza cartelle nelle Impostazioni «Cartelle bin e obj nei progetti» e «File grandi» non hanno
+    /// nulla da analizzare: anche se ricordate, partono deselezionate e con l'avviso.
+    @Test func categoriesWithoutFoldersAreUnavailableEvenWhenRemembered() throws {
+        var settings = CleanerSettings()
+        settings.selectedCategoryIds = ["project-build-output", "logs", "large-files"]
+        let model = ChooseStepModel(environment: try makeEnvironment(settings: FakeSettingsStore(settings)), navigation: nil)
+
+        let unavailable = model.choices.filter { !$0.isAvailable }
+        #expect(unavailable.map(\.category.id) == ["project-build-output", "large-files"])
+        #expect(unavailable.map(\.unavailableText) == ["Nessuna cartella da analizzare.", "Nessuna cartella da analizzare."])
+        #expect(model.choices.filter(\.isAvailable).allSatisfy { $0.unavailableText.isEmpty })
+        #expect(model.choices.filter(\.isSelected).map(\.category.id) == ["logs"])
+        #expect(model.selectedCountText == "1 categoria selezionata")
+    }
+
+    /// La casella disattivata è della vista; il modello ignora comunque una spunta, così una categoria
+    /// vuota non arriva mai all'analisi né alla selezione salvata.
+    @Test func selectingAnUnavailableCategoryIsIgnored() throws {
+        var settings = CleanerSettings()
+        settings.selectedCategoryIds = ["logs"]
+        let store = FakeSettingsStore(settings)
+        let navigation = CleanupNavigationSpy()
+        let model = ChooseStepModel(environment: try makeEnvironment(settings: store), navigation: navigation)
+        let largeFiles = try #require(model.choices.first { $0.category.id == "large-files" })
+
+        largeFiles.isSelected = true
+
+        #expect(!largeFiles.isSelected)
+        #expect(model.selectedCountText == "1 categoria selezionata")
+
+        model.analyze()
+
+        #expect(navigation.scannedCategories.map(\.id) == ["logs"])
+        #expect(store.current.selectedCategoryIds == ["logs"])
+    }
+
+    @Test func categoriesWithFoldersAreAvailableAndSelectable() throws {
+        var settings = CleanerSettings()
+        settings.selectedCategoryIds = ["project-build-output"]
+        settings.projectRoots = ["~/src"]
+        settings.largeFileRoots = ["~/Downloads"]
+        let model = ChooseStepModel(environment: try makeEnvironment(settings: FakeSettingsStore(settings)), navigation: nil)
+        let largeFiles = try #require(model.choices.first { $0.category.id == "large-files" })
+
+        largeFiles.isSelected = true
+
+        #expect(model.choices.allSatisfy { $0.isAvailable })
+        #expect(model.choices.filter(\.isSelected).map(\.category.id) == ["project-build-output", "large-files"])
+        #expect(largeFiles.unavailableText.isEmpty)
+    }
+
+    /// Anche chi costruisce una riga già spuntata non può selezionare una categoria senza regole.
+    @Test func aChoiceBuiltSelectedWithoutRulesIsNotSelected() {
+        let choice = CategoryChoice(category: makeCategory("large-files"), isSelected: true)
+
+        #expect(!choice.isAvailable)
+        #expect(!choice.isSelected)
+    }
+
+    /// «Apri Impostazioni…» accanto all'avviso.
+    @Test func openSettingsAsksTheWindowForTheSettingsSheet() throws {
+        let navigation = CleanupNavigationSpy()
+        let model = ChooseStepModel(environment: try makeEnvironment(), navigation: navigation)
+
+        model.openSettings()
+
+        #expect(navigation.events == ["settings"])
+    }
 }

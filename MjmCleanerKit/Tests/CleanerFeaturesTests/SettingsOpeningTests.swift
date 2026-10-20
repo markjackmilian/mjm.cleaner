@@ -32,4 +32,18 @@ struct SettingsOpeningTests {
         #expect(main.settings == nil)
         #expect(main.canShowSettings)
     }
+
+    /// «Apri Impostazioni…» del passo 1 apre lo stesso sheet di ⌘, (spec
+    /// `2026-10-20-package-exclusions-folder-warning-design.md`).
+    @Test func stepOneOpensTheSettingsSheet() throws {
+        let main = try Self.main()
+        guard case .choose(let choose) = main.page else {
+            Issue.record("La finestra non parte dal passo 1")
+            return
+        }
+
+        choose.openSettings()
+
+        #expect(main.settings != nil)
+    }
 }

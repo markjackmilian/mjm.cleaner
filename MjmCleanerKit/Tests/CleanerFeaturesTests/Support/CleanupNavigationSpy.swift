@@ -24,4 +24,8 @@ final class CleanupNavigationSpy: NavigationSpy, CleanupNavigating {
         doneReport = report
         doneJournal = journal
     }
+
+    func showSettings() {
+        record("settings")
+    }
 }

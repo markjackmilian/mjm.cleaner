@@ -18,6 +18,18 @@ struct CategoryCatalogTests {
         ])
     }
 
+    /// Solo «Cartelle bin e obj nei progetti» e «File grandi» prendono le regole dalle cartelle delle
+    /// Impostazioni: senza cartelle restano vuote, e il passo 1 le mostra non disponibili (spec
+    /// `2026-10-20-package-exclusions-folder-warning-design.md`). Ogni altra categoria ha sempre regole.
+    @Test func onlyTheCategoriesFedBySettingsFoldersCanBeEmpty() throws {
+        #expect(try build().filter(\.rules.isEmpty).map(\.id) == ["project-build-output", "large-files"])
+
+        var settings = CleanerSettings()
+        settings.projectRoots = ["~/src"]
+        settings.largeFileRoots = ["~/Downloads"]
+        #expect(try build(settings).filter(\.rules.isEmpty).isEmpty)
+    }
+
     /// Download e file grandi contengono dati reali: mai preselezionati, né al passo 1 né al passo 3.
     @Test func downloadsAndLargeFilesAreHighRiskAndTheirItemsStartDeselected() throws {
         let categories = try build()

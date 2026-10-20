@@ -145,6 +145,26 @@ struct SettingsStoreTests {
         #expect(loaded.lastUpdateCheck == Date(timeIntervalSince1970: 1_790_000_000))
     }
 
+    @Test func excludedFoldersDefaultToEmptyAndLegacyFilesLoadWithoutThem() {
+        #expect(CleanerSettings().excludedFolders.isEmpty)
+        let fs = InMemoryFileSystem()
+        fs.addFile(Self.paths.settingsFile, text: #"{ "LargeFileRoots": [ "/Volumes/Dati" ] }"#)
+        let settings = SettingsStore(fileSystem: fs, paths: Self.paths).load()
+        #expect(settings.largeFileRoots == ["/Volumes/Dati"])
+        #expect(settings.excludedFolders.isEmpty)
+    }
+
+    @Test func excludedFoldersRoundTripUnderTheirKey() throws {
+        let fs = InMemoryFileSystem()
+        let store = SettingsStore(fileSystem: fs, paths: Self.paths)
+        var settings = CleanerSettings()
+        settings.excludedFolders = ["/Users/tester/Parallels", "/Volumes/Archivio"]
+        try store.save(settings)
+
+        #expect(try savedJSON(fs)["ExcludedFolders"] as? [String] == ["/Users/tester/Parallels", "/Volumes/Archivio"])
+        #expect(store.load().excludedFolders == ["/Users/tester/Parallels", "/Volumes/Archivio"])
+    }
+
     @Test func neverCheckedLeavesNoLastCheckKey() throws {
         let fs = InMemoryFileSystem()
         try SettingsStore(fileSystem: fs, paths: Self.paths).save(CleanerSettings())

@@ -50,4 +50,11 @@ public struct CleanupRule: Sendable, Equatable {
         self.requiresProjectMarker = requiresProjectMarker
         self.excludedPaths = excludedPaths
     }
+
+    /// La stessa regola con le cartelle escluse nelle Impostazioni.
+    public func excluding(_ excludedPaths: [String]) -> CleanupRule {
+        CleanupRule(
+            root, mode, include: includeGlobs, exclude: excludeGlobs, minAge: minAge, minSizeBytes: minSizeBytes,
+            maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths)
+    }
 }

@@ -7,6 +7,8 @@ public struct CleanerSettings: Sendable, Equatable, Codable {
     public var projectRoots: [String] = []
     public var largeFileRoots: [String] = []
     public var largeFileThresholdBytes: Int64 = 500 * 1024 * 1024
+    /// Cartelle mai analizzate né proposte, in nessuna categoria della pulizia guidata.
+    public var excludedFolders: [String] = []
     public var downloadsMinAgeDays = 90
     public var logsMinAgeDays = 30
     public var nuGetMinAgeDays = 180
@@ -24,6 +26,7 @@ public struct CleanerSettings: Sendable, Equatable, Codable {
         case projectRoots = "ProjectRoots"
         case largeFileRoots = "LargeFileRoots"
         case largeFileThresholdBytes = "LargeFileThresholdBytes"
+        case excludedFolders = "ExcludedFolders"
         case downloadsMinAgeDays = "DownloadsMinAgeDays"
         case logsMinAgeDays = "LogsMinAgeDays"
         case nuGetMinAgeDays = "NuGetMinAgeDays"
@@ -39,6 +42,7 @@ public struct CleanerSettings: Sendable, Equatable, Codable {
         projectRoots = try container.decodeIfPresent([String].self, forKey: .projectRoots) ?? defaults.projectRoots
         largeFileRoots = try container.decodeIfPresent([String].self, forKey: .largeFileRoots) ?? defaults.largeFileRoots
         largeFileThresholdBytes = try container.decodeIfPresent(Int64.self, forKey: .largeFileThresholdBytes) ?? defaults.largeFileThresholdBytes
+        excludedFolders = try container.decodeIfPresent([String].self, forKey: .excludedFolders) ?? defaults.excludedFolders
         downloadsMinAgeDays = try container.decodeIfPresent(Int.self, forKey: .downloadsMinAgeDays) ?? defaults.downloadsMinAgeDays
         logsMinAgeDays = try container.decodeIfPresent(Int.self, forKey: .logsMinAgeDays) ?? defaults.logsMinAgeDays
         nuGetMinAgeDays = try container.decodeIfPresent(Int.self, forKey: .nuGetMinAgeDays) ?? defaults.nuGetMinAgeDays

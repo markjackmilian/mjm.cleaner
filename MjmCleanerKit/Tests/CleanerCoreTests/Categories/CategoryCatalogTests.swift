@@ -12,10 +12,70 @@ struct CategoryCatalogTests {
         return try #require(matches.first)
     }
 
-    @Test func definesTheSevenCategories() throws {
+    @Test func definesTheEightCategories() throws {
         #expect(try build().map(\.id) == [
-            "system-caches", "dev-caches", "nuget-packages", "project-build-output", "logs", "trash", "downloads-large",
+            "system-caches", "dev-caches", "nuget-packages", "project-build-output", "logs", "trash", "downloads", "large-files",
         ])
+    }
+
+    /// Download e file grandi contengono dati reali: mai preselezionati, né al passo 1 né al passo 3.
+    @Test func downloadsAndLargeFilesAreHighRiskAndTheirItemsStartDeselected() throws {
+        let categories = try build()
+        for id in ["downloads", "large-files"] {
+            let category = try category(id, in: categories)
+            #expect(category.risk == .high)
+            #expect(!category.selectedByDefault)
+        }
+        #expect(categories.filter { !$0.itemsSelectedByDefault }.map(\.id) == ["downloads", "large-files"])
+    }
+
+    @Test func downloadsHaveTheAgeRuleAndLargeFilesOneThresholdRulePerRoot() throws {
+        var settings = CleanerSettings()
+        settings.largeFileRoots = ["~/Lavoro", "/Volumes/Dati"]
+        settings.largeFileThresholdBytes = 700 * 1_048_576
+        settings.downloadsMinAgeDays = 45
+        let categories = try build(settings)
+
+        #expect(try category("downloads", in: categories).rules == [
+            CleanupRule("/Users/tester/Downloads", .matchingFiles, include: ["*"], exclude: [], minAge: days(45)),
+        ])
+        #expect(try category("large-files", in: categories).rules == [
+            CleanupRule("/Users/tester/Lavoro", .matchingFiles, include: ["*"], exclude: [], minSizeBytes: 700 * 1_048_576),
+            CleanupRule("/Volumes/Dati", .matchingFiles, include: ["*"], exclude: [], minSizeBytes: 700 * 1_048_576),
+        ])
+    }
+
+    @Test func excludedFoldersReachEveryRuleAlreadyExpanded() throws {
+        var settings = CleanerSettings()
+        settings.projectRoots = ["~/src"]
+        settings.largeFileRoots = ["~"]
+        settings.excludedFolders = ["~/Parallels", "/Volumes/Archivio/"]
+        let rules = try build(settings).flatMap(\.rules)
+
+        #expect(rules.count == 13)
+        #expect(rules.allSatisfy { $0.excludedPaths == ["/Users/tester/Parallels", "/Volumes/Archivio"] })
+    }
+
+    /// `excluding` cambia solo le cartelle escluse: ogni altro campo della regola e della categoria
+    /// resta com'era (la soglia di età di NuGet, la profondità, il marcatore di progetto…).
+    @Test func excludingKeepsEveryOtherField() {
+        let rule = CleanupRule(
+            "/Users/tester/.nuget/packages", .matchingDirs, include: ["a*"], exclude: ["b*"], minAge: days(3), minSizeBytes: 7,
+            maxDepth: 1, requiresProjectMarker: true)
+        let category = CleanupCategory(
+            id: "x", displayName: "X", description: "d", risk: .high, selectedByDefault: true, parentId: "p", rules: [rule],
+            itemsSelectedByDefault: false)
+
+        #expect(rule.excluding(["/e"]) == CleanupRule(
+            "/Users/tester/.nuget/packages", .matchingDirs, include: ["a*"], exclude: ["b*"], minAge: days(3), minSizeBytes: 7,
+            maxDepth: 1, requiresProjectMarker: true, excludedPaths: ["/e"]))
+        #expect(category.excluding(["/e"]) == CleanupCategory(
+            id: "x", displayName: "X", description: "d", risk: .high, selectedByDefault: true, parentId: "p",
+            rules: [rule.excluding(["/e"])], itemsSelectedByDefault: false))
+    }
+
+    @Test func withoutExcludedFoldersNoRuleExcludesAnything() throws {
+        #expect(try build().flatMap(\.rules).allSatisfy { $0.excludedPaths.isEmpty })
     }
 
     @Test func nuGetIsNestedUnderDevCachesAndNotSelectedByDefault() throws {
@@ -61,7 +121,7 @@ struct CategoryCatalogTests {
         let categories = try build(settings)
 
         let logRule = try #require(try category("logs", in: categories).rules.first)
-        let downloadsRule = try #require(try category("downloads-large", in: categories).rules.first { $0.root == "/Users/tester/Downloads" })
+        let downloadsRule = try #require(try category("downloads", in: categories).rules.first)
         let nugetRule = try #require(try category("nuget-packages", in: categories).rules.first)
 
         #expect(logRule.minAge == days(7))

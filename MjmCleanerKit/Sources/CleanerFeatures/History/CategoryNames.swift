@@ -19,6 +19,8 @@ public struct CategoryNames: Sendable {
             ("xcode-simulator-devices", String(localized: "Dispositivi simulati", bundle: .module)),
             ("xcode-runtimes", String(localized: "Runtime dei simulatori", bundle: .module)),
             ("trash-downloads-large", String(localized: "Cestino, Download e file grandi", bundle: .module)),
+            // Fino al 2026-10-19 una sola categoria; ora sono «Download» e «File grandi».
+            ("downloads-large", String(localized: "Download e file grandi", bundle: .module)),
         ]
 
         var names: [[UInt8]: String] = [:]

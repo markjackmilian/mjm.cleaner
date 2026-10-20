@@ -6,6 +6,9 @@ public struct CleanupCategory: Sendable, Equatable, Identifiable {
     public let selectedByDefault: Bool
     public let parentId: String?
     public let rules: [CleanupRule]
+    /// Lo stato iniziale delle voci al passo 3: falso per le categorie di dati reali (Download, File
+    /// grandi), dove ogni voce va spuntata a mano.
+    public let itemsSelectedByDefault: Bool
 
     public init(
         id: String,
@@ -14,7 +17,8 @@ public struct CleanupCategory: Sendable, Equatable, Identifiable {
         risk: RiskLevel,
         selectedByDefault: Bool,
         parentId: String?,
-        rules: [CleanupRule]
+        rules: [CleanupRule],
+        itemsSelectedByDefault: Bool = true
     ) {
         self.id = id
         self.displayName = displayName
@@ -23,5 +27,13 @@ public struct CleanupCategory: Sendable, Equatable, Identifiable {
         self.selectedByDefault = selectedByDefault
         self.parentId = parentId
         self.rules = rules
+        self.itemsSelectedByDefault = itemsSelectedByDefault
+    }
+
+    /// La stessa categoria con le cartelle escluse nelle Impostazioni su ogni regola.
+    public func excluding(_ excludedPaths: [String]) -> CleanupCategory {
+        CleanupCategory(
+            id: id, displayName: displayName, description: description, risk: risk, selectedByDefault: selectedByDefault,
+            parentId: parentId, rules: rules.map { $0.excluding(excludedPaths) }, itemsSelectedByDefault: itemsSelectedByDefault)
     }
 }

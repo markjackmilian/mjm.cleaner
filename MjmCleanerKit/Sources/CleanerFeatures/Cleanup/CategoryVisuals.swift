@@ -18,7 +18,8 @@ public enum CategoryVisuals {
         case Array("nuget-packages".utf8): CategoryVisual(tileColorName: "TileNuGet", designHex: "#3567D0", symbolName: "shippingbox")
         case Array("project-build-output".utf8): CategoryVisual(tileColorName: "TileBuildOutput", designHex: "#1D8784", symbolName: "folder")
         case Array("trash".utf8): CategoryVisual(tileColorName: "TileTrash", designHex: "#D2453A", symbolName: "trash")
-        case Array("downloads-large".utf8): CategoryVisual(tileColorName: "TileDownloadsLarge", designHex: "#E8833A", symbolName: "arrow.down.to.line")
+        case Array("downloads".utf8): CategoryVisual(tileColorName: "TileDownloads", designHex: "#E8833A", symbolName: "arrow.down.to.line")
+        case Array("large-files".utf8): CategoryVisual(tileColorName: "TileLargeFiles", designHex: "#B5477F", symbolName: "scalemass")
         default: CategoryVisual(tileColorName: "TileNeutral", designHex: "#85858B", symbolName: "doc.text")
         }
     }

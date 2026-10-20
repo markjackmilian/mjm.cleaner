@@ -6,6 +6,9 @@ public enum CategoryCatalog {
     public static func build(_ settings: CleanerSettings, _ expander: PathExpander) -> [CleanupCategory] {
         func expanded(_ path: String) -> String { expander.expand(path) }
         func days(_ count: Int) -> TimeInterval { TimeInterval(count) * 86_400 }
+        // Le cartelle escluse valgono per ogni regola del wizard (spec
+        // `2026-10-19-large-files-exclusions-design.md`).
+        let excluded = settings.excludedFolders.map(expanded)
 
         return [
             CleanupCategory(
@@ -86,17 +89,30 @@ public enum CategoryCatalog {
                 ]),
 
             CleanupCategory(
-                id: "downloads-large",
-                displayName: String(localized: "Download e file grandi", bundle: .module),
-                description: String(localized: "Contiene dati reali, non file rigenerabili. Ogni voce va selezionata manualmente.", bundle: .module),
+                id: "downloads",
+                displayName: String(localized: "Download", bundle: .module),
+                description: String(localized: "File in Download non usati da tempo. Contiene dati reali: nella verifica ogni voce parte deselezionata.", bundle: .module),
                 risk: .high,
                 selectedByDefault: false,
                 parentId: nil,
                 rules: [
                     CleanupRule(expanded("~/Downloads"), .matchingFiles, include: all, exclude: [], minAge: days(settings.downloadsMinAgeDays)),
-                ] + settings.largeFileRoots.map { root in
+                ],
+                itemsSelectedByDefault: false),
+
+            // Separata dai Download (2026-10-19): nello stesso gruppo i file grandi si confondevano
+            // con i download, e fra loro c'erano i dischi delle macchine virtuali.
+            CleanupCategory(
+                id: "large-files",
+                displayName: String(localized: "File grandi", bundle: .module),
+                description: String(localized: "File e pacchetti oltre la soglia, nelle cartelle scelte nelle Impostazioni. Contiene dati reali: nella verifica ogni voce parte deselezionata.", bundle: .module),
+                risk: .high,
+                selectedByDefault: false,
+                parentId: nil,
+                rules: settings.largeFileRoots.map { root in
                     CleanupRule(expanded(root), .matchingFiles, include: all, exclude: [], minSizeBytes: settings.largeFileThresholdBytes)
-                }),
-        ]
+                },
+                itemsSelectedByDefault: false),
+        ].map { $0.excluding(excluded) }
     }
 }

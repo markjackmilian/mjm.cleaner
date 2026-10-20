@@ -105,7 +105,7 @@ public final class ConfirmStepModel {
         // Una riga per PERCORSO, non per ScanItem, e la deduplicazione è GLOBALE a tutto il passo:
         // due regole, anche di categorie diverse, possono coprire lo stesso file. La logica vive
         // nel Core (ConfirmationRows), pura e testata; qui si trasforma in nodi.
-        nodes = ConfirmationRows.build(results).map { row in
+        nodes = ConfirmationRows.build(results, resolveRoot: environment.roots.resolvedRoot).map { row in
             let category = categories.first { FeatureText.same($0.id, row.categoryId) }
             // Una categoria assente dal catalogo oggi non capita; se capitasse, le sue voci partono
             // deselezionate: è la direzione sicura.

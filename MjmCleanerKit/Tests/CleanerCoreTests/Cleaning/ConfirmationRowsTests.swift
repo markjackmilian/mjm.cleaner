@@ -159,6 +159,21 @@ struct ConfirmationRowsTests {
         #expect(built.map { $0.rows.map(\.container) } == [[nil, nil], [position(0, 0), position(0, 1)]])
     }
 
+    /// Il ripiegamento unisce maiuscole e grafie, non accenti né larghezze: APFS distingue «résumé» da
+    /// «resume» e «ａ» (a larga) da «a», e una riga unita per errore sarebbe un file mai proposto.
+    @Test func accentsAndWidthsAreNotFolded() {
+        let built = build([
+            result("cat-a", item("/x/Cafe", directory: true), item("/x/résumé.pdf"), item("/x/resume.pdf"), item("/x/\u{FF41}.txt"), item("/x/a.txt")),
+            result("cat-b", item("/x/Café/f.bin")),
+        ])
+
+        #expect(built.map { $0.items.map(\.path) } == [
+            ["/x/Cafe", "/x/résumé.pdf", "/x/resume.pdf", "/x/\u{FF41}.txt", "/x/a.txt"],
+            ["/x/Café/f.bin"],
+        ])
+        #expect(built.map { $0.rows.map(\.container) } == [[nil, nil, nil, nil, nil], [nil]])
+    }
+
     /// `~/.cache` è un collegamento a `~/Dati/cache` e «File grandi» guarda `~/Dati`: il modello sta
     /// nella cartella che il motore cancellerà, anche se il testo dei due percorsi non lo dice.
     @Test func aLinkedRootIsComparedWhereItLeads() {

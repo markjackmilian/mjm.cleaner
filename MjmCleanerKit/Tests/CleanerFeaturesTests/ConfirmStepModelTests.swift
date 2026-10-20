@@ -504,6 +504,32 @@ struct ConfirmStepModelTests {
         #expect(!ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: nested, results: results).nodes[1].paths[0].isCovered)
     }
 
+    /// La riga intermedia di una catena ha entrambe le note; la nota della voce nomina la cartella più
+    /// vicina; la cartella conta le voci di ogni gruppo, nell'ordine dei gruppi.
+    @Test func notesOnAChainAndOnSeveralGroups() throws {
+        let groups = [
+            makeCategory("g-a", name: "Gruppo A"), makeCategory("g-b", name: "Gruppo B"),
+            makeCategory("g-c", name: "Gruppo C"), makeCategory("g-d", name: "Gruppo D"),
+        ]
+        let results = [
+            CategoryScanResult(categoryId: "g-a", items: [makeItem("/Users/tester/x/a", directory: true)], totalBytes: 100, errors: [], exclusions: []),
+            CategoryScanResult(categoryId: "g-b", items: [makeItem("/Users/tester/x/a/b", directory: true)], totalBytes: 100, errors: [], exclusions: []),
+            CategoryScanResult(
+                categoryId: "g-c", items: [makeItem("/Users/tester/x/a/b/1.bin"), makeItem("/Users/tester/x/a/b/2.bin")],
+                totalBytes: 200, errors: [], exclusions: []),
+            CategoryScanResult(categoryId: "g-d", items: [makeItem("/Users/tester/x/a/b/3.bin")], totalBytes: 100, errors: [], exclusions: []),
+        ]
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: groups, results: results)
+        let outer = model.nodes[0].paths[0]
+        let middle = model.nodes[1].paths[0]
+
+        #expect(outer.containsText == "Contiene anche 1 voce di Gruppo B.")
+        #expect(middle.containmentText == "Inclusa in /Users/tester/x/a (Gruppo A): si elimina con la cartella.")
+        #expect(middle.containsText == "Contiene anche 2 voci di Gruppo C. Contiene anche 1 voce di Gruppo D.")
+        #expect(model.nodes[2].paths[0].containmentText == "Inclusa in /Users/tester/x/a/b (Gruppo B): si elimina con la cartella.")
+        #expect(model.nodes[3].paths[0].containmentText == "Inclusa in /Users/tester/x/a/b (Gruppo B): si elimina con la cartella.")
+    }
+
     /// La garanzia vista dall'utente, su ogni combinazione di una catena di tre cartelle e di un file
     /// libero: una casella vuota non sta mai sotto una voce inviata al motore, e una casella spuntata
     /// è inviata o sta sotto una voce inviata.
@@ -526,6 +552,7 @@ struct ConfirmStepModelTests {
                 row.isSelected = mask & (1 << index) != 0
             }
 
+            let total = model.totalText
             await model.delete()
             let sent = clean.selections.first?.flatMap { $0.items.map(\.path) } ?? []
 
@@ -533,6 +560,8 @@ struct ConfirmStepModelTests {
                 let deleted = sent.contains(row.path) || sent.contains { isUnder(row.path, $0) }
                 #expect(deleted == row.isChecked, "maschera \(mask): \(row.path)")
             }
+            // Ogni voce pesa 100 byte: il pulsante «Elimina» conta esattamente ciò che parte.
+            #expect(total == "\(100 * sent.count) B · \(sent.count) \(sent.count == 1 ? "elemento" : "elementi")", "maschera \(mask)")
         }
     }
 }

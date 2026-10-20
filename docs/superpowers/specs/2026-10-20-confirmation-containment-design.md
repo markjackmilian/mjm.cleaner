@@ -226,6 +226,7 @@ Swift Testing; `swift test -Xswiftc -warnings-as-errors` in `MjmCleanerKit`.
   inviata;
 - più voci sotto la stessa root collegata; un segmento che comincia con un segno combinante;
   l'ordine dei gruppi e delle righe in `selections`;
+- accenti e larghezze non si ripiegano (APFS li distingue);
 - i sette test esistenti, invariati nelle asserzioni.
 
 **Core, garanzia completa con `InMemoryFileSystem`:** un vero `PathGuard` con
@@ -243,8 +244,10 @@ con root negata e con root senza percorso canonico.
   `containsText`;
 - totale senza doppi conteggi;
 - un test esaustivo su una catena di tre livelli più una voce libera (16 combinazioni di
-  `isSelected`): una voce con la casella vuota non sta mai sotto una voce inviata, e una voce con
-  la casella spuntata è inviata o sta sotto una voce inviata.
+  `isSelected`): una voce con la casella vuota non sta mai sotto una voce inviata, una voce con
+  la casella spuntata è inviata o sta sotto una voce inviata, e il totale di «Elimina» conta
+  esattamente le voci inviate;
+- le note su una catena e su una cartella che contiene voci di due gruppi.
 
 **Features, `AppEnvironmentTests`:** in `live`, `roots.resolvedRoot` segue un collegamento reale
 in una `TemporaryDirectory`.
@@ -262,8 +265,8 @@ coperte; risolutore identità in `live`. Una mutazione che sopravvive richiede u
   in «File grandi»; nelle impostazioni demo «File grandi» guarda `~`, il caso segnalato. Gli screenshot con `-MJMDemo` si catturano solo dopo averlo chiesto
   all'utente.
 - README: nella riga «3 · Confirm» della tabella dei passi, una frase in inglese come il resto del
-  file: un elemento dentro una cartella spuntata in un altro gruppo è segnato «Included in …» e si
-  elimina con quella cartella.
+  file: un elemento dentro una cartella spuntata, nello stesso gruppo o in un altro, è segnato
+  «Included in …» e si elimina con quella cartella.
 - Le frasi nuove sono in italiano con `String(localized:)`, nel bundle di Features: «Inclusa in
   … (…): si elimina con la cartella.», «Inclusa in … (…).», «Contiene anche … di ….», «voce»,
   «voci», «1 voce è dentro una cartella spuntata e si elimina con quella.», «… voci sono dentro

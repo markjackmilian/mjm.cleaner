@@ -92,8 +92,8 @@ private struct PathRow: View {
     let path: PathNode
 
     var body: some View {
-        // Letto qui e non solo nel Binding: la riga si ridisegna quando cambia la sua casella o
-        // quella della cartella che la contiene.
+        // Letto nel corpo, non dentro il Binding: così Observation registra la casella della voce e
+        // quelle della sua catena di cartelle, e la riga si ridisegna quando una di loro cambia.
         let isChecked = path.isChecked
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Toggle(path.path, isOn: Binding(get: { isChecked }, set: { path.isSelected = $0 }))

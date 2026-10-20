@@ -75,6 +75,20 @@ struct PackageScanTests {
         #expect(outcome.items.map(\.path) == ["\(Self.downloads)/Vecchia.app"])
     }
 
+    /// Una cartella con data sotto il 1990 (uno ZIP estratto con data 1980) non ha un'età
+    /// determinabile: il pacchetto non è «vecchio» e non si propone, come in `clearContents`.
+    @Test func aPackageWithoutADeterminableStampIsNotProposed() throws {
+        let fs = InMemoryFileSystem()
+        let package = "\(Self.downloads)/Estratta.app"
+        makePackage(fs, package, files: [("binario", 10)], written: Self.now.addingTimeInterval(-days(120)))
+        let sentinel = Date(timeIntervalSince1970: 315_532_800)
+        fs.setTimes(package, lastWrite: sentinel, lastAccess: sentinel)
+
+        let outcome = try create(fs).scan(CleanupRule(Self.downloads, .matchingFiles, include: Self.all, exclude: [], minAge: days(90)))
+
+        #expect(outcome.items.isEmpty)
+    }
+
     @Test func globsApplyToThePackageName() throws {
         let fs = InMemoryFileSystem()
         makePackage(fs, "\(Self.work)/Windows 11.pvm", files: [("disco.hds", 80 * Self.gigabyte)])

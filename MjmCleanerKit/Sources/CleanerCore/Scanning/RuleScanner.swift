@@ -176,6 +176,13 @@ public struct RuleScanner: Sendable {
                     continue
                 }
 
+                // Un pacchetto macOS (una macchina virtuale, un'app, un .logarchive) è un documento
+                // unico: cancellarne un file interno lo rompe. Non si entra mai, si valuta intero.
+                if fileSystem.isPackage(entry) {
+                    try considerPackage(entry, rule, excluded, &accumulator)
+                    continue
+                }
+
                 enter(entry, depth: depth + 1, rule, &open, &accumulator.errors)
                 continue
             }
@@ -192,6 +199,30 @@ public struct RuleScanner: Sendable {
 
             accumulator.items.append(ScanItem(path: entry, sizeBytes: size, isDirectory: false, declaredRoot: rule.root))
         }
+    }
+
+    /// Un pacchetto trovato da `scanFiles`: si propone intero, con le regole di una cartella di
+    /// `scanContents`. Il guard e le esclusioni dell'utente decidono prima delle statistiche, che
+    /// attraversano l'intero albero; età e soglia valgono sul timestamp più recente e sul totale.
+    private func considerPackage(_ package: String, _ rule: CleanupRule, _ excluded: ExcludedFolders, _ accumulator: inout Accumulator) throws {
+        guard Self.matchesGlobs(PathText.fileName(package), rule) else { return }
+
+        let verdict = pathGuard.validate(package, declaredRoot: rule.root)
+        guard verdict.isAllowed else {
+            accumulator.exclusions.append(GuardExclusion(path: package, reason: verdict.reason))
+            return
+        }
+
+        if let reason = excluded.candidateReason(package) {
+            accumulator.exclusions.append(GuardExclusion(path: package, reason: reason))
+            return
+        }
+
+        let stats = try directoryStats(package, &accumulator.errors)
+        guard stats.determinable, acceptStamp(stats.newest, rule.minAge) else { return }
+        if let minSize = rule.minSizeBytes, stats.size < minSize { return }
+
+        accumulator.items.append(ScanItem(path: package, sizeBytes: stats.size, isDirectory: true, declaredRoot: rule.root))
     }
 
     /// Cerca in profondità cartelle il cui nome corrisponde ai pattern (bin/obj, pacchetti NuGet).

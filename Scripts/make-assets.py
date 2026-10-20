@@ -61,7 +61,8 @@ for name, value in [
     ("TileNuGet", "#3567D0"),
     ("TileBuildOutput", "#1D8784"),
     ("TileTrash", "#D2453A"),
-    ("TileDownloadsLarge", "#E8833A"),
+    ("TileDownloads", "#E8833A"),
+    ("TileLargeFiles", "#B5477F"),
     ("TileNeutral", "#85858B"),
 ]:
     colorset(name, value)

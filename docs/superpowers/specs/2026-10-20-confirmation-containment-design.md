@@ -33,8 +33,9 @@ Decisioni dell'utente (2026-10-20):
   - **C, «cartella prudente»:** come B, ma una cartella che contiene voci di dati reali parte
     deselezionata. Cambierebbe la pulizia predefinita delle cache.
 - **Il contenimento si riconosce sulle root risolte**, come le cancellerà il motore: una root
-  che è un collegamento (`~/.cache` → `/Volumes/Dati/cache`, con «File grandi» su
-  `/Volumes/Dati`) non deve sfuggire. Scartati: il confronto solo testuale (il collegamento
+  che è un collegamento (`~/.cache` → `~/Dati/cache`, con «File grandi» su `~/Dati`) non deve
+  sfuggire. Un collegamento verso `/Volumes` non conta: la deny-list nega quella root, e le sue
+  voci non si cancellano. Scartati: il confronto solo testuale (il collegamento
   sfugge) e una seconda difesa nel motore (tocca `CleanEngine` senza coprire un caso in più
   quando il passo 3 è corretto).
 - La nota sulla riga della cartella («Contiene anche 1 voce di File grandi.») e la riga di
@@ -83,10 +84,14 @@ distinta (stringa esatta) e ricorda il risultato.
 1. **Chiave di confronto.** Per ogni voce:
    - il percorso si riporta sulla root risolta con `CleanEngine.rewriteToResolvedRoot(path,
      declaredRoot:, resolvedRoot:)`, la stessa funzione che il motore usa prima di validare;
-   - si scompone in NFD (`decomposedStringWithCanonicalMapping`), si ripiega con
-     `PathText.folded` e si tolgono le barre finali.
+   - si ripiega con il ripiegamento completo delle maiuscole di Foundation
+     (`folding(options: [.caseInsensitive], locale: nil)`), come fa APFS: «Straße» e «STRASSE»,
+     il segno Kelvin e «k». È più ampio di `PathText.folded`, che segue OrdinalIgnoreCase per il
+     guard.
 
-   Le chiavi si confrontano come `String`, cioè per equivalenza canonica.
+   Le chiavi si confrontano come `String`, cioè per equivalenza canonica: le grafie NFC e NFD
+   coincidono senza scomporle a parte (una scomposizione esplicita sarebbe codice che nessun
+   test può distinguere).
 2. **Deduplicazione** sulla chiave, non più sulla `String` esatta del percorso: resta la prima
    occorrenza nell'ordine dei risultati. `~/Projects/a/bin` e `~/projects/a/bin` diventano una
    riga sola; così anche due grafie che arrivano allo stesso file attraverso un collegamento.
@@ -208,19 +213,25 @@ Swift Testing; `swift test -Xswiftc -warnings-as-errors` in `MjmCleanerKit`.
 - contenimento fra gruppi diversi, con la cartella prima e dopo la voce nell'ordine dei gruppi;
 - cartella più vicina in una catena A ⊃ B ⊃ C;
 - confine di segmento; un file non contiene; un percorso non contiene se stesso;
-- maiuscole e NFC/NFD nella deduplicazione e nel contenimento;
-- alias risolto (`~/.cache` → `/Volumes/Dati/cache`) e risolutore chiamato una volta per root;
+- maiuscole, «ß»/«SS» e NFC/NFD nella deduplicazione e nel contenimento;
+- alias risolto (`~/.cache` → `~/Dati/cache`), due grafie che portano alla stessa cartella e
+  risolutore chiamato una volta per root;
 - `selections`: voce coperta non inviata anche se selezionata; catena con la cartella esterna
   deselezionata e l'intermedia selezionata; nessuna voce inviata sotto un'altra; gruppi senza
   voci da inviare omessi;
+- una posizione di `container` che non esiste: la riga non si invia;
+- la garanzia su ogni combinazione di sei righe (una catena di tre, una cartella sorella con un
+  file dentro, un file libero; 64 combinazioni): nessuna voce inviata sta sotto un'altra inviata, e ogni voce selezionata è
+  inviata o sta sotto una voce inviata;
 - i sette test esistenti, invariati nelle asserzioni.
 
 **Core, garanzia completa con `InMemoryFileSystem`:** un vero `PathGuard` con
-`FakeLinkInspector(targets:)` (`~/.cache` → `/Volumes/Dati/cache`), poi `ConfirmationRows`,
+`FakeLinkInspector(targets:)` (`~/.cache` → `~/Dati/cache`), poi `ConfirmationRows`,
 poi `CleanEngine`. Con la cartella deselezionata il modello sopravvive; con la cartella spuntata
 e il modello deselezionato il modello sparisce, il resoconto non ha errori e i byte liberati
-sono contati una volta. Un test di `PathGuard.resolvedRoot` con root consentita, con root sotto
-un collegamento e con root negata.
+sono contati una volta; con cartella e modello entrambi spuntati, una sola cancellazione e nessun
+ENOENT. Un test di `PathGuard.resolvedRoot` con root consentita, con root sotto un collegamento,
+con root negata e con root senza percorso canonico.
 
 **Features, `ConfirmStepModelTests`** (`CleanPerforming` finto che registra la selezione):
 
@@ -237,14 +248,15 @@ in una `TemporaryDirectory`.
 
 Revisioni: i revisori del Core e di Features verificano le garanzie con mutazioni in una copia
 scratch. Da uccidere almeno: `selections` che ignora la copertura; copertura solo di primo
-livello; chiave senza ripiegamento, senza NFD o senza root risolta; confine di segmento tolto;
+livello; chiave senza ripiegamento, con `PathText.folded` o senza root risolta; confine di
+segmento tolto;
 `isDirectory` ignorato; `isCovered` sempre falso; `allSelected` che scrive anche le voci
 coperte; risolutore identità in `live`. Una mutazione che sopravvive richiede un test nuovo.
 
 ## Demo, documentazione e localizzazione
 
 - `DemoData`: `~/.cache/huggingface` in «Cache di sviluppo» e un modello sotto quella cartella
-  in «File grandi». Gli screenshot con `-MJMDemo` si catturano solo dopo averlo chiesto
+  in «File grandi»; nelle impostazioni demo «File grandi» guarda `~`, il caso segnalato. Gli screenshot con `-MJMDemo` si catturano solo dopo averlo chiesto
   all'utente.
 - README: nella riga «3 · Confirm» della tabella dei passi, una frase in inglese come il resto del
   file: un elemento dentro una cartella spuntata in un altro gruppo è segnato «Included in …» e si

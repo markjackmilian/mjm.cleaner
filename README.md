@@ -53,9 +53,9 @@ The application uses a four-step wizard, always in the same order:
 
 | Step | What it does |
 |---|---|
-| **1 · Choose** | Select the categories to clean. Each category declares its risk level; high-risk categories are never preselected. Project bin and obj directories and Large files stay unavailable, with a shortcut to Settings, until a directory is chosen there. |
+| **1 · Choose** | Select the categories to clean. For Downloads, turn on «Empty Downloads» to ignore only the minimum age for this scan; exclusions and scanner protections still apply. Each category declares its risk level; high-risk categories are never preselected. Project bin and obj directories and Large files stay unavailable, with a shortcut to Settings, until a directory is chosen there. |
 | **2 · Analyze** | Performs a read-only scan, processing categories in parallel. Nothing is deleted. |
-| **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard` and by the excluded folders. Each group has a «Select all» checkbox; Downloads and large-file items start deselected. An item inside a ticked folder, in the same group or another, is marked «Included in …»: it shows ticked and locked, because deleting the folder deletes it too. This is the final point at which the operation can be abandoned. |
+| **3 · Confirm** | Shows the mandatory preview: exact paths, sizes, a warning about running applications, and the exclusions made by `PathGuard` and by the excluded folders. Categories contain expandable groups for each immediate parent folder, with a checkbox to select or clear their individual rows. Downloads and large-file items start deselected, except that «Empty Downloads» starts its proposed items selected. An item inside a ticked folder, in the same group or another, is marked «Included in …»: it shows ticked and locked, because deleting the folder deletes it too. This is the final point at which the operation can be abandoned. |
 | **4 · Done** | Summarizes the disk space recovered and any items that could not be deleted. |
 
 In the sidebar, **Docker** opens the Docker cleanup page, **Xcode** opens the
@@ -78,7 +78,9 @@ packages.
 - **Logs and crash reports** — `~/Library/Logs`, `/Library/Logs`
 - **Trash** — high risk, never preselected
 - **Downloads** — files in `~/Downloads` older than the minimum age; high risk,
-  never preselected, and every item starts deselected in the preview
+  never preselected, and every item starts deselected in the preview. «Empty
+  Downloads» for one scan ignores that age limit and starts its proposed items
+  selected; exclusions and other scanner protections still apply.
 - **Large files** — files and packages above the threshold in the directories
   chosen in Settings; high risk, never preselected, and every item starts
   deselected in the preview

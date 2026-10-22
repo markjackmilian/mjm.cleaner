@@ -1,4 +1,5 @@
 import CleanerCore
+import Foundation
 import Observation
 
 /// Una riga selezionabile: un singolo `ScanItem`, non la root della regola che lo ha prodotto.
@@ -62,10 +63,56 @@ public final class PathNode: Identifiable {
 
 @MainActor
 @Observable
+public final class FolderGroupNode: Identifiable {
+    public let folderPath: String
+    public let paths: [PathNode]
+    public nonisolated let id: String
+
+    init(folderPath: String, paths: [PathNode]) {
+        self.folderPath = folderPath
+        self.paths = paths
+        id = folderPath
+    }
+
+    public var summaryText: String {
+        let noun = Formatting.plural(paths.count, String(localized: "elemento", bundle: .module), String(localized: "elementi", bundle: .module))
+        return "\(Formatting.integer(paths.count)) \(noun) · \(Formatting.bytes(SafeSum.total(paths.map(\.sizeBytes))))"
+    }
+
+    public var selectedCountText: String {
+        let count = paths.count(where: \.isChecked)
+        let noun = count == 1 ? String(localized: "selezionato", bundle: .module) : String(localized: "selezionati", bundle: .module)
+        return "\(Formatting.integer(count)) \(noun)"
+    }
+
+    public var allSelected: Bool {
+        get { !paths.isEmpty && paths.allSatisfy(\.isChecked) }
+        set {
+            var changed = true
+            while changed {
+                changed = false
+                for path in paths where !path.isCovered && path.isSelected != newValue {
+                    path.isSelected = newValue
+                    changed = true
+                }
+            }
+        }
+    }
+
+    public var canSelectAll: Bool { paths.contains { !$0.isCovered } }
+
+    public var selectAllAccessibilityLabel: String {
+        String(localized: "Seleziona tutte le voci di \(folderPath)", bundle: .module)
+    }
+}
+
+@MainActor
+@Observable
 public final class CategoryNode: Identifiable {
     public let categoryId: String
     public let displayName: String
     public let paths: [PathNode]
+    public let folderGroups: [FolderGroupNode]
 
     /// Il totale della categoria, visibile a colpo d'occhio prima di espandere: conteggio e
     /// dimensione di tutte le righe trovate, selezionate o no.
@@ -78,6 +125,13 @@ public final class CategoryNode: Identifiable {
         self.categoryId = categoryId
         self.displayName = displayName
         paths = items.map { PathNode(item: $0, isSelected: itemsSelectedByDefault) }
+        let pathsByParent = Dictionary(grouping: paths) { path in
+            (path.path as NSString).deletingLastPathComponent
+        }
+        folderGroups = pathsByParent.keys.sorted().compactMap { folderPath in
+            guard let paths = pathsByParent[folderPath] else { return nil }
+            return FolderGroupNode(folderPath: folderPath, paths: paths)
+        }
         itemsStartDeselected = !itemsSelectedByDefault
         let noun = Formatting.plural(items.count, String(localized: "elemento", bundle: .module), String(localized: "elementi", bundle: .module))
         summaryText = "\(Formatting.integer(items.count)) \(noun) · \(Formatting.bytes(SafeSum.total(items.map(\.sizeBytes))))"

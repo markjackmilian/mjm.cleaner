@@ -1,8 +1,8 @@
 import CleanerFeatures
 import SwiftUI
 
-/// Passo 3 (`ConfirmStepView`): ogni percorso da eliminare, raggruppato per categoria, con le
-/// deselezioni puntuali. «Elimina» parte da un `Task` non legato alla vista: un cambio di vista
+/// Passo 3 (`ConfirmStepView`): ogni percorso da eliminare, raggruppato per categoria e cartella,
+/// con le deselezioni puntuali. «Elimina» parte da un `Task` non legato alla vista: un cambio di vista
 /// non annulla la pulizia, la ferma solo «Interrompi» (`cancelDelete()`).
 struct ConfirmStepView: View {
     let model: ConfirmStepModel
@@ -61,7 +61,7 @@ private struct CategoryNodeView: View {
     @State private var isExpanded = true
 
     var body: some View {
-        CollapsibleCard(items: node.paths, isExpanded: $isExpanded) {
+        CollapsibleCard(items: node.folderGroups, isExpanded: $isExpanded) {
             HStack(spacing: 10) {
                 Text(node.displayName)
                     .fontWeight(.semibold)
@@ -80,6 +80,35 @@ private struct CategoryNodeView: View {
                 .toggleStyle(.checkbox)
                 .accessibilityLabel(node.selectAllAccessibilityLabel)
                 .disabled(!node.canSelectAll)
+        } row: { group in
+            FolderGroupView(group: group)
+        }
+    }
+}
+
+private struct FolderGroupView: View {
+    @Bindable var group: FolderGroupNode
+    @State private var isExpanded = false
+
+    var body: some View {
+        CollapsibleCard(items: group.paths, isExpanded: $isExpanded) {
+            HStack(spacing: 8) {
+                Text(group.folderPath)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                Text(group.summaryText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Text(group.selectedCountText)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        } header: {
+            Toggle(group.selectAllAccessibilityLabel, isOn: $group.allSelected)
+                .toggleStyle(.checkbox)
+                .disabled(!group.canSelectAll)
         } row: { path in
             PathRow(path: path)
         }

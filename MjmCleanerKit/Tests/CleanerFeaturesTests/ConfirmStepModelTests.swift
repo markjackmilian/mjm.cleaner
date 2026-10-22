@@ -302,6 +302,77 @@ struct ConfirmStepModelTests {
         #expect(!model.isDeleting)
     }
 
+    @Test func folderGroupsUseImmediateParentsInPathOrderAndKeepDirectoryRows() throws {
+        let category = [makeCategory("downloads", name: "Download", itemsSelectedByDefault: false)]
+        let paths = [
+            makeItem("/Users/tester/Downloads/AB/child.txt", size: 2),
+            makeItem("/Users/tester/Downloads/A/folder", size: 3, directory: true),
+            makeItem("/Users/tester/Downloads/a.txt", size: 1),
+        ]
+        let result = CategoryScanResult(categoryId: "downloads", items: paths, totalBytes: 6, errors: [], exclusions: [])
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: category, results: [result])
+        let groups = model.nodes[0].folderGroups
+
+        #expect(groups.map(\.folderPath) == ["/Users/tester/Downloads", "/Users/tester/Downloads/A", "/Users/tester/Downloads/AB"])
+        #expect(groups.map { $0.paths.map(\.path) } == [
+            ["/Users/tester/Downloads/a.txt"], ["/Users/tester/Downloads/A/folder"], ["/Users/tester/Downloads/AB/child.txt"],
+        ])
+        #expect(groups.map(\.summaryText) == ["1 elemento · 1 B", "1 elemento · 3 B", "1 elemento · 2 B"])
+        for group in groups {
+            #expect(group.paths[0] === model.nodes[0].paths.first(where: { $0.path == group.paths[0].path }))
+        }
+    }
+
+    @Test func twoHundredRowsInOneParentMakeOneGroupAndMixedSelectionIsCounted() throws {
+        let items = (0..<200).map { makeItem("/Users/tester/Downloads/batch/file-\($0).txt", size: 1) }
+        let category = [makeCategory("downloads", name: "Download", itemsSelectedByDefault: false)]
+        let result = CategoryScanResult(categoryId: "downloads", items: items, totalBytes: 200, errors: [], exclusions: [])
+        let model = ConfirmStepModel(environment: try makeEnvironment(), navigation: nil, categories: category, results: [result])
+        let group = try #require(model.nodes[0].folderGroups.first)
+
+        #expect(model.nodes[0].folderGroups.count == 1)
+        #expect(group.paths.count == 200)
+        #expect(group.paths[0] === model.nodes[0].paths[0])
+        group.paths[0].isSelected = true
+        #expect(group.selectedCountText == "1 selezionato")
+        #expect(!group.allSelected)
+    }
+
+    @Test func folderGroupSelectionTouchesOnlyItsRowsAndDoesNotAddFolderToDeletion() async throws {
+        let clean = FakeClean()
+        let categories = [makeCategory("logs", name: "Log e crash report"), makeCategory("archive", name: "Archivio", itemsSelectedByDefault: false)]
+        let result = [
+            CategoryScanResult(categoryId: "logs", items: [
+                makeItem("/Users/tester/Downloads/A", size: 30, directory: true),
+            ], totalBytes: 30, errors: [], exclusions: []),
+            CategoryScanResult(categoryId: "archive", items: [
+                makeItem("/Users/tester/Downloads/A/file.txt", size: 10),
+                makeItem("/Users/tester/Downloads/AB/file.txt", size: 20),
+            ], totalBytes: 30, errors: [], exclusions: []),
+        ]
+        let model = ConfirmStepModel(environment: try makeEnvironment(clean: clean), navigation: nil, categories: categories, results: result)
+        let archive = model.nodes[1]
+        let aGroup = try #require(archive.folderGroups.first { $0.folderPath == "/Users/tester/Downloads/A" })
+        let abGroup = try #require(archive.folderGroups.first { $0.folderPath == "/Users/tester/Downloads/AB" })
+
+        #expect(aGroup.paths.count == 1)
+        #expect(aGroup.paths[0].path == "/Users/tester/Downloads/A/file.txt")
+        #expect(!aGroup.canSelectAll)
+        #expect(abGroup.paths.count == 1)
+        #expect(aGroup.paths[0].isCovered)
+        #expect(model.totalText == "30 B · 1 elemento")
+        abGroup.paths[0].isSelected = false
+        abGroup.allSelected = true
+        #expect(archive.paths.map(\.isSelected) == [false, true])
+        #expect(model.nodes[0].paths[0].isSelected)
+        #expect(model.totalText == "50 B · 2 elementi")
+
+        await model.delete()
+
+        #expect(clean.selections.first?.flatMap(\.items).map(\.path) == ["/Users/tester/Downloads/A", "/Users/tester/Downloads/AB/file.txt"])
+        #expect(!clean.selections.first!.flatMap(\.items).contains { $0.path == "/Users/tester/Downloads" })
+    }
+
     /// Un secondo «Elimina» durante l'eliminazione non avvia una seconda pulizia né un secondo diario:
     /// Annulla ferma ancora l'unica in corso.
     @Test func secondDeleteWhileDeletingDoesNothing() async throws {

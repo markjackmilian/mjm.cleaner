@@ -56,41 +56,53 @@ private struct ChoiceRow: View {
     let openSettings: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Toggle(choice.displayName, isOn: $choice.isSelected)
-                .toggleStyle(.checkbox)
-                .labelsHidden()
-                .disabled(!choice.isAvailable)
-                // VoiceOver dice perché la casella è disattivata; il testo è vuoto per una categoria disponibile.
-                .accessibilityHint(Text(choice.unavailableText))
-            CategoryTile(visual: choice.visual)
-                .opacity(choice.isAvailable ? 1 : 0.5)
-            VStack(alignment: .leading, spacing: 2) {
-                // Il nome lo legge già la casella: VoiceOver non lo ripete.
-                Text(choice.displayName)
-                    .fontWeight(.semibold)
-                    .accessibilityHidden(true)
-                Text(choice.description)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !choice.isAvailable {
-                    MissingFoldersNote(text: choice.unavailableText, openSettings: openSettings)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Toggle(choice.displayName, isOn: $choice.isSelected)
+                    .toggleStyle(.checkbox)
+                    .labelsHidden()
+                    .disabled(!choice.isAvailable)
+                    // VoiceOver dice perché la casella è disattivata; il testo è vuoto per una categoria disponibile.
+                    .accessibilityHint(Text(choice.unavailableText))
+                CategoryTile(visual: choice.visual)
+                    .opacity(choice.isAvailable ? 1 : 0.5)
+                VStack(alignment: .leading, spacing: 2) {
+                    // Il nome lo legge già la casella: VoiceOver non lo ripete.
+                    Text(choice.displayName)
+                        .fontWeight(.semibold)
+                        .accessibilityHidden(true)
+                    Text(choice.description)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !choice.isAvailable {
+                        MissingFoldersNote(text: choice.unavailableText, openSettings: openSettings)
+                    }
+                }
+                Spacer(minLength: 12)
+                RiskPill(risk: choice.risk)
+            }
+            .padding(.top, 11)
+            .padding(.leading, choice.isChild ? 60 : 16)
+            .padding(.trailing, 16)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Come la casella: una categoria senza cartelle non si spunta.
+                if choice.isAvailable {
+                    choice.isSelected.toggle()
                 }
             }
-            Spacer(minLength: 12)
-            RiskPill(risk: choice.risk)
-        }
-        .padding(.vertical, 11)
-        .padding(.leading, choice.isChild ? 60 : 16)
-        .padding(.trailing, 16)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            // Come la casella: una categoria senza cartelle non si spunta.
-            if choice.isAvailable {
-                choice.isSelected.toggle()
+
+            if choice.category.id == "downloads" {
+                Toggle("Svuota Download (ignora il limite di età)", isOn: $choice.emptiesDownloads)
+                    .toggleStyle(.checkbox)
+                    .font(.callout)
+                    .padding(.leading, choice.isChild ? 116 : 72)
+                    .padding(.trailing, 16)
+                    .padding(.top, 4)
             }
         }
+        .padding(.bottom, 11)
     }
 }
 

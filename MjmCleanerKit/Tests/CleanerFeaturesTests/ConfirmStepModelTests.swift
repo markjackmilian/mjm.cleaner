@@ -218,6 +218,20 @@ struct ConfirmStepModelTests {
         #expect(model.totalText == "1 KB · 1 elemento")
     }
 
+    @Test func completeDownloadsStartsSelectedWhileStandardDownloadsStayDeselected() throws {
+        let environment = try makeEnvironment()
+        let standard = try #require(environment.categories().first { $0.id == "downloads" })
+        let complete = standard.forCompleteDownloads()
+        let items = [makeItem("/Users/tester/Downloads/recent.txt", size: 12)]
+        let result = CategoryScanResult(categoryId: "downloads", items: items, totalBytes: 12, errors: [], exclusions: [])
+
+        let standardModel = ConfirmStepModel(environment: environment, navigation: nil, categories: [standard], results: [result])
+        let completeModel = ConfirmStepModel(environment: environment, navigation: nil, categories: [complete], results: [result])
+
+        #expect(standardModel.nodes[0].paths.map(\.isSelected) == [false])
+        #expect(completeModel.nodes[0].paths.map(\.isSelected) == [true])
+    }
+
     @Test func withOnlyRealDataNothingIsDeletedUntilAnItemIsTicked() throws {
         let model = ConfirmStepModel(
             environment: try makeEnvironment(), navigation: nil,

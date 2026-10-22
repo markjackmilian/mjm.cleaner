@@ -136,6 +136,50 @@ struct ChooseStepTests {
         #expect(store.current == settings)
     }
 
+    @Test func completeDownloadsIsOneRunAndDoesNotChangeRememberedCategoryIds() throws {
+        var settings = CleanerSettings()
+        settings.selectedCategoryIds = ["downloads"]
+        let store = FakeSettingsStore(settings)
+        let navigation = CleanupNavigationSpy()
+        let environment = try makeEnvironment(settings: store)
+        let model = ChooseStepModel(environment: environment, navigation: navigation)
+        let downloads = try #require(model.choices.first { $0.category.id == "downloads" })
+        let configuredAges = downloads.category.rules.map(\.minAge)
+
+        #expect(downloads.isSelected)
+        #expect(!downloads.emptiesDownloads)
+
+        downloads.emptiesDownloads = true
+        #expect(downloads.isSelected)
+        model.analyze()
+
+        let scannedDownloads = try #require(navigation.scannedCategories.first { $0.id == "downloads" })
+        #expect(scannedDownloads.rules.map(\.minAge).allSatisfy { $0 == nil })
+        #expect(scannedDownloads.itemsSelectedByDefault)
+        #expect(store.current.selectedCategoryIds == ["downloads"])
+
+        downloads.emptiesDownloads = false
+        model.analyze()
+        let ordinaryDownloads = try #require(navigation.scannedCategories.first { $0.id == "downloads" })
+        #expect(ordinaryDownloads.rules.map(\.minAge) == configuredAges)
+        #expect(!ordinaryDownloads.itemsSelectedByDefault)
+
+        downloads.emptiesDownloads = true
+        downloads.isSelected = false
+        #expect(!downloads.emptiesDownloads)
+        #expect(store.current.selectedCategoryIds == ["downloads"])
+    }
+
+    @Test func completeDownloadsModeIsOffWhenRememberedCategoryReturns() throws {
+        var settings = CleanerSettings()
+        settings.selectedCategoryIds = ["downloads"]
+        let model = ChooseStepModel(environment: try makeEnvironment(settings: FakeSettingsStore(settings)), navigation: nil)
+
+        let downloads = try #require(model.choices.first { $0.category.id == "downloads" })
+        #expect(downloads.isSelected)
+        #expect(!downloads.emptiesDownloads)
+    }
+
     // Categorie senza cartelle (spec `2026-10-20-package-exclusions-folder-warning-design.md`).
 
     /// Senza cartelle nelle Impostazioni «Cartelle bin e obj nei progetti» e «File grandi» non hanno

@@ -27,6 +27,7 @@ public final class CategoryChoice: Identifiable {
     public let isAvailable: Bool
 
     private var selected: Bool
+    private var completeDownloads = false
 
     public init(category: CleanupCategory, isSelected: Bool, showSeparator: Bool = false) {
         self.category = category
@@ -40,7 +41,24 @@ public final class CategoryChoice: Identifiable {
     /// casella disattivata è della vista; questa è la garanzia.
     public var isSelected: Bool {
         get { selected && isAvailable }
-        set { selected = newValue }
+        set {
+            selected = newValue
+            if !newValue { completeDownloads = false }
+        }
+    }
+
+    /// Modalità valida solo per Download e solo finché la categoria resta selezionata.
+    public var emptiesDownloads: Bool {
+        get { completeDownloads }
+        set {
+            guard category.id == "downloads" else { return }
+            completeDownloads = newValue
+            if newValue { isSelected = true }
+        }
+    }
+
+    var categoryForAnalysis: CleanupCategory {
+        emptiesDownloads && isSelected ? category.forCompleteDownloads() : category
     }
 
     /// L'avviso del passo 1 per una categoria senza cartelle; vuoto se la categoria è disponibile.
@@ -93,7 +111,8 @@ public final class ChooseStepModel {
     }
 
     public func analyze() {
-        let selected = choices.filter(\.isSelected).map(\.category)
+        let selectedChoices = choices.filter(\.isSelected)
+        let selected = selectedChoices.map(\.categoryForAnalysis)
         guard !selected.isEmpty else { return }
 
         // La selezione viene ricordata: è ciò che rende sopportabili quattro passi ogni settimana.

@@ -373,6 +373,39 @@ struct ConfirmStepModelTests {
         #expect(!clean.selections.first!.flatMap(\.items).contains { $0.path == "/Users/tester/Downloads" })
     }
 
+    @Test func deselectingAFolderGroupLeavesOtherGroupsAndCoveredRowsAlone() async throws {
+        let clean = FakeClean()
+        let categories = [makeCategory("logs", name: "Log e crash report"), makeCategory("archive", name: "Archivio", itemsSelectedByDefault: false)]
+        let results = [
+            CategoryScanResult(categoryId: "logs", items: [
+                makeItem("/Users/tester/Downloads/A", size: 30, directory: true),
+            ], totalBytes: 30, errors: [], exclusions: []),
+            CategoryScanResult(categoryId: "archive", items: [
+                makeItem("/Users/tester/Downloads/A/file.txt", size: 10),
+                makeItem("/Users/tester/Downloads/AB/file.txt", size: 20),
+            ], totalBytes: 30, errors: [], exclusions: []),
+        ]
+        let model = ConfirmStepModel(environment: try makeEnvironment(clean: clean), navigation: nil, categories: categories, results: results)
+        let archive = model.nodes[1]
+        let coveredGroup = try #require(archive.folderGroups.first { $0.folderPath == "/Users/tester/Downloads/A" })
+        let selectedGroup = try #require(archive.folderGroups.first { $0.folderPath == "/Users/tester/Downloads/AB" })
+
+        selectedGroup.allSelected = true
+        #expect(selectedGroup.allSelected)
+        #expect(model.totalText == "50 B · 2 elementi")
+
+        selectedGroup.allSelected = false
+
+        #expect(!selectedGroup.allSelected)
+        #expect(!selectedGroup.paths[0].isSelected)
+        #expect(model.nodes[0].paths[0].isSelected)
+        #expect(coveredGroup.paths[0].isChecked)
+        #expect(model.totalText == "30 B · 1 elemento")
+
+        await model.delete()
+        #expect(clean.selections.first?.flatMap(\.items).map(\.path) == ["/Users/tester/Downloads/A"])
+    }
+
     /// Un secondo «Elimina» durante l'eliminazione non avvia una seconda pulizia né un secondo diario:
     /// Annulla ferma ancora l'unica in corso.
     @Test func secondDeleteWhileDeletingDoesNothing() async throws {

@@ -61,6 +61,20 @@ public final class PathNode: Identifiable {
     }
 }
 
+/// Imposta le righe libere senza sovrascrivere una selezione decisa da una cartella contenitrice.
+/// Ripete le passate perché deselezionare una cartella può liberare una riga visitata prima.
+@MainActor
+private func setSelection(_ selected: Bool, for paths: [PathNode]) {
+    var changed = true
+    while changed {
+        changed = false
+        for path in paths where !path.isCovered && path.isSelected != selected {
+            path.isSelected = selected
+            changed = true
+        }
+    }
+}
+
 @MainActor
 @Observable
 public final class FolderGroupNode: Identifiable {
@@ -87,16 +101,7 @@ public final class FolderGroupNode: Identifiable {
 
     public var allSelected: Bool {
         get { !paths.isEmpty && paths.allSatisfy(\.isChecked) }
-        set {
-            var changed = true
-            while changed {
-                changed = false
-                for path in paths where !path.isCovered && path.isSelected != newValue {
-                    path.isSelected = newValue
-                    changed = true
-                }
-            }
-        }
+        set { setSelection(newValue, for: paths) }
     }
 
     public var canSelectAll: Bool { paths.contains { !$0.isCovered } }
@@ -143,19 +148,7 @@ public final class CategoryNode: Identifiable {
     /// sincronizzare.
     public var allSelected: Bool {
         get { !paths.isEmpty && paths.allSatisfy(\.isChecked) }
-        set {
-            // Deselezionare una cartella del gruppo libera le voci che conteneva, anche se vengono
-            // prima nell'elenco: si ripete finché nessuna voce libera cambia. Ogni passata ne
-            // cambia almeno una verso `newValue` e nessuna torna indietro.
-            var changed = true
-            while changed {
-                changed = false
-                for path in paths where !path.isCovered && path.isSelected != newValue {
-                    path.isSelected = newValue
-                    changed = true
-                }
-            }
-        }
+        set { setSelection(newValue, for: paths) }
     }
 
     /// Falso se ogni voce del gruppo è coperta da una cartella spuntata: la casella di gruppo non

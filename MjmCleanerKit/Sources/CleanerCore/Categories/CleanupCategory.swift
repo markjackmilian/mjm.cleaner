@@ -36,4 +36,12 @@ public struct CleanupCategory: Sendable, Equatable, Identifiable {
             id: id, displayName: displayName, description: description, risk: risk, selectedByDefault: selectedByDefault,
             parentId: parentId, rules: rules.map { $0.excluding(excludedPaths) }, itemsSelectedByDefault: itemsSelectedByDefault)
     }
+
+    /// La categoria Download per un'analisi completa, senza il solo filtro di età.
+    public func forCompleteDownloads() -> CleanupCategory {
+        guard id == "downloads" else { return self }
+        return CleanupCategory(
+            id: id, displayName: displayName, description: description, risk: risk, selectedByDefault: selectedByDefault,
+            parentId: parentId, rules: rules.map { $0.withoutMinimumAge() }, itemsSelectedByDefault: true)
+    }
 }

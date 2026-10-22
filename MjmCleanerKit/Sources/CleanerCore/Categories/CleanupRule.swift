@@ -57,4 +57,11 @@ public struct CleanupRule: Sendable, Equatable {
             root, mode, include: includeGlobs, exclude: excludeGlobs, minAge: minAge, minSizeBytes: minSizeBytes,
             maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths)
     }
+
+    /// La stessa regola senza la soglia minima di età.
+    public func withoutMinimumAge() -> CleanupRule {
+        CleanupRule(
+            root, mode, include: includeGlobs, exclude: excludeGlobs, minAge: nil, minSizeBytes: minSizeBytes,
+            maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths)
+    }
 }

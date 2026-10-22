@@ -75,6 +75,28 @@ struct PackageScanTests {
         #expect(outcome.items.map(\.path) == ["\(Self.downloads)/Vecchia.app"])
     }
 
+    @Test func completeDownloadsIncludesRecentFilesAndPackagesButHonorsExclusions() throws {
+        let fs = InMemoryFileSystem()
+        let recentFile = "\(Self.downloads)/recente.txt"
+        let oldFile = "\(Self.downloads)/vecchio.txt"
+        let recentPackage = "\(Self.downloads)/Recente.app"
+        let excludedPackage = "\(Self.downloads)/Esclusa.app"
+        fs.addFile(recentFile, size: 10, stamp: Self.now)
+        fs.addFile(oldFile, size: 20, stamp: Self.now.addingTimeInterval(-days(120)))
+        makePackage(fs, recentPackage, files: [("binario", 30)])
+        makePackage(fs, excludedPackage, files: [("binario", 40)])
+        let category = CleanupCategory(
+            id: "downloads", displayName: "Download", description: "", risk: .high, selectedByDefault: false,
+            parentId: nil,
+            rules: [CleanupRule(Self.downloads, .matchingFiles, include: Self.all, exclude: [], minAge: days(90), excludedPaths: [excludedPackage])],
+            itemsSelectedByDefault: false)
+
+        let outcome = try create(fs).scan(category.forCompleteDownloads().rules[0])
+
+        #expect(outcome.items.map(\.path) == [recentPackage, recentFile, oldFile])
+        #expect(outcome.exclusions.map(\.path) == [excludedPackage])
+    }
+
     /// Una cartella con data sotto il 1990 (uno ZIP estratto con data 1980) non ha un'età
     /// determinabile: il pacchetto non è «vecchio» e non si propone, come in `clearContents`.
     @Test func aPackageWithoutADeterminableStampIsNotProposed() throws {

@@ -141,6 +141,39 @@ struct CategoryCatalogTests {
         #expect(nugetRule.minAge == days(60))
     }
 
+    @Test func completeDownloadsVariantRemovesOnlyMinimumAgeAndSelectsItems() throws {
+        var settings = CleanerSettings()
+        settings.downloadsMinAgeDays = 45
+        settings.excludedFolders = ["~/Protected"]
+        let downloads = try category("downloads", in: build(settings))
+        let other = try category("logs", in: build(settings))
+
+        let complete = downloads.forCompleteDownloads()
+
+        #expect(downloads.rules.first?.minAge == days(45))
+        #expect(!downloads.itemsSelectedByDefault)
+        #expect(complete.id == downloads.id)
+        #expect(complete.displayName == downloads.displayName)
+        #expect(complete.description == downloads.description)
+        #expect(complete.risk == downloads.risk)
+        #expect(complete.selectedByDefault == downloads.selectedByDefault)
+        #expect(complete.parentId == downloads.parentId)
+        #expect(complete.itemsSelectedByDefault)
+        #expect(complete.rules.count == downloads.rules.count)
+        let original = try #require(downloads.rules.first)
+        let variant = try #require(complete.rules.first)
+        #expect(variant.root == original.root)
+        #expect(variant.mode == original.mode)
+        #expect(variant.includeGlobs == original.includeGlobs)
+        #expect(variant.excludeGlobs == original.excludeGlobs)
+        #expect(variant.excludedPaths == original.excludedPaths)
+        #expect(variant.maxDepth == original.maxDepth)
+        #expect(variant.minSizeBytes == original.minSizeBytes)
+        #expect(variant.requiresProjectMarker == original.requiresProjectMarker)
+        #expect(variant.minAge == nil)
+        #expect(other.forCompleteDownloads() == other)
+    }
+
     @Test func dockerIsNotReferencedByAnyRule() throws {
         #expect(!(try build()).flatMap(\.rules).contains { $0.root.lowercased().contains("docker") })
     }

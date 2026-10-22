@@ -149,7 +149,9 @@ public struct RuleScanner: Sendable {
 
             if let minSize = rule.minSizeBytes, size < minSize { continue }
 
-            accumulator.items.append(ScanItem(path: entry, sizeBytes: size, isDirectory: isDirectory, declaredRoot: rule.root))
+            accumulator.items.append(ScanItem(
+                path: entry, sizeBytes: size, isDirectory: isDirectory, declaredRoot: rule.root,
+                pruneEmptyDirectories: rule.pruneEmptyDirectories))
         }
     }
 
@@ -209,7 +211,9 @@ public struct RuleScanner: Sendable {
                 continue
             }
 
-            accumulator.items.append(ScanItem(path: entry, sizeBytes: size, isDirectory: false, declaredRoot: rule.root))
+            accumulator.items.append(ScanItem(
+                path: entry, sizeBytes: size, isDirectory: false, declaredRoot: rule.root,
+                pruneEmptyDirectories: rule.pruneEmptyDirectories))
         }
     }
 
@@ -234,7 +238,9 @@ public struct RuleScanner: Sendable {
         guard stats.determinable, acceptStamp(stats.newest, rule.minAge) else { return }
         if let minSize = rule.minSizeBytes, stats.size < minSize { return }
 
-        accumulator.items.append(ScanItem(path: directory, sizeBytes: stats.size, isDirectory: true, declaredRoot: rule.root))
+        accumulator.items.append(ScanItem(
+            path: directory, sizeBytes: stats.size, isDirectory: true, declaredRoot: rule.root,
+            pruneEmptyDirectories: rule.pruneEmptyDirectories))
     }
 
     /// Cerca in profondità cartelle il cui nome corrisponde ai pattern (bin/obj, pacchetti NuGet).

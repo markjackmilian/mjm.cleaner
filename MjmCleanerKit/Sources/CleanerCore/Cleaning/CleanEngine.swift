@@ -142,6 +142,18 @@ public struct CleanEngine: CleanPerforming {
                         deleted.append(target)
                         journal?.recordDeleted(target)
                         addToCategory(selection.categoryId, bytes: size, items: 1)
+
+                        if item.pruneEmptyDirectories {
+                            do {
+                                for directory in try pruneEmptyParents(of: target, resolvedRoot: resolvedRoot) {
+                                    deleted.append(directory)
+                                    journal?.recordDeleted(directory)
+                                }
+                            } catch let error as FileSystemError {
+                                errors.append(RuleScanner.describe(error.path, error))
+                                totalFailed += 1
+                            }
+                        }
                     } catch let error as FileSystemError {
                         errors.append(RuleScanner.describe(item.path, error))
                         totalFailed += 1
@@ -164,6 +176,37 @@ public struct CleanEngine: CleanPerforming {
             categories: categories,
             errors: errors,
             deletedPaths: deleted)
+    }
+
+    /// Risale dal genitore dell'elemento selezionato fino alla root (esclusa). La rimozione POSIX
+    /// è atomica: se nel frattempo compare un contenuto, `ENOTEMPTY` ferma la risalita senza
+    /// cancellare nulla. Le directory non toccate da un elemento selezionato non vengono visitate.
+    private func pruneEmptyParents(of deletedPath: String, resolvedRoot: String) throws -> [String] {
+        var removed: [String] = []
+        var candidate = PathText.parent(deletedPath)
+
+        while let directory = candidate {
+            if PathText.equalsIgnoringCase(directory, resolvedRoot) { break }
+
+            let verdict = pathGuard.validate(directory, declaredRoot: resolvedRoot)
+            guard verdict.isAllowed else { break }
+            let validated = verdict.canonicalPathValidated
+            if PathText.equalsIgnoringCase(validated, resolvedRoot) { break }
+
+            do {
+                try fileSystem.deleteDirectoryIfEmpty(validated)
+                removed.append(validated)
+            } catch let error as FileSystemError where error.code == ENOTEMPTY {
+                break
+            } catch let error as FileSystemError where error.code == ENOENT {
+                // Può essere stata rimossa da un'operazione precedente: la directory superiore
+                // potrebbe essere diventata vuota a sua volta.
+            }
+
+            candidate = PathText.parent(directory)
+        }
+
+        return removed
     }
 
     /// Chiave di confronto per le root: la forma ripiegata in byte UTF-8, non una `String`, perché

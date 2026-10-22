@@ -83,6 +83,29 @@ struct LocalFileSystemTests {
         #expect(FileManager.default.fileExists(atPath: target))
     }
 
+    @Test func deleteDirectoryIfEmptyRemovesOnlyEmptyDirectories() throws {
+        let tmp = try TemporaryDirectory(); defer { tmp.remove() }
+        let empty = try tmp.directory("vuota")
+        let nonempty = try tmp.directory("non-vuota")
+        let child = try tmp.file("non-vuota/keep.txt", contents: "x")
+
+        try fs.deleteDirectoryIfEmpty(empty)
+
+        #expect(!FileManager.default.fileExists(atPath: empty))
+        #expect(throws: FileSystemError(code: ENOTEMPTY, path: nonempty)) { try fs.deleteDirectoryIfEmpty(nonempty) }
+        #expect(FileManager.default.fileExists(atPath: child))
+    }
+
+    @Test func deleteDirectoryIfEmptyNeverFollowsLinks() throws {
+        let tmp = try TemporaryDirectory(); defer { tmp.remove() }
+        let target = try tmp.directory("target")
+        let link = try tmp.symlink("link", to: target)
+
+        #expect(throws: FileSystemError(code: ENOTDIR, path: link)) { try fs.deleteDirectoryIfEmpty(link) }
+        #expect(FileManager.default.fileExists(atPath: target))
+        #expect(FileManager.default.fileExists(atPath: link))
+    }
+
     @Test func deleteDirectoryRecursivelyNeverFollowsLinks() throws {
         let tmp = try TemporaryDirectory(); defer { tmp.remove() }
         let precious = try tmp.file("Documents/fatture/2026.pdf", contents: "dati")

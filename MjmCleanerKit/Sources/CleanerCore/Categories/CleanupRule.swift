@@ -28,6 +28,8 @@ public struct CleanupRule: Sendable, Equatable {
     /// Le cartelle escluse nelle Impostazioni, già espanse: mai attraversate né proposte, e nemmeno
     /// una cartella che ne contiene una (spec `2026-10-19-large-files-exclusions-design.md`).
     public let excludedPaths: [String]
+    /// Rimuove le cartelle genitore diventate vuote dopo l'eliminazione di una voce selezionata.
+    public let pruneEmptyDirectories: Bool
 
     public init(
         _ root: String,
@@ -38,7 +40,8 @@ public struct CleanupRule: Sendable, Equatable {
         minSizeBytes: Int64? = nil,
         maxDepth: Int = .max,
         requiresProjectMarker: Bool = false,
-        excludedPaths: [String] = []
+        excludedPaths: [String] = [],
+        pruneEmptyDirectories: Bool = false
     ) {
         self.root = root
         self.mode = mode
@@ -49,19 +52,30 @@ public struct CleanupRule: Sendable, Equatable {
         self.maxDepth = maxDepth
         self.requiresProjectMarker = requiresProjectMarker
         self.excludedPaths = excludedPaths
+        self.pruneEmptyDirectories = pruneEmptyDirectories
     }
 
     /// La stessa regola con le cartelle escluse nelle Impostazioni.
     public func excluding(_ excludedPaths: [String]) -> CleanupRule {
         CleanupRule(
             root, mode, include: includeGlobs, exclude: excludeGlobs, minAge: minAge, minSizeBytes: minSizeBytes,
-            maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths)
+            maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths,
+            pruneEmptyDirectories: pruneEmptyDirectories)
     }
 
     /// La stessa regola senza la soglia minima di età.
     public func withoutMinimumAge() -> CleanupRule {
         CleanupRule(
             root, mode, include: includeGlobs, exclude: excludeGlobs, minAge: nil, minSizeBytes: minSizeBytes,
-            maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths)
+            maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths,
+            pruneEmptyDirectories: pruneEmptyDirectories)
+    }
+
+    /// Attiva la rimozione delle cartelle genitore diventate vuote dopo l'eliminazione.
+    public func pruningEmptyDirectories() -> CleanupRule {
+        CleanupRule(
+            root, mode, include: includeGlobs, exclude: excludeGlobs, minAge: minAge, minSizeBytes: minSizeBytes,
+            maxDepth: maxDepth, requiresProjectMarker: requiresProjectMarker, excludedPaths: excludedPaths,
+            pruneEmptyDirectories: true)
     }
 }

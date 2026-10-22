@@ -15,6 +15,7 @@ class ForwardingFileSystem: FileSystem, @unchecked Sendable {
     func contentsOfDirectory(_ path: String) throws -> [String] { try inner.contentsOfDirectory(path) }
     func itemInfo(_ path: String) throws -> FileItemInfo { try inner.itemInfo(path) }
     func deleteFile(_ path: String) throws { try inner.deleteFile(path) }
+    func deleteDirectoryIfEmpty(_ path: String) throws { try inner.deleteDirectoryIfEmpty(path) }
     func deleteDirectoryRecursively(_ path: String) throws { try inner.deleteDirectoryRecursively(path) }
     func readData(_ path: String) throws -> Data { try inner.readData(path) }
     func writeData(_ path: String, _ data: Data) throws { try inner.writeData(path, data) }

@@ -73,6 +73,12 @@ public struct LocalFileSystem: FileSystem {
         if code != ENOENT { throw FileSystemError(code: code, path: path) }
     }
 
+    public func deleteDirectoryIfEmpty(_ path: String) throws {
+        let trimmed = PathText.trimmingTrailingSlashes(path)
+        let target = trimmed.isEmpty && path.utf8.first == UInt8(ascii: "/") ? "/" : trimmed
+        guard rmdir(target) == 0 else { throw FileSystemError(code: errno, path: target) }
+    }
+
     public func deleteDirectoryRecursively(_ path: String) throws {
         // Senza normalizzazione, "collegamento/" farebbe risolvere `lstat` al bersaglio (come
         // "collegamento/."): il controllo sotto vedrebbe una cartella e cancellerebbe il suo

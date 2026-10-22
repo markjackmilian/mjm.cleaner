@@ -108,6 +108,18 @@ final class InMemoryFileSystem: FileSystem {
         }
     }
 
+    func deleteDirectoryIfEmpty(_ path: String) throws {
+        let key = Self.key(path)
+        try nodes.withLock { nodes in
+            guard let node = nodes[key] else { throw FileSystemError(code: ENOENT, path: path) }
+            guard node.isDirectory else { throw FileSystemError(code: ENOTDIR, path: path) }
+            guard !nodes.keys.contains(where: { $0 != key && PathText.parent($0) == key }) else {
+                throw FileSystemError(code: ENOTEMPTY, path: path)
+            }
+            nodes[key] = nil
+        }
+    }
+
     func deleteDirectoryRecursively(_ path: String) throws {
         let key = Self.key(path)
         try nodes.withLock { nodes in

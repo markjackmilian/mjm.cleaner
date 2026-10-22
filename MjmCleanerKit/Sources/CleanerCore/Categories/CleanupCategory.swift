@@ -42,6 +42,6 @@ public struct CleanupCategory: Sendable, Equatable, Identifiable {
         guard id == "downloads" else { return self }
         return CleanupCategory(
             id: id, displayName: displayName, description: description, risk: risk, selectedByDefault: selectedByDefault,
-            parentId: parentId, rules: rules.map { $0.withoutMinimumAge() }, itemsSelectedByDefault: true)
+            parentId: parentId, rules: rules.map { $0.withoutMinimumAge().pruningEmptyDirectories() }, itemsSelectedByDefault: true)
     }
 }

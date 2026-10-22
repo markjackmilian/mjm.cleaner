@@ -171,6 +171,8 @@ struct CategoryCatalogTests {
         #expect(variant.minSizeBytes == original.minSizeBytes)
         #expect(variant.requiresProjectMarker == original.requiresProjectMarker)
         #expect(variant.minAge == nil)
+        #expect(!original.pruneEmptyDirectories)
+        #expect(variant.pruneEmptyDirectories)
         #expect(other.forCompleteDownloads() == other)
     }
 

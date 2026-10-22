@@ -69,6 +69,9 @@ public protocol FileSystem: Sendable {
     /// Come `File.Delete`: un percorso inesistente non è un errore; un collegamento si rimuove,
     /// la destinazione resta.
     func deleteFile(_ path: String) throws
+    /// Rimuove `path` solo se è una cartella vuota. La semantica POSIX di `rmdir` rende
+    /// l'operazione atomica rispetto ad aggiunte concorrenti e non segue collegamenti simbolici.
+    func deleteDirectoryIfEmpty(_ path: String) throws
     /// Come `Directory.Delete(path, recursive: true)`: non segue mai i collegamenti (su un
     /// collegamento rimuove solo il collegamento), prova a eliminare tutto e lancia il primo
     /// errore incontrato.
@@ -98,6 +101,10 @@ public protocol FileSystem: Sendable {
 }
 
 extension FileSystem {
+    public func deleteDirectoryIfEmpty(_ path: String) throws {
+        throw FileSystemError(code: ENOTSUP, path: path)
+    }
+
     /// Come `FileInfo.Length`: dimensione logica; su una cartella lancia `ENOENT`, come .NET
     /// lancia `FileNotFoundException`.
     public func fileLength(_ path: String) throws -> Int64 {

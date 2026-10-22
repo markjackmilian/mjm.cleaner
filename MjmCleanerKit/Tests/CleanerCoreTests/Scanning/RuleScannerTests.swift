@@ -122,6 +122,17 @@ struct RuleScannerTests {
         #expect(try single(outcome).path == "\(downloads)/grande.dmg")
     }
 
+    @Test func completeDownloadsMarksSelectedFilesForEmptyParentPruning() throws {
+        let fs = InMemoryFileSystem()
+        let downloads = "\(Self.home)/Downloads"
+        addFile(fs, "\(downloads)/Archivio/file.txt", 10)
+        let rule = CleanupRule(downloads, .matchingFiles, include: Self.all, exclude: []).pruningEmptyDirectories()
+
+        let outcome = try create(fs).scan(rule)
+
+        #expect(try single(outcome).pruneEmptyDirectories)
+    }
+
     // Solo Swift (visite iterative del 2026-10-16): `maxDepth` conta i livelli sotto la root come la
     // ricorsione, che elencava una cartella solo se la sua profondità non lo superava.
     @Test func matchingFilesHonoursMaxDepth() throws {

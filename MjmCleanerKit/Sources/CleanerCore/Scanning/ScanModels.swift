@@ -4,12 +4,16 @@ public struct ScanItem: Sendable, Equatable, Hashable {
     public let sizeBytes: Int64
     public let isDirectory: Bool
     public let declaredRoot: String
+    /// Dopo la rimozione di una voce Download selezionata, rimuove i suoi genitori rimasti vuoti
+    /// fino alla root dichiarata. È attivo solo nella modalità «Svuota Download» di questa analisi.
+    public let pruneEmptyDirectories: Bool
 
-    public init(path: String, sizeBytes: Int64, isDirectory: Bool, declaredRoot: String) {
+    public init(path: String, sizeBytes: Int64, isDirectory: Bool, declaredRoot: String, pruneEmptyDirectories: Bool = false) {
         self.path = path
         self.sizeBytes = sizeBytes
         self.isDirectory = isDirectory
         self.declaredRoot = declaredRoot
+        self.pruneEmptyDirectories = pruneEmptyDirectories
     }
 }
 

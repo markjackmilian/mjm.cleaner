@@ -54,6 +54,45 @@ struct CleanEngineTests {
         #expect(report.itemsFailed == 0)
     }
 
+    @Test func completeDownloadsPrunesOnlyDirectoriesEmptiedBySelectedFiles() async throws {
+        let fs = InMemoryFileSystem()
+        let root = "\(Self.home)/Downloads"
+        let emptied = "\(root)/Archivio/Vecchio"
+        fs.addFile("\(emptied)/selected.txt", size: 10)
+        fs.addFile("\(root)/Archivio/unchecked.txt", size: 20)
+        fs.addFile("\(root)/Esclusa/keep.txt", size: 30)
+        fs.addDirectory(root)
+
+        let item = ScanItem(
+            path: "\(emptied)/selected.txt", sizeBytes: 10, isDirectory: false, declaredRoot: root,
+            pruneEmptyDirectories: true)
+        let report = try await create(fs).clean(
+            [CategorySelection(categoryId: "downloads", items: [item])], progress: nil, journal: nil)
+
+        #expect(!fs.directoryExists(emptied))
+        #expect(!fs.directoryExists("\(root)/Archivio/Vecchio"))
+        #expect(fs.directoryExists("\(root)/Archivio"))
+        #expect(fs.fileExists("\(root)/Archivio/unchecked.txt"))
+        #expect(fs.directoryExists("\(root)/Esclusa"))
+        #expect(fs.fileExists("\(root)/Esclusa/keep.txt"))
+        #expect(fs.directoryExists(root))
+        #expect(report.bytesFreed == 10)
+        #expect(report.itemsDeleted == 1)
+    }
+
+    @Test func ordinaryDownloadCleanupDoesNotPruneDirectories() async throws {
+        let fs = InMemoryFileSystem()
+        let root = "\(Self.home)/Downloads"
+        let folder = "\(root)/Archivio"
+        fs.addFile("\(folder)/selected.txt", size: 10)
+
+        _ = try await create(fs).clean(
+            [selection("downloads", item("\(folder)/selected.txt", 10, root: root))], progress: nil, journal: nil)
+
+        #expect(fs.directoryExists(folder))
+        #expect(fs.directoryExists(root))
+    }
+
     @Test func deletesDirectoriesRecursively() async throws {
         let fs = InMemoryFileSystem()
         fs.addFile("\(Self.cacheRoot)/app/dentro/x.bin", size: 40)
